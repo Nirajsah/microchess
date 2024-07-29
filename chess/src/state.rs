@@ -1,10 +1,18 @@
 extern crate chess_rs;
-use chess::Board;
-use linera_sdk::views::{linera_views, MapView, RootView, ViewStorageContext};
+use chess::{ChessBoard, Game};
+use linera_sdk::views::{linera_views, RegisterView, RootView, ViewStorageContext};
 
 #[derive(RootView, async_graphql::SimpleObject)]
 #[view(context = "ViewStorageContext")]
 
 pub struct Chess {
-    pub value: MapView<i32, Board>,
+    pub board: RegisterView<Game>,
+}
+
+#[allow(dead_code)]
+impl Chess {
+    pub fn new(&mut self) {
+        let board: ChessBoard = ChessBoard::new();
+        self.board.set(Game { board });
+    }
 }
