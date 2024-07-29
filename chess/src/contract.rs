@@ -1,4 +1,5 @@
 #![cfg_attr(target_arch = "wasm32", no_main)]
+#![allow(unused_imports)]
 
 mod state;
 
@@ -40,11 +41,13 @@ impl Contract for ChessContract {
     async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {
         match operation {
             Operation::NewGame => {
-                let board = chess_rs::ChessBoard::new().get_board();
-                self.state
-                    .value
-                    .insert(&1, chess::Board { board: board })
-                    .expect("Failed to insert board");
+                self.state.new();
+            }
+            Operation::MakeMove { .. } => {
+                // self.state.board.get_mut().board;
+
+                // self.state.board.get_mut().board;
+                // .move_piece(13, 23, bitboard);
             }
         }
     }
