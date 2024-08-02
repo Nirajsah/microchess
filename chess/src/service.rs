@@ -5,8 +5,8 @@ mod state;
 use std::sync::Arc;
 
 use self::state::Chess;
-use async_graphql::{EmptySubscription, Request, Response, Schema};
-use chess::Operation;
+use async_graphql::{EmptySubscription, Object, Request, Response, Schema};
+use chess::{ChessBoard, Operation};
 use linera_sdk::{
     base::WithServiceAbi,
     graphql::GraphQLMutationRoot,
@@ -38,12 +38,15 @@ impl Service for ChessService {
     }
 
     async fn handle_query(&self, query: Request) -> Response {
-        let schema = Schema::build(
-            self.state.clone(),
-            Operation::mutation_root(),
-            EmptySubscription,
-        )
-        .finish();
+        let schema =
+            Schema::build(self.clone(), Operation::mutation_root(), EmptySubscription).finish();
         schema.execute(query).await
+    }
+}
+
+#[Object]
+impl ChessService {
+    async fn board(&self) -> &ChessBoard {
+        self.state.board.get()
     }
 }
