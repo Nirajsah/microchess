@@ -3,12 +3,13 @@
 
 mod state;
 
-use chess::Operation;
+use chess::{Operation, Piece};
 use linera_sdk::{
-    base::WithContractAbi,
+    base::{TimeDelta, WithContractAbi},
     views::{RootView, View, ViewStorageContext},
     Contract, ContractRuntime,
 };
+use log;
 
 use self::state::Chess;
 
@@ -36,14 +37,26 @@ impl Contract for ChessContract {
         ChessContract { state, runtime }
     }
 
-    async fn instantiate(&mut self, _argument: Self::InstantiationArgument) {}
+    async fn instantiate(&mut self, _argument: Self::InstantiationArgument) {
+        self.runtime.application_parameters();
+    }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {
+        let block_time = self.runtime.system_time();
         match operation {
             Operation::NewGame => {
                 self.state.new();
             }
-            Operation::MakeMove { .. } => {
+            Operation::MakeMove { from, to } => {
+                let owner = self.runtime.authenticated_signer();
+                log::info!("Called from{:?} block_time: {:?}", owner, block_time);
+                let piece = Piece::WhitePawn;
+                self.state
+                    .board
+                    .get_mut()
+                    .select_piece_move(from, to, piece);
+
+                // clock.make_move(block_time, active);
                 // self.state.board.get_mut().board;
 
                 // self.state.board.get_mut().board;
