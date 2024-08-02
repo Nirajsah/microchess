@@ -534,6 +534,7 @@ dependencies = [
  "async-graphql-derive",
  "chess_rs",
  "linera-sdk",
+ "log",
  "serde",
 ]
 
