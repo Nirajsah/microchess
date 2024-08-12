@@ -1,9 +1,16 @@
 #![allow(non_snake_case)]
-use async_graphql::{Request, Response, SimpleObject};
-use linera_sdk::base::{ContractAbi, ServiceAbi};
+use std::str::FromStr;
+
+use async_graphql::{Enum, Request, Response, SimpleObject};
+use lazy_static::lazy_static;
+use linera_sdk::base::{ContractAbi, Owner, ServiceAbi, TimeDelta, Timestamp};
 use serde::{Deserialize, Serialize};
 pub struct ChessAbi;
 use linera_sdk::graphql::GraphQLMutationRoot;
+pub mod moves;
+use moves::*;
+pub mod square;
+use square::*;
 
 impl ContractAbi for ChessAbi {
     type Operation = Operation;
@@ -15,29 +22,70 @@ impl ServiceAbi for ChessAbi {
     type QueryResponse = Response;
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstantiationArgument {
+    /// The `Owner` controlling player 1 and 2, respectively.
+    pub players: [Owner; 2],
+}
+
+lazy_static! {
+    pub static ref WHITE_MOVES: Vec<Bitboard> = computed_pawn_moves(&Color::White);
+    pub static ref BLACK_MOVES: Vec<Bitboard> = computed_pawn_moves(&Color::Black);
+    pub static ref KNIGHT_MOVES: Vec<Bitboard> = computed_knight_attacks();
+    pub static ref KING_MOVES: Vec<Bitboard> = computed_king_moves();
+}
 #[derive(Debug, Deserialize, Serialize, Clone, GraphQLMutationRoot)]
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
     NewGame,
-    MakeMove { from: u64, to: u64 },
+    MakeMove {
+        from: String,
+        to: String,
+        piece: String,
+    },
 }
 
 /// A type alias for a bitboard
 pub type Bitboard = u64;
 
 /// A struct to represent a color
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Enum)]
 pub enum Color {
+    #[default]
     White,
     Black,
 }
 
-const NOT_A_FILE: Bitboard = 0xFEFEFEFEFEFEFEFE;
-const NOT_H_FILE: Bitboard = 0x7F7F7F7F7F7F7F7F;
-const NOT_HG_FILE: Bitboard = 0x3F3F3F3F3F3F3F3F;
-const NOT_AB_FILE: Bitboard = 0xFCFCFCFCFCFCFCFC;
+impl Color {
+    /// A function to get the opposite color
+    pub fn opposite(&self) -> Self {
+        match self {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
+        }
+    }
+
+    /// A function to get the index of the color
+    pub fn index(&self) -> usize {
+        match self {
+            Color::White => 0,
+            Color::Black => 1,
+        }
+    }
+}
+
+/// A clock to track both players' time.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Clock {
+    time_left: [TimeDelta; 2],
+    increment: TimeDelta,
+    current_turn_start: Timestamp,
+    pub block_delay: TimeDelta,
+}
 
 /// A struct to represent a chess piece
-#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Enum)]
 #[serde(rename_all = "camelCase")]
 pub enum Piece {
     WhitePawn,
@@ -54,19 +102,33 @@ pub enum Piece {
     BlackKing,
 }
 
-#[rustfmt::skip]
-#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Copy)]
-/// A struct to represent a square on a chess board
-pub enum Square {
-        A1, B1, C1, D1, E1, F1, G1, H1,
-        A2, B2, C2, D2, E2, F2, G2, H2,
-        A3, B3, C3, D3, E3, F3, G3, H3,
-        A4, B4, C4, D4, E4, F4, G4, H4,
-        A5, B5, C5, D5, E5, F5, G5, H5,
-        A6, B6, C6, D6, E6, F6, G6, H6,
-        A7, B7, C7, D7, E7, F7, G7, H7,
-        A8, B8, C8, D8, E8, F8, G8, H8,
+/// The state of a Chess game.
+#[derive(Clone, Default, Serialize, Deserialize, SimpleObject)]
+pub struct Game {
+    /// The current state of the board.
+    pub board: ChessBoard,
+    /// The player whose turn it is. If the game has ended, this player loses.
+    pub active: Color,
+}
+
+impl Game {
+    /// A function to create a new game
+    pub fn new() -> Self {
+        Game {
+            board: ChessBoard::new_game(),
+            active: Color::White,
+        }
     }
+
+    /// A function to get active player
+    pub fn active_player(&self) -> Color {
+        self.active
+    }
+
+    pub fn switch_player_turn(&mut self) {
+        self.active = self.active.opposite()
+    }
+}
 
 #[derive(Clone, Default, Debug, Deserialize, Serialize, SimpleObject)]
 /// A struct to represent a chess board
@@ -85,143 +147,9 @@ pub struct ChessBoard {
     pub bK: Bitboard,
 }
 
-#[derive(Clone, Default, Debug, Deserialize, Serialize)]
-/// A struct to represent a chess game pre-computed moves for each piece
-pub struct Game {
-    pub wp_moves: Vec<Bitboard>,
-    pub bp_moves: Vec<Bitboard>,
-    pub knight_attacks: Vec<Bitboard>,
-    pub king_moves: Vec<Bitboard>,
-}
-
-impl Game {
-    /// A function to create pre-computed moves for each piece
-    pub fn new() -> Self {
-        Game {
-            wp_moves: Self::computed_pawn_moves(&Color::White),
-            bp_moves: Self::computed_pawn_moves(&Color::Black),
-            knight_attacks: Self::computed_knight_attacks(),
-            king_moves: Self::computed_king_moves(),
-        }
-    }
-
-    /// A function to compute pawn moves
-    pub fn computed_pawn_moves(color: &Color) -> Vec<Bitboard> {
-        let mut pawn_moves = Vec::new();
-        for i in 0..64 {
-            let boards = Self::check_pawn_moves(i, &color);
-            pawn_moves.push(boards);
-        }
-        pawn_moves
-    }
-
-    /// A function to compute knight attacks
-    pub fn computed_knight_attacks() -> Vec<Bitboard> {
-        let mut moves = Vec::new();
-        for i in 0..64 {
-            let boards = Self::attacks_knight_moves(i);
-            moves.push(boards);
-        }
-        moves
-    }
-    /// A function to compute king moves
-    pub fn computed_king_moves() -> Vec<Bitboard> {
-        let mut moves = Vec::new();
-        for i in 0..64 {
-            let boards = Self::attacks_king_moves(i);
-            moves.push(boards);
-        }
-        moves
-    }
-
-    /// possible pawn_moves
-    pub fn check_pawn_moves(square: u8, color: &Color) -> Bitboard {
-        let mut moves = 0u64;
-        let mut board: Bitboard = 0u64;
-
-        board |= 1u64 << square as u64; // Set the bit at the square
-
-        match color {
-            Color::White => {
-                if square < (Square::A3 as u8) {
-                    moves |= board << 16; // Initial double step move
-                    moves |= board << 8; // White pawns move up the board
-                }
-                moves |= board << 8; // White pawns move up the board
-            }
-            Color::Black => {
-                if square > (Square::H6 as u8) {
-                    moves |= board >> 16; // Initial double step move
-                    moves |= board >> 8; // Black pawns move down the board
-                }
-                moves |= board >> 8; // Black pawns move down the board
-            }
-        }
-        moves
-    }
-
-    /// possible pawn_attacks
-    pub fn attacks_pawn_moves(square: Square, color: Color) -> Bitboard {
-        let mut attacks = 0u64;
-        let mut board: Bitboard = 0u64;
-
-        board |= 1u64 << square as u64; // Set the bit at the square
-
-        match color {
-            Color::White => {
-                attacks |= (board << 9) & NOT_A_FILE; // White pawns attack up-right
-                attacks |= (board << 7) & NOT_H_FILE; // White pawns attack up-left
-            }
-            Color::Black => {
-                attacks |= (board >> 9) & NOT_H_FILE; // Black pawns attack down-left
-                attacks |= (board >> 7) & NOT_A_FILE; // Black pawns attack down-right
-            }
-        }
-        attacks
-    }
-
-    /// possible knight attacks
-    pub fn attacks_knight_moves(square: u8) -> Bitboard {
-        let mut attacks = 0u64;
-        let mut board: Bitboard = 0u64;
-
-        board |= 1u64 << square as u64; // Set the bit at the square
-
-        attacks |= (board >> 17) & NOT_H_FILE; // Knight attacks up-right
-        attacks |= (board >> 15) & NOT_A_FILE; // Knight attacks up-left
-        attacks |= (board >> 10) & NOT_HG_FILE; // Knight attacks right-up
-        attacks |= (board >> 6) & NOT_AB_FILE; // Knight attacks left-up
-        attacks |= (board << 17) & NOT_A_FILE; // Knight attacks down-left
-        attacks |= (board << 15) & NOT_H_FILE; // Knight attacks down-right
-        attacks |= (board << 10) & NOT_AB_FILE; // Knight attacks left-down
-        attacks |= (board << 6) & NOT_HG_FILE; // Knight attacks right-down
-
-        attacks
-    }
-
-    /// possible king moves
-    pub fn attacks_king_moves(square: u8) -> Bitboard {
-        let mut attacks = 0u64;
-        let mut board: Bitboard = 0u64;
-
-        board |= 1u64 << square as u64; // Set the bit at the square
-
-        attacks |= (board >> 9) & NOT_H_FILE; // King attacks up-right
-        attacks |= board >> 8; // King attacks up
-        attacks |= (board >> 7) & NOT_A_FILE; // King attacks up-left
-        attacks |= (board >> 1) & NOT_H_FILE; // King attacks right
-        attacks |= (board << 1) & NOT_A_FILE; // King attacks left
-        attacks |= (board << 7) & NOT_H_FILE; // King attacks
-        attacks |= board << 8; // King attacks down
-        attacks |= (board << 9) & NOT_A_FILE; // King
-
-        attacks
-    }
-}
-
 impl ChessBoard {
     /// A function to create a new chess board
-    pub fn new() -> Self {
+    pub fn new_game() -> Self {
         ChessBoard {
             wP: 0x000000000000FF00,
             wN: 0x0000000000000042,
@@ -240,50 +168,150 @@ impl ChessBoard {
 
     #[allow(unused_variables)]
     /// A function to select a piece move
-    pub fn select_piece_move(&mut self, from: u64, to: u64, piece: Piece) {
+    pub fn select_piece_move(&mut self, from: &str, to: &str, piece: Piece) -> bool {
+        let from_square = Square::from_str(from).unwrap();
+        let to_square = Square::from_str(to).unwrap();
         match piece {
             Piece::WhitePawn => {
                 // Logic for white pawn
-                self.white_pawn_moves();
+                self.white_pawn_moves(from_square, to_square)
             }
             Piece::BlackPawn => {
                 // Logic for black pawn
+                self.black_pawn_moves(from_square, to_square)
             }
+
             Piece::WhiteKnight | Piece::BlackKnight => {
-                // Logic for knights (same for both colors)
+                // Logic for knights
+                self.knight_moves(from_square, to_square, piece)
             }
+
             Piece::WhiteBishop | Piece::BlackBishop => {
                 // Logic for bishops
+                false
             }
             Piece::WhiteRook | Piece::BlackRook => {
                 // Logic for rooks
+                //
+                false
             }
             Piece::WhiteQueen | Piece::BlackQueen => {
                 // Logic for queens
+                //
+                false
             }
-            Piece::WhiteKing => {
+            Piece::WhiteKing | Piece::BlackKing => {
                 // Logic for white king
-            }
-            Piece::BlackKing => {
-                // Logic for black king
+                self.king_moves(from_square, to_square, piece)
             }
         }
     }
 
-    /// A function to move a piece on the board
-    pub fn white_pawn_moves(&mut self) {
-        // (moves & (1u64 << 39)) != 0 // if this is true then the move is valid (self.make_move(20, 12, &mut bitboard));
+    /// A function to move a white pawn piece on the board
+    pub fn white_pawn_moves(&mut self, from: Square, to: Square) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        if WHITE_MOVES[from as usize] & (1u64 << to as u32) != 0 {
+            // Clear the bit at the original position
+            self.wP &= !from_bit;
+
+            // Set the bit at the new position
+            self.wP |= to_bit;
+
+            true
+        } else {
+            false
+        }
     }
 
-    /// A function to move a piece on the board
-    pub fn make_move(&mut self, from_square: u64, to_square: u64, bitboard: &mut Bitboard) {
-        let from_bit = 1u64 << from_square as u32;
-        let to_bit = 1u64 << to_square as u32;
+    /// A function to move black pawn piece on the board
+    pub fn black_pawn_moves(&mut self, from: Square, to: Square) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
 
-        // Clear the bit at the original position
-        *bitboard &= !from_bit;
+        if BLACK_MOVES[from as usize] & (1u64 << to as u32) != 0 {
+            // Clear the bit at the original position
+            self.bP &= !from_bit;
 
-        // Set the bit at the new position
-        *bitboard |= to_bit;
+            // Set the bit at the new position
+            self.bP |= to_bit;
+
+            true
+        } else {
+            false
+        }
+    }
+
+    /// A function to move a knight piece on the board
+    pub fn knight_moves(&mut self, from: Square, to: Square, piece: Piece) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        match piece {
+            Piece::WhiteKnight => {
+                if KNIGHT_MOVES[from as usize] & (1u64 << to as u32) != 0 {
+                    // Clear the bit at the original position
+                    self.wN &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.wN |= to_bit;
+
+                    true
+                } else {
+                    false
+                }
+            }
+            Piece::BlackKnight => {
+                if KNIGHT_MOVES[from as usize] & (1u64 << to as u32) != 0 {
+                    // Clear the bit at the original position
+                    self.bN &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.bN |= to_bit;
+
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    /// A function to move a king piece on the board
+    pub fn king_moves(&mut self, from: Square, to: Square, piece: Piece) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        match piece {
+            Piece::WhiteKing => {
+                if KING_MOVES[from as usize] & (1u64 << to as u32) != 0 {
+                    // Clear the bit at the original position
+                    self.wK &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.wK |= to_bit;
+
+                    true
+                } else {
+                    false
+                }
+            }
+            Piece::BlackKing => {
+                if KING_MOVES[from as usize] & (1u64 << to as u32) != 0 {
+                    // Clear the bit at the original position
+                    self.bK &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.bK |= to_bit;
+
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
     }
 }
