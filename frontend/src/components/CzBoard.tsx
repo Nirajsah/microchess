@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import whitePawn from '../assets/wp.png'
 import whiteRook from '../assets/wr.png'
 import whiteKnight from '../assets/wn.png'
@@ -11,8 +11,8 @@ import blackKnight from '../assets/bn.png'
 import blackBishop from '../assets/bb.png'
 import blackQueen from '../assets/bq.png'
 import blackKing from '../assets/bk.png'
-import { useLazyQuery, useSubscription } from '@apollo/client'
-import { GET_BOARD, NOTIFICATIONS } from '../GraphQL/queries'
+import { useLazyQuery, useMutation, useSubscription } from '@apollo/client'
+import { GET_BOARD, MOVE_PIECE, NOTIFICATIONS } from '../GraphQL/queries'
 
 const pieceImages: any = {
   wP: whitePawn,
@@ -58,15 +58,19 @@ const bitboardToArray = (bitboards: Record<string, Bitboard>): BoardArray => {
 const CzBoard = () => {
   const chainId = window.sessionStorage.getItem('chainId') ?? ''
   const [boardState, setBoardState] = useState({})
+  const [selectedPiece, setSelectedPiece] = React.useState<string | null>(null)
+  const [moveMutation] = useMutation(MOVE_PIECE)
   const [boardQuery, { called }] = useLazyQuery(GET_BOARD, {
     variables: {
       endpoint: 'chess',
       chainId: chainId,
     },
     onCompleted: (data) => {
-      setBoardState(data?.board?.entries[0]?.value?.board)
+      setBoardState(data.board)
     },
+    fetchPolicy: 'network-only',
   })
+
   useSubscription(NOTIFICATIONS, {
     variables: {
       chainId: chainId,
@@ -74,9 +78,42 @@ const CzBoard = () => {
     onData: () => boardQuery(),
   })
 
+  const [selectedSquare, setSelectedSquare] = useState<string | null>(null)
+
+  const handleSquareClick = (square: string, piece: string | null) => {
+    if (selectedPiece && selectedSquare) {
+      // If a piece and a target square are already selected, perform the move
+      // console.log(`Moving ${selectedPiece} from ${selectedSquare} to ${square}`)
+      movePiece(selectedSquare, square, selectedPiece)
+      setSelectedPiece(null) // Deselect the piece after moving
+      setSelectedSquare(null) // Reset the selected square
+    } else if (piece) {
+      // If no piece is selected yet, select this piece and square
+      setSelectedPiece(piece)
+      setSelectedSquare(square)
+      console.log(`Selected piece ${piece} at square ${square}`)
+    }
+  }
+  const movePiece = async (from: string, to: string, piece: string) => {
+    console.log(`Moving ${piece} from ${from} to ${to}`)
+
+    await moveMutation({
+      variables: {
+        piece,
+        from: from,
+        to: to,
+        endpoint: 'chess',
+      },
+      onError: (error) => {
+        console.error('Message:', error.message)
+      },
+    })
+  }
+
   if (!called) {
     void boardQuery()
   }
+
   const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
   const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
   const renderSquare = (pieceType: string | null, row: number, col: number) => {
@@ -86,6 +123,9 @@ const CzBoard = () => {
     return (
       <>
         <div
+          onClick={() => {
+            handleSquareClick(`${files[col]}${ranks[row]}`, pieceType)
+          }}
           key={`${row}-${col}`}
           style={{
             width: '100px',
@@ -109,9 +149,12 @@ const CzBoard = () => {
     )
   }
 
-  const renderBoard = () => {
-    const boardArray = bitboardToArray(boardState)
+  const boardArray = React.useMemo(
+    () => bitboardToArray(boardState),
+    [boardState]
+  )
 
+  const renderBoard = () => {
     return boardArray.map((row, rowIndex) => (
       <div style={{ display: 'flex' }} key={rowIndex}>
         {row.map((pieceType, colIndex) =>
