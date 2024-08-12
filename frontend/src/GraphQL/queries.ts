@@ -35,3 +35,11 @@ export const GET_PLAYER_TURN = gql`
     playerTurn
   }
 `
+
+export const GET_PLAYER_COLOR = gql`
+  query {
+    PlayerColor(player: Owner!) {
+      color
+    } 
+  }
+`
