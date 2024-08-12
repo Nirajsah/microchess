@@ -59,6 +59,8 @@ const CzBoard = () => {
   const chainId = window.sessionStorage.getItem('chainId') ?? ''
   const [boardState, setBoardState] = useState({})
   const [selectedPiece, setSelectedPiece] = React.useState<string | null>(null)
+  const [color, setColor] = React.useState('')
+
   const [moveMutation] = useMutation(MOVE_PIECE)
   const [boardQuery, { called }] = useLazyQuery(GET_BOARD, {
     variables: {
@@ -67,6 +69,17 @@ const CzBoard = () => {
     },
     onCompleted: (data) => {
       setBoardState(data.board)
+    },
+    fetchPolicy: 'network-only',
+  })
+
+  const [playerColorQuery] = useLazyQuery(GET_BOARD, {
+    variables: {
+      endpoint: 'chess',
+      chainId: chainId,
+    },
+    onCompleted: (data) => {
+      setColor(data.PlayerColor.color)
     },
     fetchPolicy: 'network-only',
   })
@@ -82,21 +95,15 @@ const CzBoard = () => {
 
   const handleSquareClick = (square: string, piece: string | null) => {
     if (selectedPiece && selectedSquare) {
-      // If a piece and a target square are already selected, perform the move
-      // console.log(`Moving ${selectedPiece} from ${selectedSquare} to ${square}`)
       movePiece(selectedSquare, square, selectedPiece)
       setSelectedPiece(null) // Deselect the piece after moving
       setSelectedSquare(null) // Reset the selected square
     } else if (piece) {
-      // If no piece is selected yet, select this piece and square
       setSelectedPiece(piece)
       setSelectedSquare(square)
-      console.log(`Selected piece ${piece} at square ${square}`)
     }
   }
   const movePiece = async (from: string, to: string, piece: string) => {
-    console.log(`Moving ${piece} from ${from} to ${to}`)
-
     await moveMutation({
       variables: {
         piece,
@@ -112,6 +119,7 @@ const CzBoard = () => {
 
   if (!called) {
     void boardQuery()
+    void playerColorQuery()
   }
 
   const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
@@ -156,7 +164,13 @@ const CzBoard = () => {
 
   const renderBoard = () => {
     return boardArray.map((row, rowIndex) => (
-      <div style={{ display: 'flex' }} key={rowIndex}>
+      <div
+        className={`border border-black flex ${
+          color === 'black' ? 'rotate-180' : ''
+        }`}
+        style={{ display: 'flex' }}
+        key={rowIndex}
+      >
         {row.map((pieceType, colIndex) =>
           renderSquare(pieceType, rowIndex, colIndex)
         )}
