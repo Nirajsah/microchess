@@ -9,33 +9,29 @@ export const NOTIFICATIONS = gql`
 export const GET_BOARD = gql`
   query {
     board {
-      entries {
-        value {
-          board {
-            wP
-            wN
-            wB
-            wR
-            wQ
-            wK
-            bP
-            bN
-            bB
-            bR
-            bQ
-            bK
-          }
-        }
-      }
+      wP
+      wN
+      wB
+      wR
+      wQ
+      wK
+      bP
+      bN
+      bB
+      bR
+      bQ
+      bK
     }
   }
 `
 
 export const MOVE_PIECE = gql`
-  mutation MovePiece($piece: String!, $from: String!, $to: String!) {
-    movePiece(piece: $piece, from: $from, to: $to) {
-      from
-      to
-    }
+  mutation MakeMove($from: String!, $to: String!, $piece: String!) {
+    makeMove(from: $from, to: $to, piece: $piece)
+  }
+`
+export const GET_PLAYER_TURN = gql`
+  query {
+    playerTurn
   }
 `
