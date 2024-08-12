@@ -31,6 +31,8 @@ pub struct InstantiationArgument {
 
 lazy_static! {
     pub static ref WHITE_MOVES: Vec<Bitboard> = computed_pawn_moves(&Color::White);
+    pub static ref WHITE_ATTACKS: Vec<Bitboard> = computed_pawn_attacks(&Color::White);
+    pub static ref BLACK_ATTACKS: Vec<Bitboard> = computed_pawn_attacks(&Color::Black);
     pub static ref BLACK_MOVES: Vec<Bitboard> = computed_pawn_moves(&Color::Black);
     pub static ref KNIGHT_MOVES: Vec<Bitboard> = computed_knight_attacks();
     pub static ref KING_MOVES: Vec<Bitboard> = computed_king_moves();
@@ -125,6 +127,7 @@ impl Game {
         self.active
     }
 
+    /// A function to switch player turn
     pub fn switch_player_turn(&mut self) {
         self.active = self.active.opposite()
     }
@@ -145,6 +148,13 @@ pub struct ChessBoard {
     pub bR: Bitboard,
     pub bQ: Bitboard,
     pub bK: Bitboard,
+
+    #[serde(skip)]
+    all_white_pieces: Bitboard,
+    #[serde(skip)]
+    all_black_pieces: Bitboard,
+    #[serde(skip)]
+    all_pieces: Bitboard,
 }
 
 impl ChessBoard {
@@ -163,6 +173,10 @@ impl ChessBoard {
             bR: 0x8100000000000000,
             bQ: 0x0800000000000000,
             bK: 0x1000000000000000,
+
+            all_white_pieces: 0x000000000000FFFF,
+            all_black_pieces: 0xFFFF000000000000,
+            all_pieces: 0xFFFF00000000FFFF,
         }
     }
 
@@ -213,11 +227,21 @@ impl ChessBoard {
         let to_bit = 1u64 << to as u32;
 
         if WHITE_MOVES[from as usize] & (1u64 << to as u32) != 0 {
+            if self.all_black_pieces & to_bit != 0 {
+                // Remove the opponent's piece from its bitboard
+                self.remove_black_piece(to_bit);
+            }
+
             // Clear the bit at the original position
             self.wP &= !from_bit;
 
             // Set the bit at the new position
             self.wP |= to_bit;
+
+            // Update every piece bitboard
+            self.all_white_pieces &= !from_bit;
+            self.all_white_pieces |= to_bit;
+            self.all_pieces = self.all_white_pieces | self.all_black_pieces;
 
             true
         } else {
@@ -231,11 +255,21 @@ impl ChessBoard {
         let to_bit = 1u64 << to as u32;
 
         if BLACK_MOVES[from as usize] & (1u64 << to as u32) != 0 {
+            if self.all_white_pieces & to_bit != 0 {
+                // Remove the opponent's piece from its bitboard
+                self.remove_white_piece(to_bit);
+            }
+
             // Clear the bit at the original position
             self.bP &= !from_bit;
 
             // Set the bit at the new position
             self.bP |= to_bit;
+
+            // Update every piece bitboard
+            self.all_black_pieces &= !from_bit;
+            self.all_black_pieces |= to_bit;
+            self.all_pieces = self.all_white_pieces | self.all_black_pieces;
 
             true
         } else {
@@ -251,12 +285,21 @@ impl ChessBoard {
         match piece {
             Piece::WhiteKnight => {
                 if KNIGHT_MOVES[from as usize] & (1u64 << to as u32) != 0 {
+                    if self.all_black_pieces & to_bit != 0 {
+                        // Remove the opponent's piece from its bitboard
+                        self.remove_black_piece(to_bit);
+                    }
+
                     // Clear the bit at the original position
                     self.wN &= !from_bit;
 
                     // Set the bit at the new position
                     self.wN |= to_bit;
 
+                    // Update every piece bitboard
+                    self.all_white_pieces &= !from_bit;
+                    self.all_white_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
                     true
                 } else {
                     false
@@ -264,11 +307,21 @@ impl ChessBoard {
             }
             Piece::BlackKnight => {
                 if KNIGHT_MOVES[from as usize] & (1u64 << to as u32) != 0 {
+                    if self.all_white_pieces & to_bit != 0 {
+                        // Remove the opponent's piece from its bitboard
+                        self.remove_white_piece(to_bit);
+                    }
+
                     // Clear the bit at the original position
                     self.bN &= !from_bit;
 
                     // Set the bit at the new position
                     self.bN |= to_bit;
+
+                    // Update every piece bitboard
+                    self.all_black_pieces &= !from_bit;
+                    self.all_black_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
 
                     true
                 } else {
@@ -287,11 +340,20 @@ impl ChessBoard {
         match piece {
             Piece::WhiteKing => {
                 if KING_MOVES[from as usize] & (1u64 << to as u32) != 0 {
+                    if self.all_black_pieces & to_bit != 0 {
+                        // Remove the opponent's piece from its bitboard
+                        self.remove_black_piece(to_bit);
+                    }
                     // Clear the bit at the original position
                     self.wK &= !from_bit;
 
                     // Set the bit at the new position
                     self.wK |= to_bit;
+
+                    // Update every piece bitboard
+                    self.all_white_pieces &= !from_bit;
+                    self.all_white_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
 
                     true
                 } else {
@@ -300,11 +362,20 @@ impl ChessBoard {
             }
             Piece::BlackKing => {
                 if KING_MOVES[from as usize] & (1u64 << to as u32) != 0 {
+                    if self.all_white_pieces & to_bit != 0 {
+                        // Remove the opponent's piece from its bitboard
+                        self.remove_white_piece(to_bit);
+                    }
                     // Clear the bit at the original position
                     self.bK &= !from_bit;
 
                     // Set the bit at the new position
                     self.bK |= to_bit;
+
+                    // Update every piece bitboard
+                    self.all_black_pieces &= !from_bit;
+                    self.all_black_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
 
                     true
                 } else {
@@ -314,4 +385,58 @@ impl ChessBoard {
             _ => false,
         }
     }
+
+    /// A function to remove a black piece from the board
+    pub fn remove_black_piece(&mut self, to_bit: u64) {
+        if self.bP & to_bit != 0 {
+            self.bP &= !to_bit;
+        } else if self.bN & to_bit != 0 {
+            self.bN &= !to_bit;
+        } else if self.bB & to_bit != 0 {
+            self.bB &= !to_bit;
+        } else if self.bR & to_bit != 0 {
+            self.bR &= !to_bit;
+        } else if self.bQ & to_bit != 0 {
+            self.bQ &= !to_bit;
+        } else if self.bK & to_bit != 0 {
+            self.bK &= !to_bit;
+        }
+
+        // Update the overall black pieces bitboard
+        self.all_black_pieces &= !to_bit;
+        self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+    }
+
+    /// A function to remove a white piece from the board
+    pub fn remove_white_piece(&mut self, to_bit: u64) {
+        if self.wP & to_bit != 0 {
+            self.wP &= !to_bit;
+        } else if self.wN & to_bit != 0 {
+            self.wN &= !to_bit;
+        } else if self.wB & to_bit != 0 {
+            self.wB &= !to_bit;
+        } else if self.wR & to_bit != 0 {
+            self.wR &= !to_bit;
+        } else if self.wQ & to_bit != 0 {
+            self.wQ &= !to_bit;
+        } else if self.wK & to_bit != 0 {
+            self.wK &= !to_bit;
+        }
+
+        // Update the overall white pieces bitboard
+        self.all_white_pieces &= !to_bit;
+        self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+    }
+
+    // A function to move a bishop piece on the board
+    // pub fn bishop_moves(&mut self, from: Square, to: Square, piece: Piece) -> bool {
+    //     let from_bit = 1u64 << from as u32;
+    //     let to_bit = 1u64 << to as u32;
+    //
+    //     match piece {
+    //         Piece::WhiteBishop => false,
+    //         Piece::BlackBishop => false,
+    //         _ => false,
+    //     }
+    // }
 }
