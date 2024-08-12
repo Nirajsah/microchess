@@ -3,7 +3,7 @@
 
 mod state;
 
-use chess::{Operation, Piece};
+use chess::{Game, InstantiationArgument, Operation, Piece};
 use linera_sdk::{
     base::{TimeDelta, WithContractAbi},
     views::{RootView, View, ViewStorageContext},
@@ -28,7 +28,7 @@ impl WithContractAbi for ChessContract {
 impl Contract for ChessContract {
     type Message = ();
     type Parameters = ();
-    type InstantiationArgument = ();
+    type InstantiationArgument = InstantiationArgument;
 
     async fn load(runtime: ContractRuntime<Self>) -> Self {
         let state = Chess::load(ViewStorageContext::from(runtime.key_value_store()))
@@ -37,24 +37,54 @@ impl Contract for ChessContract {
         ChessContract { state, runtime }
     }
 
-    async fn instantiate(&mut self, _argument: Self::InstantiationArgument) {
+    async fn instantiate(&mut self, argument: Self::InstantiationArgument) {
         self.runtime.application_parameters();
+        self.state.owners.set(Some(argument.players));
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {
         let block_time = self.runtime.system_time();
         match operation {
             Operation::NewGame => {
-                self.state.new();
+                let game = Game::new();
+                self.state.board.set(game);
             }
-            Operation::MakeMove { from, to } => {
+            Operation::MakeMove { from, to, piece } => {
+                let active = self.state.board.get().active_player();
                 let owner = self.runtime.authenticated_signer();
                 log::info!("Called from{:?} block_time: {:?}", owner, block_time);
-                let piece = Piece::WhitePawn;
-                self.state
+
+                let piece = match piece.as_str() {
+                    "wP" => Piece::WhitePawn,
+                    "wN" => Piece::WhiteKnight,
+                    "wB" => Piece::WhiteBishop,
+                    "wR" => Piece::WhiteRook,
+                    "wQ" => Piece::WhiteQueen,
+                    "bP" => Piece::BlackPawn,
+                    "bN" => Piece::BlackKnight,
+                    "bB" => Piece::BlackBishop,
+                    "bR" => Piece::BlackRook,
+                    "bQ" => Piece::BlackQueen,
+                    _ => Piece::WhitePawn,
+                };
+                assert_eq!(
+                    owner.unwrap(),
+                    self.state.owners.get().unwrap()[active.index()],
+                    "Only the active player can make a move."
+                );
+
+                let success = self
+                    .state
                     .board
                     .get_mut()
-                    .select_piece_move(from, to, piece);
+                    .board
+                    .select_piece_move(&from, &to, piece);
+
+                if success {
+                    self.state.board.get_mut().switch_player_turn();
+                } else {
+                    log::info!("Invalid move");
+                }
 
                 // clock.make_move(block_time, active);
                 // self.state.board.get_mut().board;
