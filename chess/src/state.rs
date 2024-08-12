@@ -1,8 +1,8 @@
 extern crate chess_rs;
-use chess::Game;
+use chess::{Color, Game};
 use linera_sdk::{
     base::Owner,
-    views::{linera_views, RegisterView, RootView, ViewStorageContext},
+    views::{linera_views, MapView, RegisterView, RootView, ViewStorageContext},
 };
 
 #[derive(RootView, async_graphql::SimpleObject)]
@@ -10,7 +10,7 @@ use linera_sdk::{
 
 pub struct Chess {
     /// Players of the game
-    pub owners: RegisterView<Option<[Owner; 2]>>,
+    pub owners: MapView<Owner, Color>,
     /// The current game state
     pub board: RegisterView<Game>,
 }
