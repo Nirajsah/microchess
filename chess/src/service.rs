@@ -8,7 +8,7 @@ use self::state::Chess;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema};
 use chess::{ChessBoard, Color, Operation};
 use linera_sdk::{
-    base::WithServiceAbi,
+    base::{Owner, WithServiceAbi},
     graphql::GraphQLMutationRoot,
     views::{View, ViewStorageContext},
     Service, ServiceRuntime,
@@ -51,5 +51,9 @@ impl ChessService {
     }
     async fn player_turn(&self) -> &Color {
         &self.state.board.get().active
+    }
+    async fn player(&self, player: Owner) -> Color {
+        let color = self.state.owners.get(&player).await.unwrap();
+        color.unwrap()
     }
 }
