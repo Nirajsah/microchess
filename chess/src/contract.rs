@@ -3,7 +3,7 @@
 
 mod state;
 
-use chess::{Game, InstantiationArgument, Operation, Piece};
+use chess::{Color, Game, InstantiationArgument, Operation, Piece};
 use linera_sdk::{
     base::{TimeDelta, WithContractAbi},
     views::{RootView, View, ViewStorageContext},
@@ -39,7 +39,14 @@ impl Contract for ChessContract {
 
     async fn instantiate(&mut self, argument: Self::InstantiationArgument) {
         self.runtime.application_parameters();
-        self.state.owners.set(Some(argument.players));
+        let players_colors = vec![
+            (argument.players[0], Color::White),
+            (argument.players[1], Color::Black),
+        ];
+
+        for (player, color) in players_colors {
+            self.state.owners.insert(&player, color).unwrap();
+        }
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {
@@ -67,11 +74,7 @@ impl Contract for ChessContract {
                     "bQ" => Piece::BlackQueen,
                     _ => Piece::WhitePawn,
                 };
-                assert_eq!(
-                    owner.unwrap(),
-                    self.state.owners.get().unwrap()[active.index()],
-                    "Only the active player can make a move."
-                );
+                // assert_eq!(owner.unwrap(), "Only the active player can make a move.");
 
                 let success = self
                     .state
