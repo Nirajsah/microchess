@@ -5,10 +5,21 @@ const NOT_H_FILE: Bitboard = 0x7F7F7F7F7F7F7F7F;
 const NOT_HG_FILE: Bitboard = 0x3F3F3F3F3F3F3F3F;
 const NOT_AB_FILE: Bitboard = 0xFCFCFCFCFCFCFCFC;
 
+/// A function to compute all possible pawn moves
 pub fn computed_pawn_moves(color: &Color) -> Vec<Bitboard> {
     let mut pawn_moves = Vec::new();
     for i in 0..64 {
         let boards = check_pawn_moves(i, &color);
+        pawn_moves.push(boards);
+    }
+    pawn_moves
+}
+
+/// A function to compute pawn attacks
+pub fn computed_pawn_attacks(color: &Color) -> Vec<Bitboard> {
+    let mut pawn_moves = Vec::new();
+    for i in 0..64 {
+        let boards = mask_pawn_attacks(i, &color);
         pawn_moves.push(boards);
     }
     pawn_moves
@@ -60,7 +71,7 @@ pub fn check_pawn_moves(square: u8, color: &Color) -> Bitboard {
 }
 
 /// possible pawn_attacks
-pub fn attacks_pawn_moves(square: Square, color: Color) -> Bitboard {
+pub fn mask_pawn_attacks(square: u8, color: &Color) -> Bitboard {
     let mut attacks = 0u64;
     let mut board: Bitboard = 0u64;
 
