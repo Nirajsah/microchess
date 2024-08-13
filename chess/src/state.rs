@@ -1,4 +1,3 @@
-extern crate chess_rs;
 use chess::{Color, Game};
 use linera_sdk::{
     base::Owner,
