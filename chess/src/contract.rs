@@ -6,6 +6,7 @@ mod state;
 use chess::{Color, Game, InstantiationArgument, Operation, Piece};
 use linera_sdk::{
     base::{TimeDelta, WithContractAbi},
+    util::BlockingWait,
     views::{RootView, View, ViewStorageContext},
     Contract, ContractRuntime,
 };
@@ -50,16 +51,73 @@ impl Contract for ChessContract {
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {
-        let block_time = self.runtime.system_time();
         match operation {
             Operation::NewGame => {
                 let game = Game::new();
                 self.state.board.set(game);
             }
+            Operation::CapturePiece {
+                from,
+                to,
+                piece,
+                captured_piece,
+            } => {
+                log::info!(
+                    "Capture piece operation {:?} {:?} {:?} {:?}",
+                    from,
+                    to,
+                    piece,
+                    captured_piece
+                );
+                let piece = match piece.as_str() {
+                    "wP" => Piece::WhitePawn,
+                    "wN" => Piece::WhiteKnight,
+                    "wB" => Piece::WhiteBishop,
+                    "wR" => Piece::WhiteRook,
+                    "wQ" => Piece::WhiteQueen,
+                    "bP" => Piece::BlackPawn,
+                    "bN" => Piece::BlackKnight,
+                    "bB" => Piece::BlackBishop,
+                    "bR" => Piece::BlackRook,
+                    "bQ" => Piece::BlackQueen,
+                    _ => Piece::WhitePawn,
+                };
+                let captured_piece = match captured_piece.as_str() {
+                    "wP" => Piece::WhitePawn,
+                    "wN" => Piece::WhiteKnight,
+                    "wB" => Piece::WhiteBishop,
+                    "wR" => Piece::WhiteRook,
+                    "wQ" => Piece::WhiteQueen,
+                    "bP" => Piece::BlackPawn,
+                    "bN" => Piece::BlackKnight,
+                    "bB" => Piece::BlackBishop,
+                    "bR" => Piece::BlackRook,
+                    "bQ" => Piece::BlackQueen,
+                    _ => Piece::WhitePawn,
+                };
+                let success = self.state.board.get_mut().board.capture_piece(
+                    &from,
+                    &to,
+                    piece,
+                    captured_piece,
+                );
+
+                if success {
+                    self.state.board.get_mut().switch_player_turn();
+                } else {
+                    log::info!("Invalid move");
+                }
+            }
             Operation::MakeMove { from, to, piece } => {
-                let active = self.state.board.get().active_player();
-                let owner = self.runtime.authenticated_signer();
-                log::info!("Called from{:?} block_time: {:?}", owner, block_time);
+                let owner = self.runtime.authenticated_signer().unwrap();
+                let active_player = self.state.board.get().active;
+                let active = self
+                    .state
+                    .owners
+                    .get(&owner)
+                    .await
+                    .expect("Failed to get active player")
+                    .expect("Active player not found");
 
                 let piece = match piece.as_str() {
                     "wP" => Piece::WhitePawn,
@@ -74,26 +132,23 @@ impl Contract for ChessContract {
                     "bQ" => Piece::BlackQueen,
                     _ => Piece::WhitePawn,
                 };
-                // assert_eq!(owner.unwrap(), "Only the active player can make a move.");
+                assert_eq!(
+                    active_player, active,
+                    "Only the active player can make a move."
+                );
 
                 let success = self
                     .state
                     .board
                     .get_mut()
                     .board
-                    .select_piece_move(&from, &to, piece);
+                    .select_piece_to_move(&from, &to, piece);
 
                 if success {
                     self.state.board.get_mut().switch_player_turn();
                 } else {
                     log::info!("Invalid move");
                 }
-
-                // clock.make_move(block_time, active);
-                // self.state.board.get_mut().board;
-
-                // self.state.board.get_mut().board;
-                // .move_piece(13, 23, bitboard);
             }
         }
     }
