@@ -8,20 +8,7 @@ export const NOTIFICATIONS = gql`
 
 export const GET_BOARD = gql`
   query {
-    board {
-      wP
-      wN
-      wB
-      wR
-      wQ
-      wK
-      bP
-      bN
-      bB
-      bR
-      bQ
-      bK
-    }
+    board
   }
 `
 
@@ -30,14 +17,23 @@ export const MOVE_PIECE = gql`
     makeMove(from: $from, to: $to, piece: $piece)
   }
 `
+// mutation {
+//   capturePiece(from: "e5", to: "f7", piece: "wN", capturedPiece: "bP")
+// }
+
 export const CAPTURE_PIECE = gql`
   mutation CapturePiece(
     $from: String!
     $to: String!
     $piece: String!
-    $captured: String!
+    $capturedPiece: String!
   ) {
-    capturePiece(from: $from, to: $to, piece: $piece, captured: $captured)
+    capturePiece(
+      from: $from
+      to: $to
+      piece: $piece
+      capturedPiece: $capturedPiece
+    )
   }
 `
 
@@ -50,5 +46,20 @@ export const GET_PLAYER_TURN = gql`
 export const GET_PLAYER = gql`
   query Player($player: ID!) {
     player(player: $player)
+  }
+`
+// query {
+//   getMoves {
+//     white
+//     black
+//   }
+// }
+
+export const GET_MOVES = gql`
+  query {
+    getMoves {
+      white
+      black
+    }
   }
 `

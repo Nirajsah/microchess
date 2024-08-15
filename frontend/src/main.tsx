@@ -4,6 +4,7 @@ import './index.css'
 import { createApolloClient } from './GraphQL/URI.ts'
 import { ApolloProvider } from '@apollo/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import CBoard from './components/CBoard.tsx'
 
 const client = createApolloClient()
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -12,6 +13,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<App />} />
+          <Route path="/chess" element={<CBoard />} />
         </Routes>
       </BrowserRouter>
     </div>
