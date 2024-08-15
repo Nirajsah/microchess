@@ -3,7 +3,7 @@
 
 mod state;
 
-use chess::{Color, Game, InstantiationArgument, Operation, Piece};
+use chess::{ChessBoard, Color, Game, InstantiationArgument, Operation, Piece};
 use linera_sdk::{
     base::{TimeDelta, WithContractAbi},
     util::BlockingWait,
@@ -51,6 +51,16 @@ impl Contract for ChessContract {
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {
+        let owner = self.runtime.authenticated_signer().unwrap();
+        let active_player = self.state.board.get().active;
+        let active = self
+            .state
+            .owners
+            .get(&owner)
+            .await
+            .expect("Failed to get active player")
+            .expect("Active player not found");
+
         match operation {
             Operation::NewGame => {
                 let game = Game::new();
@@ -62,39 +72,35 @@ impl Contract for ChessContract {
                 piece,
                 captured_piece,
             } => {
+                assert_eq!(
+                    active_player, active,
+                    "Only the active player can make a move."
+                );
+
                 log::info!(
-                    "Capture piece operation {:?} {:?} {:?} {:?}",
+                    "Capture piece: {} {} {} {}",
                     from,
                     to,
                     piece,
                     captured_piece
                 );
-                let piece = match piece.as_str() {
-                    "wP" => Piece::WhitePawn,
-                    "wN" => Piece::WhiteKnight,
-                    "wB" => Piece::WhiteBishop,
-                    "wR" => Piece::WhiteRook,
-                    "wQ" => Piece::WhiteQueen,
-                    "bP" => Piece::BlackPawn,
-                    "bN" => Piece::BlackKnight,
-                    "bB" => Piece::BlackBishop,
-                    "bR" => Piece::BlackRook,
-                    "bQ" => Piece::BlackQueen,
-                    _ => Piece::WhitePawn,
-                };
-                let captured_piece = match captured_piece.as_str() {
-                    "wP" => Piece::WhitePawn,
-                    "wN" => Piece::WhiteKnight,
-                    "wB" => Piece::WhiteBishop,
-                    "wR" => Piece::WhiteRook,
-                    "wQ" => Piece::WhiteQueen,
-                    "bP" => Piece::BlackPawn,
-                    "bN" => Piece::BlackKnight,
-                    "bB" => Piece::BlackBishop,
-                    "bR" => Piece::BlackRook,
-                    "bQ" => Piece::BlackQueen,
-                    _ => Piece::WhitePawn,
-                };
+
+                if piece.starts_with("w")
+                    && active_player != Color::White
+                    && captured_piece.starts_with("w")
+                {
+                    return;
+                }
+                if piece.starts_with("b")
+                    && active_player != Color::Black
+                    && captured_piece.starts_with("b")
+                {
+                    return;
+                }
+
+                let piece = ChessBoard::get_piece(&piece).expect("Invalid piece");
+                let captured_piece = ChessBoard::get_piece(&captured_piece).expect("Invalid piece");
+
                 let success = self.state.board.get_mut().board.capture_piece(
                     &from,
                     &to,
@@ -102,40 +108,38 @@ impl Contract for ChessContract {
                     captured_piece,
                 );
 
-                if success {
-                    self.state.board.get_mut().switch_player_turn();
-                } else {
-                    log::info!("Invalid move");
+                match success {
+                    Ok(true) => {
+                        self.state.board.get_mut().switch_player_turn();
+                        let moves = ChessBoard::create_capture_string(&from, &to);
+                        self.state.board.get_mut().create_move_string(active, moves);
+                        self.state
+                            .board
+                            .get_mut()
+                            .board
+                            .captured_pieces
+                            .push(captured_piece);
+                    }
+                    _ => {
+                        log::info!("Invalid move");
+                    }
                 }
             }
-            Operation::MakeMove { from, to, piece } => {
-                let owner = self.runtime.authenticated_signer().unwrap();
-                let active_player = self.state.board.get().active;
-                let active = self
-                    .state
-                    .owners
-                    .get(&owner)
-                    .await
-                    .expect("Failed to get active player")
-                    .expect("Active player not found");
 
-                let piece = match piece.as_str() {
-                    "wP" => Piece::WhitePawn,
-                    "wN" => Piece::WhiteKnight,
-                    "wB" => Piece::WhiteBishop,
-                    "wR" => Piece::WhiteRook,
-                    "wQ" => Piece::WhiteQueen,
-                    "bP" => Piece::BlackPawn,
-                    "bN" => Piece::BlackKnight,
-                    "bB" => Piece::BlackBishop,
-                    "bR" => Piece::BlackRook,
-                    "bQ" => Piece::BlackQueen,
-                    _ => Piece::WhitePawn,
-                };
+            Operation::MakeMove { from, to, piece } => {
                 assert_eq!(
                     active_player, active,
                     "Only the active player can make a move."
                 );
+
+                if piece.starts_with("w") && active_player != Color::White {
+                    return;
+                }
+                if piece.starts_with("b") && active_player != Color::Black {
+                    return;
+                }
+
+                let piece = ChessBoard::get_piece(&piece).expect("Invalid piece");
 
                 let success = self
                     .state
@@ -144,10 +148,14 @@ impl Contract for ChessContract {
                     .board
                     .select_piece_to_move(&from, &to, piece);
 
-                if success {
-                    self.state.board.get_mut().switch_player_turn();
-                } else {
-                    log::info!("Invalid move");
+                match success {
+                    Ok(true) => {
+                        self.state.board.get_mut().switch_player_turn();
+                        self.state.board.get_mut().create_move_string(active, to);
+                    }
+                    _ => {
+                        log::info!("Invalid move");
+                    }
                 }
             }
         }
