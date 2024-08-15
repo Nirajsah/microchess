@@ -127,3 +127,119 @@ pub fn attacks_king_moves(square: u8) -> Bitboard {
 
     attacks
 }
+/// possible rook attacks
+pub fn generate_rook_attacks_on_the_fly(square: Square, block: Bitboard) -> Bitboard {
+    let mut attacks = 0u64;
+
+    let target_rank = square as u8 / 8;
+    let target_file = square as u8 % 8;
+
+    // Up
+    for rank in (target_rank + 1)..8 {
+        let square = 1u64 << rank * 8 + target_file;
+        attacks |= square;
+        if rank <= 7 && (block & square) != 0 {
+            break;
+        }
+    }
+    // Down
+    for rank in (0..target_rank).rev() {
+        let square = 1u64 << rank * 8 + target_file;
+        attacks |= square;
+        if (block & square) != 0 {
+            break;
+        }
+    }
+    // Right
+    for file in (target_file + 1)..8 {
+        let square = 1u64 << target_rank * 8 + file;
+        attacks |= square;
+        if file <= 7 && (block & square) != 0 {
+            break;
+        }
+    }
+    // Left
+    for file in (0..target_file).rev() {
+        let square = 1u64 << target_rank * 8 + file;
+        // if file >= 0 {
+        attacks |= square;
+        if (block & square) != 0 {
+            break;
+        }
+    }
+    attacks
+}
+
+/// possible bishop attacks
+pub fn bishop_attacks_on_the_fly(square: Square, block: Bitboard) -> Bitboard {
+    let mut attacks = 0u64;
+
+    let target_rank = square as u8 / 8;
+    let target_file = square as u8 % 8;
+
+    // Up-right
+    for rank in (target_rank + 1)..8 {
+        let file = target_file as i8 + ((rank - target_rank) as i8);
+        let square = rank * 8 + file as u8;
+        if file >= 0 && file < 8 {
+            attacks |= 1u64 << square;
+            if (block & (1u64 << square)) != 0 {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    // Up-left
+    for rank in (target_rank + 1)..8 {
+        let file = target_file as i8 - ((rank - target_rank) as i8);
+        let square = rank * 8 + file as u8;
+        if rank <= 7 && file >= 0 {
+            attacks |= 1u64 << square;
+            if (block & (1u64 << square)) != 0 {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    // Down-right
+    for rank in (0..target_rank).rev() {
+        let file = target_file as i8 + ((target_rank - rank) as i8);
+
+        let square = rank * 8 + file as u8;
+        if file <= 7 {
+            attacks |= 1u64 << (rank * 8 + file as u8);
+            if (block & (1u64 << square)) != 0 {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    // Down-left
+    for rank in (0..target_rank).rev() {
+        let file = target_file as i8 - ((target_rank - rank) as i8);
+        let square = rank * 8 + file as u8;
+        if file >= 0 {
+            attacks |= 1u64 << (rank * 8 + file as u8);
+            if (block & (1u64 << square)) != 0 {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    attacks
+}
+
+pub fn queen_attacks_on_the_fly(square: Square, block: Bitboard) -> Bitboard {
+    let mut attacks = 0u64;
+
+    attacks |= generate_rook_attacks_on_the_fly(square, block);
+    attacks |= bishop_attacks_on_the_fly(square, block);
+
+    attacks
+}
