@@ -38,11 +38,14 @@ echo "Assigning keys..."
 linera -w0 assign --key $PUB_KEY_1 --message-id $MESSAGE_ID
 linera -w1 assign --key $PUB_KEY_2 --message-id $MESSAGE_ID
 
-echo "Publishing and creating Hex Game project..."
+echo "Publishing and creating Chess Game project..."
 APP_ID=$(linera -w0 --wait-for-outgoing-messages \
   project publish-and-create chess chess $CHESS_CHAIN \
     --json-argument "{
-        \"players\": [\"$OWNER_1\", \"$OWNER_2\"]
+        \"players\": [\"$OWNER_1\", \"$OWNER_2\"],
+        \"startTime\": 600000000,
+        \"increment\": 600000000,
+        \"blockDelay\": 100000000
     }")
 
 echo "Starting Linera services..."

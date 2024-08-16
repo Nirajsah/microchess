@@ -66,6 +66,7 @@ impl Contract for ChessContract {
                 let game = Game::new();
                 self.state.board.set(game);
             }
+
             Operation::CapturePiece {
                 from,
                 to,
@@ -108,21 +109,18 @@ impl Contract for ChessContract {
                     captured_piece,
                 );
 
-                match success {
-                    Ok(true) => {
-                        self.state.board.get_mut().switch_player_turn();
-                        let moves = ChessBoard::create_capture_string(&from, &to);
-                        self.state.board.get_mut().create_move_string(active, moves);
-                        self.state
-                            .board
-                            .get_mut()
-                            .board
-                            .captured_pieces
-                            .push(captured_piece);
-                    }
-                    _ => {
-                        log::info!("Invalid move");
-                    }
+                if success {
+                    self.state.board.get_mut().switch_player_turn();
+                    let moves = ChessBoard::create_capture_string(&from, &to);
+                    self.state.board.get_mut().create_move_string(active, moves);
+                    self.state
+                        .board
+                        .get_mut()
+                        .board
+                        .captured_pieces
+                        .push(captured_piece);
+                } else {
+                    log::info!("Invalid move");
                 }
             }
 
