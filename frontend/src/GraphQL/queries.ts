@@ -17,9 +17,6 @@ export const MOVE_PIECE = gql`
     makeMove(from: $from, to: $to, piece: $piece)
   }
 `
-// mutation {
-//   capturePiece(from: "e5", to: "f7", piece: "wN", capturedPiece: "bP")
-// }
 
 export const CAPTURE_PIECE = gql`
   mutation CapturePiece(
@@ -48,12 +45,6 @@ export const GET_PLAYER = gql`
     player(player: $player)
   }
 `
-// query {
-//   getMoves {
-//     white
-//     black
-//   }
-// }
 
 export const GET_MOVES = gql`
   query {
@@ -61,5 +52,17 @@ export const GET_MOVES = gql`
       white
       black
     }
+  }
+`
+
+export const GET_CAPTURED_PIECES = gql`
+  query {
+    capturedPieces
+  }
+`
+
+export const NEW_GAME = gql`
+  mutation NewGame($player: ID!) {
+    newGame(player: $player)
   }
 `
