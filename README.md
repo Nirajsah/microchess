@@ -31,7 +31,7 @@ git clone https://github.com/Nirajsah/stella.git
 cd stella
 ./run.sh
 cd frontend
-bun build
+bun vite build
 bun preview
 ```
 
