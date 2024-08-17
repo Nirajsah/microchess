@@ -22,11 +22,19 @@ impl ServiceAbi for ChessAbi {
     type QueryResponse = Response;
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct InstantiationArgument {
     /// The `Owner` controlling player 1 and 2, respectively.
     pub players: [Owner; 2],
+    /// The initial time each player has to think about their turns.
+    pub start_time: TimeDelta,
+    /// The duration that is added to the clock after each turn.
+    pub increment: TimeDelta,
+    /// The maximum time that is allowed to pass between a block proposal and validation.
+    /// This should be long enough to confirm a block, but short enough for the block timestamp
+    /// to accurately reflect the current time.
+    pub block_delay: TimeDelta,
 }
 
 lazy_static! {
@@ -93,13 +101,40 @@ impl Color {
     }
 }
 
-/// A clock to track both players' time.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
 pub struct Clock {
-    time_left: [TimeDelta; 2],
-    increment: TimeDelta,
-    current_turn_start: Timestamp,
+    pub time_left: [TimeDelta; 2],
+    pub increment: TimeDelta,
+    pub current_turn_start: Timestamp,
     pub block_delay: TimeDelta,
+}
+
+impl Clock {
+    /// Initializes the clock.
+    pub fn new(block_time: Timestamp, arg: &InstantiationArgument) -> Self {
+        Self {
+            time_left: [arg.start_time, arg.start_time],
+            increment: arg.increment,
+            current_turn_start: block_time,
+            block_delay: arg.block_delay,
+        }
+    }
+
+    /// Records a player making a move in the current block.
+    pub fn make_move(&mut self, block_time: Timestamp, player: Color) {
+        let duration = block_time.delta_since(self.current_turn_start);
+        let i = player.index();
+        assert!(self.time_left[i] >= duration);
+        self.time_left[i] = self.time_left[i]
+            .saturating_sub(duration)
+            .saturating_add(self.increment);
+        self.current_turn_start = block_time;
+    }
+
+    /// Returns whether the given player has timed out.
+    pub fn timed_out(&self, block_time: Timestamp, player: Color) -> bool {
+        self.time_left[player.index()] < block_time.delta_since(self.current_turn_start)
+    }
 }
 
 /// A struct to represent a chess piece
@@ -209,13 +244,10 @@ pub struct ChessBoard {
 
     pub captured_pieces: Vec<Piece>,
 
-    #[serde(skip)]
     all_white_pieces: Bitboard,
 
-    #[serde(skip)]
     all_black_pieces: Bitboard,
 
-    #[serde(skip)]
     all_pieces: Bitboard,
 }
 
@@ -290,6 +322,14 @@ impl ChessBoard {
         // Add placeholder values for the rest of the FEN string
         fen.push_str(" w KQkq - 0 1");
 
+        if self.white_attack_mask() & self.bK != 0 {
+            fen.push_str(";bk_inCheck");
+        }
+
+        if self.black_attack_mask() & self.wK != 0 {
+            fen.push_str(";wk_inCheck");
+        }
+
         fen
     }
 
@@ -333,12 +373,15 @@ impl ChessBoard {
         to: &str,
         piece: Piece,
         captured_piece: Piece,
-    ) -> Result<bool> {
+    ) -> bool {
         let from_square = Square::from_str(from).unwrap();
         let to_square = Square::from_str(to).unwrap();
-        log::info!("Capturing piece: {:?}", captured_piece);
+        log::info!("Capturing called for: {:?}", captured_piece);
         match piece {
-            Piece::WhitePawn => self.white_pawn_captures(from_square, to_square, captured_piece),
+            Piece::WhitePawn => {
+                log::info!("White Pawn is Capturing");
+                self.white_pawn_captures(from_square, to_square, captured_piece)
+            }
             Piece::BlackPawn => self.black_pawn_captures(from_square, to_square, captured_piece),
 
             Piece::WhiteKnight | Piece::BlackKnight => {
@@ -381,6 +424,377 @@ impl ChessBoard {
         }
     }
 
+    /* ----------------------Piece Capturing Logic------------------------------- */
+
+    /// A function to capute pieces
+    pub fn white_pawn_captures(&mut self, from: Square, to: Square, captured_piece: Piece) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        if WHITE_ATTACKS[from as usize] & to_bit != 0 && self.all_black_pieces & to_bit != 0 {
+            // Remove the opponent's piece from its bitboard
+            match self.remove_black_piece(to_bit, captured_piece) {
+                Ok(true) => {
+                    // Clear the bit at the original position
+                    self.wP &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.wP |= to_bit;
+
+                    self.all_white_pieces &= !from_bit;
+                    self.all_white_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// A function to capute pieces using black pawn
+    pub fn black_pawn_captures(&mut self, from: Square, to: Square, captured_piece: Piece) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        if BLACK_ATTACKS[from as usize] & to_bit != 0 && self.all_white_pieces & to_bit != 0 {
+            // Remove the opponent's piece from its bitboard
+            match self.remove_white_piece(to_bit, captured_piece) {
+                Ok(true) => {
+                    // Clear the bit at the original position
+                    self.bP &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.bP |= to_bit;
+
+                    self.all_black_pieces &= !from_bit;
+                    self.all_black_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// A function to capute pieces using white knight
+    pub fn white_knight_captures(
+        &mut self,
+        from: Square,
+        to: Square,
+        captured_piece: Piece,
+    ) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        if KNIGHT_MOVES[from as usize] & to_bit != 0 && self.all_black_pieces & to_bit != 0 {
+            // Remove the opponent's piece from its bitboard
+            match self.remove_black_piece(to_bit, captured_piece) {
+                Ok(true) => {
+                    // Clear the bit at the original position
+                    self.wN &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.wN |= to_bit;
+
+                    self.all_white_pieces &= !from_bit;
+                    self.all_white_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// A function to capute pieces using black knight
+    pub fn black_knight_captures(
+        &mut self,
+        from: Square,
+        to: Square,
+        captured_piece: Piece,
+    ) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        if KNIGHT_MOVES[from as usize] & to_bit != 0 && self.all_white_pieces & to_bit != 0 {
+            // Remove the opponent's piece from its bitboard
+            match self.remove_white_piece(to_bit, captured_piece) {
+                Ok(true) => {
+                    // Clear the bit at the original position
+                    self.bN &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.bN |= to_bit;
+
+                    self.all_black_pieces &= !from_bit;
+                    self.all_black_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// A function to capute pieces using white king
+    pub fn white_king_captures(&mut self, from: Square, to: Square, captured_piece: Piece) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        if KING_MOVES[from as usize] & to_bit != 0 && self.all_black_pieces & to_bit != 0 {
+            // Remove the opponent's piece from its bitboard
+            match self.remove_black_piece(to_bit, captured_piece) {
+                Ok(true) => {
+                    // Clear the bit at the original position
+                    self.wK &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.wK |= to_bit;
+
+                    self.all_white_pieces &= !from_bit;
+                    self.all_white_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// A function to capute pieces using black king
+    pub fn black_king_captures(&mut self, from: Square, to: Square, captured_piece: Piece) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        if KING_MOVES[from as usize] & to_bit != 0 && self.all_white_pieces & to_bit != 0 {
+            // Remove the opponent's piece from its bitboard
+            match self.remove_white_piece(to_bit, captured_piece) {
+                Ok(true) => {
+                    // Clear the bit at the original position
+                    self.bK &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.bK |= to_bit;
+
+                    self.all_black_pieces &= !from_bit;
+                    self.all_black_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// A function to capute pieces using white rook
+    pub fn white_rook_captures(&mut self, from: Square, to: Square, captured_piece: Piece) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        let board = rook_attacks_on_the_fly(from, self.all_pieces);
+
+        if board & to_bit != 0 && self.all_black_pieces & to_bit != 0 {
+            // Remove the opponent's piece from its bitboard
+            match self.remove_black_piece(to_bit, captured_piece) {
+                Ok(true) => {
+                    // Clear the bit at the original position
+                    self.wR &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.wR |= to_bit;
+
+                    self.all_white_pieces &= !from_bit;
+                    self.all_white_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// A function to capute pieces using black rook
+    pub fn black_rook_captures(&mut self, from: Square, to: Square, captured_piece: Piece) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        let board = rook_attacks_on_the_fly(from, self.all_pieces);
+
+        if board & to_bit != 0 && self.all_white_pieces & to_bit != 0 {
+            // Remove the opponent's piece from its bitboard
+            match self.remove_white_piece(to_bit, captured_piece) {
+                Ok(true) => {
+                    // Clear the bit at the original position
+                    self.bR &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.bR |= to_bit;
+
+                    self.all_black_pieces &= !from_bit;
+                    self.all_black_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// A function to capute pieces using white bishop
+    pub fn white_bishop_captures(
+        &mut self,
+        from: Square,
+        to: Square,
+        captured_piece: Piece,
+    ) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        let board = bishop_attacks_on_the_fly(from, self.all_pieces);
+
+        if board & to_bit != 0 && self.all_black_pieces & to_bit != 0 {
+            // Remove the opponent's piece from its bitboard
+            match self.remove_black_piece(to_bit, captured_piece) {
+                Ok(true) => {
+                    // Clear the bit at the original position
+                    self.wB &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.wB |= to_bit;
+
+                    self.all_white_pieces &= !from_bit;
+                    self.all_white_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// A function to capute pieces using black bishop
+    pub fn black_bishop_captures(
+        &mut self,
+        from: Square,
+        to: Square,
+        captured_piece: Piece,
+    ) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        let board = bishop_attacks_on_the_fly(from, self.all_pieces);
+
+        if board & to_bit != 0 && self.all_white_pieces & to_bit != 0 {
+            // Remove the opponent's piece from its bitboard
+            match self.remove_white_piece(to_bit, captured_piece) {
+                Ok(true) => {
+                    // Clear the bit at the original position
+                    self.bB &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.bB |= to_bit;
+
+                    self.all_black_pieces &= !from_bit;
+                    self.all_black_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// A function to capute pieces using white queen
+    pub fn white_queen_capture(&mut self, from: Square, to: Square, captured_piece: Piece) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        let board = queen_attacks_on_the_fly(from, self.all_pieces);
+
+        if board & to_bit != 0 && self.all_black_pieces & to_bit != 0 {
+            // Remove the opponent's piece from its bitboard
+            match self.remove_black_piece(to_bit, captured_piece) {
+                Ok(true) => {
+                    // Clear the bit at the original position
+                    self.wQ &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.wQ |= to_bit;
+
+                    self.all_white_pieces &= !from_bit;
+                    self.all_white_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// A function to capute pieces using black queen
+    pub fn black_queen_capture(&mut self, from: Square, to: Square, captured_piece: Piece) -> bool {
+        let from_bit = 1u64 << from as u32;
+        let to_bit = 1u64 << to as u32;
+
+        let board = queen_attacks_on_the_fly(from, self.all_pieces);
+
+        if board & to_bit != 0 && self.all_white_pieces & to_bit != 0 {
+            // Remove the opponent's piece from its bitboard
+            match self.remove_white_piece(to_bit, captured_piece) {
+                Ok(true) => {
+                    // Clear the bit at the original position
+                    self.bQ &= !from_bit;
+
+                    // Set the bit at the new position
+                    self.bQ |= to_bit;
+
+                    self.all_black_pieces &= !from_bit;
+                    self.all_black_pieces |= to_bit;
+                    self.all_pieces = self.all_white_pieces | self.all_black_pieces;
+
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /* ----------------------Piece Movement Logic------------------------------- */
+
     /// A function to select a piece move
     pub fn select_piece_to_move(&mut self, from: &str, to: &str, piece: Piece) -> Result<bool> {
         let from_square = Square::from_str(from).unwrap();
@@ -419,369 +833,113 @@ impl ChessBoard {
         }
     }
 
-    /* ----------------------Piece Capturing Logic------------------------------- */
+    /// A function to calculate attacks mask for white pieces
+    pub fn white_attack_mask(&self) -> Bitboard {
+        let mut attacks = 0;
 
-    /// A function to capute pieces
-    pub fn white_pawn_captures(
-        &mut self,
-        from: Square,
-        to: Square,
-        captured_piece: Piece,
-    ) -> Result<bool> {
-        let from_bit = 1u64 << from as u32;
-        let to_bit = 1u64 << to as u32;
+        // Pawn attacks
+        attacks |= (self.wP << 7) & NOT_H_FILE;
+        attacks |= (self.wP << 9) & NOT_A_FILE;
 
-        if WHITE_ATTACKS[from as usize] & to_bit != 0 && self.all_black_pieces & to_bit != 0 {
-            // Remove the opponent's piece from its bitboard
-            match self.remove_black_piece(to_bit, captured_piece) {
-                Ok(true) => {
-                    // Clear the bit at the original position
-                    self.wP &= !from_bit;
-
-                    // Set the bit at the new position
-                    self.wP |= to_bit;
-
-                    Ok(true)
-                }
-                _ => return Err(ChessError::PieceNotFound),
-            }
-        } else {
-            Err(ChessError::PieceNotFound)
+        // Knight attacks
+        let mut knights = self.wN;
+        while knights != 0 {
+            let knight_pos = knights.trailing_zeros() as usize;
+            attacks |= KNIGHT_MOVES[knight_pos as usize];
+            knights &= knights - 1; // Remove the LSB
         }
+
+        // King attacks
+        let mut kings = self.wK;
+        while kings != 0 {
+            let king_pos = kings.trailing_zeros() as usize;
+            attacks |= KING_MOVES[king_pos as usize];
+            kings &= kings - 1; // Remove the LSB
+        }
+
+        // Bishop attacks
+        let mut bishops = self.wB;
+        while bishops != 0 {
+            let bishop_pos = bishops.trailing_zeros() as usize;
+            let square = Square::usize_to_square(bishop_pos);
+            attacks |= bishop_attacks_on_the_fly(square, self.all_pieces);
+            bishops &= bishops - 1; // Remove the LSB
+        }
+
+        // Rook attacks
+        let mut rooks = self.wR;
+        while rooks != 0 {
+            let rook_pos = rooks.trailing_zeros() as usize;
+            let square = Square::usize_to_square(rook_pos);
+            attacks |= rook_attacks_on_the_fly(square, self.all_pieces);
+            rooks &= rooks - 1; // Remove the LSB
+        }
+
+        // Queen attacks
+        let mut queens = self.wQ;
+        while queens != 0 {
+            let queen_pos = queens.trailing_zeros() as usize;
+            let square = Square::usize_to_square(queen_pos);
+            attacks |= queen_attacks_on_the_fly(square, self.all_pieces);
+            queens &= queens - 1; // Remove the LSB
+        }
+
+        attacks
     }
 
-    /// A function to capute pieces using black pawn
-    pub fn black_pawn_captures(
-        &mut self,
-        from: Square,
-        to: Square,
-        captured_piece: Piece,
-    ) -> Result<bool> {
-        let from_bit = 1u64 << from as u32;
-        let to_bit = 1u64 << to as u32;
+    /// A function to calculate attacks mask for black pieces
+    pub fn black_attack_mask(&self) -> Bitboard {
+        let mut attacks = 0;
 
-        if BLACK_ATTACKS[from as usize] & to_bit != 0 && self.all_white_pieces & to_bit != 0 {
-            // Remove the opponent's piece from its bitboard
-            match self.remove_white_piece(to_bit, captured_piece) {
-                Ok(true) => {
-                    // Clear the bit at the original position
-                    self.bP &= !from_bit;
+        // Pawn attacks
+        attacks |= (self.bP >> 7) & NOT_A_FILE;
+        attacks |= (self.bP >> 9) & NOT_H_FILE;
 
-                    // Set the bit at the new position
-                    self.bP |= to_bit;
-
-                    Ok(true)
-                }
-                _ => return Err(ChessError::PieceNotFound),
-            }
-        } else {
-            Err(ChessError::PieceNotFound)
+        // Knight attacks
+        let mut knights = self.bN;
+        while knights != 0 {
+            let knight_pos = knights.trailing_zeros() as usize;
+            attacks |= KNIGHT_MOVES[knight_pos as usize];
+            knights &= knights - 1; // Remove the LSB
         }
-    }
 
-    /// A function to capute pieces using white knight
-    pub fn white_knight_captures(
-        &mut self,
-        from: Square,
-        to: Square,
-        captured_piece: Piece,
-    ) -> Result<bool> {
-        let from_bit = 1u64 << from as u32;
-        let to_bit = 1u64 << to as u32;
-
-        if KNIGHT_MOVES[from as usize] & to_bit != 0 && self.all_black_pieces & to_bit != 0 {
-            // Remove the opponent's piece from its bitboard
-            match self.remove_black_piece(to_bit, captured_piece) {
-                Ok(true) => {
-                    // Clear the bit at the original position
-                    self.wN &= !from_bit;
-
-                    // Set the bit at the new position
-                    self.wN |= to_bit;
-
-                    Ok(true)
-                }
-                _ => return Err(ChessError::PieceNotFound),
-            }
-        } else {
-            Err(ChessError::PieceNotFound)
+        // King attacks
+        let mut kings = self.bK;
+        while kings != 0 {
+            let king_pos = kings.trailing_zeros() as usize;
+            attacks |= KING_MOVES[king_pos as usize];
+            kings &= kings - 1; // Remove the LSB
         }
-    }
 
-    /// A function to capute pieces using black knight
-    pub fn black_knight_captures(
-        &mut self,
-        from: Square,
-        to: Square,
-        captured_piece: Piece,
-    ) -> Result<bool> {
-        let from_bit = 1u64 << from as u32;
-        let to_bit = 1u64 << to as u32;
-
-        if KNIGHT_MOVES[from as usize] & to_bit != 0 && self.all_white_pieces & to_bit != 0 {
-            // Remove the opponent's piece from its bitboard
-            match self.remove_white_piece(to_bit, captured_piece) {
-                Ok(true) => {
-                    // Clear the bit at the original position
-                    self.bN &= !from_bit;
-
-                    // Set the bit at the new position
-                    self.bN |= to_bit;
-
-                    Ok(true)
-                }
-                _ => return Err(ChessError::PieceNotFound),
-            }
-        } else {
-            Err(ChessError::PieceNotFound)
+        // Bishop attacks
+        let mut bishops = self.bB;
+        while bishops != 0 {
+            let bishop_pos = bishops.trailing_zeros() as usize;
+            let square = Square::usize_to_square(bishop_pos);
+            attacks |= bishop_attacks_on_the_fly(square, self.all_pieces);
+            bishops &= bishops - 1; // Remove the LSB
         }
-    }
 
-    /// A function to capute pieces using white king
-    pub fn white_king_captures(
-        &mut self,
-        from: Square,
-        to: Square,
-        captured_piece: Piece,
-    ) -> Result<bool> {
-        let from_bit = 1u64 << from as u32;
-        let to_bit = 1u64 << to as u32;
-
-        if KING_MOVES[from as usize] & to_bit != 0 && self.all_black_pieces & to_bit != 0 {
-            // Remove the opponent's piece from its bitboard
-            match self.remove_black_piece(to_bit, captured_piece) {
-                Ok(true) => {
-                    // Clear the bit at the original position
-                    self.wK &= !from_bit;
-
-                    // Set the bit at the new position
-                    self.wK |= to_bit;
-
-                    Ok(true)
-                }
-                _ => return Err(ChessError::PieceNotFound),
-            }
-        } else {
-            Err(ChessError::PieceNotFound)
+        // Rook attacks
+        let mut rooks = self.bR;
+        while rooks != 0 {
+            let rook_pos = rooks.trailing_zeros() as usize;
+            let square = Square::usize_to_square(rook_pos);
+            attacks |= rook_attacks_on_the_fly(square, self.all_pieces);
+            rooks &= rooks - 1; // Remove the LSB
         }
-    }
 
-    /// A function to capute pieces using black king
-    pub fn black_king_captures(
-        &mut self,
-        from: Square,
-        to: Square,
-        captured_piece: Piece,
-    ) -> Result<bool> {
-        let from_bit = 1u64 << from as u32;
-        let to_bit = 1u64 << to as u32;
-
-        if KING_MOVES[from as usize] & to_bit != 0 && self.all_white_pieces & to_bit != 0 {
-            // Remove the opponent's piece from its bitboard
-            match self.remove_white_piece(to_bit, captured_piece) {
-                Ok(true) => {
-                    // Clear the bit at the original position
-                    self.bK &= !from_bit;
-
-                    // Set the bit at the new position
-                    self.bK |= to_bit;
-
-                    Ok(true)
-                }
-                _ => return Err(ChessError::PieceNotFound),
-            }
-        } else {
-            Err(ChessError::PieceNotFound)
+        // Queen attacks
+        let mut queens = self.bQ;
+        while queens != 0 {
+            let queen_pos = queens.trailing_zeros() as usize;
+            let square = Square::usize_to_square(queen_pos);
+            attacks |= queen_attacks_on_the_fly(square, self.all_pieces);
+            queens &= queens - 1; // Remove the LSB
         }
+
+        attacks
     }
-
-    /// A function to capute pieces using white rook
-    pub fn white_rook_captures(
-        &mut self,
-        from: Square,
-        to: Square,
-        captured_piece: Piece,
-    ) -> Result<bool> {
-        let from_bit = 1u64 << from as u32;
-        let to_bit = 1u64 << to as u32;
-
-        let board = generate_rook_attacks_on_the_fly(from, self.all_pieces);
-
-        if board & to_bit != 0 && self.all_black_pieces & to_bit != 0 {
-            // Remove the opponent's piece from its bitboard
-            match self.remove_black_piece(to_bit, captured_piece) {
-                Ok(true) => {
-                    // Clear the bit at the original position
-                    self.wR &= !from_bit;
-
-                    // Set the bit at the new position
-                    self.wR |= to_bit;
-
-                    Ok(true)
-                }
-                _ => return Err(ChessError::PieceNotFound),
-            }
-        } else {
-            Err(ChessError::PieceNotFound)
-        }
-    }
-
-    /// A function to capute pieces using black rook
-    pub fn black_rook_captures(
-        &mut self,
-        from: Square,
-        to: Square,
-        captured_piece: Piece,
-    ) -> Result<bool> {
-        let from_bit = 1u64 << from as u32;
-        let to_bit = 1u64 << to as u32;
-
-        let board = generate_rook_attacks_on_the_fly(from, self.all_pieces);
-
-        if board & to_bit != 0 && self.all_white_pieces & to_bit != 0 {
-            // Remove the opponent's piece from its bitboard
-            match self.remove_white_piece(to_bit, captured_piece) {
-                Ok(true) => {
-                    // Clear the bit at the original position
-                    self.bR &= !from_bit;
-
-                    // Set the bit at the new position
-                    self.bR |= to_bit;
-
-                    Ok(true)
-                }
-                _ => return Err(ChessError::PieceNotFound),
-            }
-        } else {
-            Err(ChessError::PieceNotFound)
-        }
-    }
-
-    /// A function to capute pieces using white bishop
-    pub fn white_bishop_captures(
-        &mut self,
-        from: Square,
-        to: Square,
-        captured_piece: Piece,
-    ) -> Result<bool> {
-        let from_bit = 1u64 << from as u32;
-        let to_bit = 1u64 << to as u32;
-
-        let board = bishop_attacks_on_the_fly(from, self.all_pieces);
-
-        if board & to_bit != 0 && self.all_black_pieces & to_bit != 0 {
-            // Remove the opponent's piece from its bitboard
-            match self.remove_black_piece(to_bit, captured_piece) {
-                Ok(true) => {
-                    // Clear the bit at the original position
-                    self.wB &= !from_bit;
-
-                    // Set the bit at the new position
-                    self.wB |= to_bit;
-
-                    Ok(true)
-                }
-                _ => return Err(ChessError::PieceNotFound),
-            }
-        } else {
-            Err(ChessError::PieceNotFound)
-        }
-    }
-
-    /// A function to capute pieces using black bishop
-    pub fn black_bishop_captures(
-        &mut self,
-        from: Square,
-        to: Square,
-        captured_piece: Piece,
-    ) -> Result<bool> {
-        let from_bit = 1u64 << from as u32;
-        let to_bit = 1u64 << to as u32;
-
-        let board = bishop_attacks_on_the_fly(from, self.all_pieces);
-
-        if board & to_bit != 0 && self.all_white_pieces & to_bit != 0 {
-            // Remove the opponent's piece from its bitboard
-            match self.remove_white_piece(to_bit, captured_piece) {
-                Ok(true) => {
-                    // Clear the bit at the original position
-                    self.bB &= !from_bit;
-
-                    // Set the bit at the new position
-                    self.bB |= to_bit;
-
-                    Ok(true)
-                }
-                _ => return Err(ChessError::PieceNotFound),
-            }
-        } else {
-            Err(ChessError::PieceNotFound)
-        }
-    }
-
-    /// A function to capute pieces using white queen
-    pub fn white_queen_capture(
-        &mut self,
-        from: Square,
-        to: Square,
-        captured_piece: Piece,
-    ) -> Result<bool> {
-        let from_bit = 1u64 << from as u32;
-        let to_bit = 1u64 << to as u32;
-
-        let board = queen_attacks_on_the_fly(from, self.all_pieces);
-
-        if board & to_bit != 0 && self.all_black_pieces & to_bit != 0 {
-            // Remove the opponent's piece from its bitboard
-            match self.remove_black_piece(to_bit, captured_piece) {
-                Ok(true) => {
-                    // Clear the bit at the original position
-                    self.wQ &= !from_bit;
-
-                    // Set the bit at the new position
-                    self.wQ |= to_bit;
-
-                    Ok(true)
-                }
-                _ => return Err(ChessError::PieceNotFound),
-            }
-        } else {
-            Err(ChessError::PieceNotFound)
-        }
-    }
-
-    /// A function to capute pieces using black queen
-    pub fn black_queen_capture(
-        &mut self,
-        from: Square,
-        to: Square,
-        captured_piece: Piece,
-    ) -> Result<bool> {
-        let from_bit = 1u64 << from as u32;
-        let to_bit = 1u64 << to as u32;
-
-        let board = queen_attacks_on_the_fly(from, self.all_pieces);
-
-        if board & to_bit != 0 && self.all_white_pieces & to_bit != 0 {
-            // Remove the opponent's piece from its bitboard
-            match self.remove_white_piece(to_bit, captured_piece) {
-                Ok(true) => {
-                    // Clear the bit at the original position
-                    self.bQ &= !from_bit;
-
-                    // Set the bit at the new position
-                    self.bQ |= to_bit;
-
-                    Ok(true)
-                }
-                _ => return Err(ChessError::PieceNotFound),
-            }
-        } else {
-            Err(ChessError::PieceNotFound)
-        }
-    }
-
-    /* ----------------------Piece Movement Logic------------------------------- */
 
     /// A function to move a white pawn piece on the board
     pub fn white_pawn_moves(&mut self, from: Square, to: Square) -> Result<bool> {
@@ -925,7 +1083,7 @@ impl ChessBoard {
         let from_bit = 1u64 << from as u32;
         let to_bit = 1u64 << to as u32;
 
-        let board = generate_rook_attacks_on_the_fly(from, self.all_pieces);
+        let board = rook_attacks_on_the_fly(from, self.all_pieces);
 
         if board & to_bit != 0 {
             // Clear the bit at the original position
@@ -950,7 +1108,7 @@ impl ChessBoard {
         let from_bit = 1u64 << from as u32;
         let to_bit = 1u64 << to as u32;
 
-        let board = generate_rook_attacks_on_the_fly(from, self.all_pieces);
+        let board = rook_attacks_on_the_fly(from, self.all_pieces);
 
         if board & to_bit != 0 {
             // Clear the bit at the original position
@@ -1070,56 +1228,64 @@ impl ChessBoard {
 
     /// A function to remove a black piece from the board
     pub fn remove_black_piece(&mut self, to_bit: u64, captured_piece: Piece) -> Result<bool> {
+        log::info!("Black piece is being captured: {:?}", captured_piece);
         match captured_piece {
             Piece::BlackPawn => {
                 if self.bP & to_bit != 0 {
                     self.bP &= !to_bit;
+                    log::info!("Black Pawn captured");
+                    Ok(true)
                 } else {
-                    return Err(ChessError::PieceNotFound);
+                    Err(ChessError::PieceNotFound)
                 }
             }
             Piece::BlackKnight => {
                 if self.bN & to_bit != 0 {
                     self.bN &= !to_bit;
+                    log::info!("Black Knight captured");
+                    Ok(true)
                 } else {
-                    return Err(ChessError::PieceNotFound);
+                    Err(ChessError::PieceNotFound)
                 }
             }
             Piece::BlackBishop => {
                 if self.bB & to_bit != 0 {
                     self.bB &= !to_bit;
+                    log::info!("Black Bishop captured");
+                    Ok(true)
                 } else {
-                    return Err(ChessError::PieceNotFound);
+                    Err(ChessError::PieceNotFound)
                 }
             }
             Piece::BlackRook => {
                 if self.bR & to_bit != 0 {
                     self.bR &= !to_bit;
+                    log::info!("Black Rook captured");
+                    Ok(true)
                 } else {
-                    return Err(ChessError::PieceNotFound);
+                    Err(ChessError::PieceNotFound)
                 }
             }
             Piece::BlackQueen => {
                 if self.bQ & to_bit != 0 {
                     self.bQ &= !to_bit;
+                    log::info!("Black Queen captured");
+                    Ok(true)
                 } else {
-                    return Err(ChessError::PieceNotFound);
+                    Err(ChessError::PieceNotFound)
                 }
             }
             Piece::BlackKing => {
                 if self.bK & to_bit != 0 {
                     self.bK &= !to_bit;
+                    log::info!("Black King captured");
+                    Ok(true)
                 } else {
-                    return Err(ChessError::PieceNotFound);
+                    Err(ChessError::PieceNotFound)
                 }
             }
-            _ => return Err(ChessError::PieceNotFound),
+            _ => Err(ChessError::PieceNotFound),
         }
-
-        // Update the overall black pieces bitboard
-        self.all_black_pieces &= !to_bit;
-        self.all_pieces = self.all_white_pieces | self.all_black_pieces;
-        Ok(true)
     }
 
     /// A function to remove a white piece from the board
@@ -1128,51 +1294,58 @@ impl ChessBoard {
             Piece::WhitePawn => {
                 if self.wP & to_bit != 0 {
                     self.wP &= !to_bit;
+                    log::info!("White Pawn captured");
+                    Ok(true)
                 } else {
-                    return Err(ChessError::PieceNotFound);
+                    Err(ChessError::PieceNotFound)
                 }
             }
             Piece::WhiteKnight => {
                 if self.wN & to_bit != 0 {
                     self.wN &= !to_bit;
+                    log::info!("Black Knight captured");
+                    Ok(true)
                 } else {
-                    return Err(ChessError::PieceNotFound);
+                    Err(ChessError::PieceNotFound)
                 }
             }
             Piece::WhiteBishop => {
                 if self.wB & to_bit != 0 {
                     self.wB &= !to_bit;
+                    log::info!("Black Bishop captured");
+                    Ok(true)
                 } else {
-                    return Err(ChessError::PieceNotFound);
+                    Err(ChessError::PieceNotFound)
                 }
             }
             Piece::WhiteRook => {
                 if self.wR & to_bit != 0 {
                     self.wR &= !to_bit;
+                    log::info!("Black Rook captured");
+                    Ok(true)
                 } else {
-                    return Err(ChessError::PieceNotFound);
+                    Err(ChessError::PieceNotFound)
                 }
             }
             Piece::WhiteQueen => {
                 if self.wQ & to_bit != 0 {
                     self.wQ &= !to_bit;
+                    log::info!("Black Queen captured");
+                    Ok(true)
                 } else {
-                    return Err(ChessError::PieceNotFound);
+                    Err(ChessError::PieceNotFound)
                 }
             }
             Piece::WhiteKing => {
                 if self.wK & to_bit != 0 {
                     self.wK &= !to_bit;
+                    log::info!("Black King captured");
+                    Ok(true)
                 } else {
-                    return Err(ChessError::PieceNotFound);
+                    Err(ChessError::PieceNotFound)
                 }
             }
-            _ => return Err(ChessError::PieceNotFound),
+            _ => Err(ChessError::PieceNotFound),
         }
-
-        // Update the overall white pieces bitboard
-        self.all_white_pieces &= !to_bit;
-        self.all_pieces = self.all_white_pieces | self.all_black_pieces;
-        Ok(true)
     }
 }
