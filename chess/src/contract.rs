@@ -3,9 +3,9 @@
 
 mod state;
 
-use chess::{ChessBoard, Color, Game, InstantiationArgument, Operation, Piece};
+use chess::{ChessBoard, Clock, Color, Game, InstantiationArgument, Operation, Piece};
 use linera_sdk::{
-    base::{TimeDelta, WithContractAbi},
+    base::{Owner, TimeDelta, WithContractAbi},
     util::BlockingWait,
     views::{RootView, View, ViewStorageContext},
     Contract, ContractRuntime,
@@ -40,6 +40,10 @@ impl Contract for ChessContract {
 
     async fn instantiate(&mut self, argument: Self::InstantiationArgument) {
         self.runtime.application_parameters();
+        self.state
+            .clock
+            .set(Clock::new(self.runtime.system_time(), &argument));
+
         let players_colors = vec![
             (argument.players[0], Color::White),
             (argument.players[1], Color::Black),
@@ -51,20 +55,17 @@ impl Contract for ChessContract {
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {
-        let owner = self.runtime.authenticated_signer().unwrap();
-        let active_player = self.state.board.get().active;
-        let active = self
-            .state
-            .owners
-            .get(&owner)
-            .await
-            .expect("Failed to get active player")
-            .expect("Active player not found");
-
         match operation {
-            Operation::NewGame => {
-                let game = Game::new();
-                self.state.board.set(game);
+            Operation::NewGame { player } => {
+                let players = self.state.get_players();
+                if players.len() == 1 {
+                    let game = Game::new();
+                    self.state.board.set(game);
+                    log::info!("Adding new Player and strating game: {:?}", player);
+                } else {
+                    log::info!("No players found: Adding new Player: {:?}", player);
+                    self.state.add_player(player);
+                }
             }
 
             Operation::CapturePiece {
@@ -73,6 +74,18 @@ impl Contract for ChessContract {
                 piece,
                 captured_piece,
             } => {
+                let block_time = self.runtime.system_time();
+                let clock = self.state.clock.get_mut();
+                let owner = self.runtime.authenticated_signer().unwrap();
+                let active_player = self.state.board.get().active;
+                let active = self
+                    .state
+                    .owners
+                    .get(&owner)
+                    .await
+                    .expect("Failed to get active player")
+                    .expect("Active player not found");
+
                 assert_eq!(
                     active_player, active,
                     "Only the active player can make a move."
@@ -119,12 +132,35 @@ impl Contract for ChessContract {
                         .board
                         .captured_pieces
                         .push(captured_piece);
+
+                    self.runtime
+                        .assert_before(block_time.saturating_add(clock.block_delay));
+                    // self.state
+                    //     .clock
+                    //     .get_mut()
+                    //     .make_move(block_time, active_player);
                 } else {
                     log::info!("Invalid move");
                 }
             }
 
             Operation::MakeMove { from, to, piece } => {
+                let block_time = self.runtime.system_time();
+                let clock = self.state.clock.get_mut();
+
+                self.runtime
+                    .assert_before(block_time.saturating_add(clock.block_delay));
+
+                let owner = self.runtime.authenticated_signer().unwrap();
+                let active_player = self.state.board.get().active;
+                let active = self
+                    .state
+                    .owners
+                    .get(&owner)
+                    .await
+                    .expect("Failed to get active player")
+                    .expect("Active player not found");
+
                 assert_eq!(
                     active_player, active,
                     "Only the active player can make a move."
@@ -150,6 +186,13 @@ impl Contract for ChessContract {
                     Ok(true) => {
                         self.state.board.get_mut().switch_player_turn();
                         self.state.board.get_mut().create_move_string(active, to);
+                        self.runtime
+                            .assert_before(block_time.saturating_add(clock.block_delay));
+
+                        // self.state
+                        //     .clock
+                        //     .get_mut()
+                        //     .make_move(block_time, active_player);
                     }
                     _ => {
                         log::info!("Invalid move");
