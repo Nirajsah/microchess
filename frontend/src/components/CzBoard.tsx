@@ -12,7 +12,16 @@ import blackBishop from '../assets/bb.png'
 import blackQueen from '../assets/bq.png'
 import blackKing from '../assets/bk.png'
 import { useLazyQuery, useMutation, useSubscription } from '@apollo/client'
-import { GET_BOARD, MOVE_PIECE, NOTIFICATIONS } from '../GraphQL/queries'
+import {
+  CAPTURE_PIECE,
+  GET_BOARD,
+  GET_PLAYER,
+  MOVE_PIECE,
+  NOTIFICATIONS,
+} from '../GraphQL/queries'
+import Ranks from './ChessBoard/Ranks'
+import Files from './ChessBoard/Files'
+import { logMissingFieldErrors } from '@apollo/client/core/ObservableQuery'
 
 const pieceImages: any = {
   wP: whitePawn,
@@ -28,6 +37,22 @@ const pieceImages: any = {
   bQ: blackQueen,
   bK: blackKing,
 }
+
+const initialBoard = {
+  wP: 0x000000000000ff00n,
+  wR: 0x0000000000000081n,
+  wN: 0x0000000000000042n,
+  wB: 0x0000000000000024n,
+  wQ: 0x0000000000000008n,
+  wK: 0x0000000000000010n,
+  bP: 0x00ff000000000000n,
+  bR: 0x8100000000000000n,
+  bN: 0x4200000000000000n,
+  bB: 0x2400000000000000n,
+  bQ: 0x0800000000000000n,
+  bK: 0x1000000000000000n,
+}
+
 type Bitboard = number | bigint
 type BoardArray = Array<Array<string | null>>
 
@@ -57,29 +82,37 @@ const bitboardToArray = (bitboards: Record<string, Bitboard>): BoardArray => {
 
 const CzBoard = () => {
   const chainId = window.sessionStorage.getItem('chainId') ?? ''
+  const owner = window.sessionStorage.getItem('owner') ?? ''
   const [boardState, setBoardState] = useState({})
   const [selectedPiece, setSelectedPiece] = React.useState<string | null>(null)
-  const [color, setColor] = React.useState('')
+  const [color, setColor] = React.useState('black')
 
   const [moveMutation] = useMutation(MOVE_PIECE)
+  const [captureMutation] = useMutation(CAPTURE_PIECE)
+
   const [boardQuery, { called }] = useLazyQuery(GET_BOARD, {
     variables: {
       endpoint: 'chess',
       chainId: chainId,
     },
     onCompleted: (data) => {
+      console.log(data)
+
       setBoardState(data.board)
     },
     fetchPolicy: 'network-only',
   })
 
-  const [playerColorQuery] = useLazyQuery(GET_BOARD, {
+  const [playerColorQuery] = useLazyQuery(GET_PLAYER, {
     variables: {
       endpoint: 'chess',
       chainId: chainId,
+      player: owner,
     },
     onCompleted: (data) => {
-      setColor(data.PlayerColor.color)
+      console.log('player: ', data)
+
+      setColor(data.player)
     },
     fetchPolicy: 'network-only',
   })
@@ -94,6 +127,18 @@ const CzBoard = () => {
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null)
 
   const handleSquareClick = (square: string, piece: string | null) => {
+    // console.log('square', square, 'piece', piece)
+    // console.log(
+    //   'selectedSquare',
+    //   selectedSquare,
+    //   'selectedPiece',
+    //   selectedPiece
+    // )
+
+    if (selectedPiece && selectedSquare) {
+      console.log('move piece', selectedSquare, square, selectedPiece, piece)
+    }
+
     if (selectedPiece && selectedSquare) {
       movePiece(selectedSquare, square, selectedPiece)
       setSelectedPiece(null) // Deselect the piece after moving
@@ -103,6 +148,26 @@ const CzBoard = () => {
       setSelectedSquare(square)
     }
   }
+  const capturePiece = async (
+    from: string,
+    to: string,
+    piece: string,
+    capturedPiece: string
+  ) => {
+    await captureMutation({
+      variables: {
+        piece,
+        from: from,
+        to: to,
+        endpoint: 'chess',
+        capturedPiece: capturedPiece,
+      },
+      onError: (error) => {
+        console.error('Message:', error.message)
+      },
+    })
+  }
+
   const movePiece = async (from: string, to: string, piece: string) => {
     await moveMutation({
       variables: {
@@ -124,6 +189,7 @@ const CzBoard = () => {
 
   const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
   const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+
   const renderSquare = (pieceType: string | null, row: number, col: number) => {
     const isWhiteSquare = (row + col) % 2 === 0
     const backgroundColor = isWhiteSquare ? '#ff685321' : '#ff2a00bf'
@@ -131,6 +197,7 @@ const CzBoard = () => {
     return (
       <>
         <div
+          className="cursor-pointer"
           onClick={() => {
             handleSquareClick(`${files[col]}${ranks[row]}`, pieceType)
           }}
@@ -157,17 +224,14 @@ const CzBoard = () => {
     )
   }
 
-  const boardArray = React.useMemo(
-    () => bitboardToArray(boardState),
-    [boardState]
-  )
+  const boardArray = bitboardToArray(boardState)
 
   const renderBoard = () => {
+    console.log('boardArray', boardArray)
+
     return boardArray.map((row, rowIndex) => (
       <div
-        className={`border border-black flex ${
-          color === 'black' ? 'rotate-180' : ''
-        }`}
+        className="border border-black flex"
         style={{ display: 'flex' }}
         key={rowIndex}
       >
@@ -179,28 +243,22 @@ const CzBoard = () => {
   }
 
   return (
-    <div className="border border-black flex">
+    <div className="flex">
       <div className="flex flex-col">
-        {ranks.map((rank) => (
-          <div
-            key={rank}
-            className="h-[100px] p-2 flex justify-center items-center"
-          >
-            {rank}
-          </div>
-        ))}
+        {color.toLowerCase() === 'black' ? (
+          <Ranks ranks={ranks.reverse()} />
+        ) : (
+          <Ranks ranks={ranks} />
+        )}
       </div>
-      <div>
-        {renderBoard()}
+      <div className="border border-black flex flex-col">
+        <div>{renderBoard()}</div>
         <div className="flex">
-          {files.map((file) => (
-            <div
-              key={file}
-              className="w-[100px] p-1 flex justify-center items-center"
-            >
-              {file}
-            </div>
-          ))}
+          {color.toLowerCase() === 'black' ? (
+            <Files files={files.reverse()} />
+          ) : (
+            <Files files={files} />
+          )}
         </div>
       </div>
     </div>

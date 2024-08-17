@@ -4,12 +4,15 @@ import Files from './Files'
 import { useLazyQuery, useSubscription } from '@apollo/client'
 import {
   GET_BOARD,
+  GET_CAPTURED_PIECES,
   GET_MOVES,
   GET_PLAYER,
   GET_PLAYER_TURN,
   NOTIFICATIONS,
-} from '../GraphQL/queries'
+} from '../../GraphQL/queries'
 import Board from './Board'
+import CapturedPieces from './CapturedPieces'
+import { Link } from 'react-router-dom'
 
 let COLUMNS = 'abcdefgh'.split('')
 type Fen = string
@@ -97,6 +100,7 @@ export type SquareToPieceMap = {
   [key in Square]?: Piece
 }
 const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
 function fenToPieceCode(piece: any) {
   // black piece
   if (piece.toLowerCase() === piece) {
@@ -107,11 +111,26 @@ function fenToPieceCode(piece: any) {
   return 'w' + piece.toUpperCase()
 }
 
-function fenToObj(fen: string) {
+function getCheckStatusFromFEN(fen: string): string | null {
+  // Split the FEN string based on the semicolon delimiter
+  const parts = fen.split(';')
+
+  // The last part contains the check status
+  if (parts.length > 1) {
+    const statusPart = parts[1].trim()
+    return statusPart // 'bk_inCheck' or any other status
+  }
+
+  return null // No check status found
+}
+
+function fenToObj(fen: string): {
+  position: SquareToPieceMap
+  KingInCheck: string
+} {
   // cut off any move, castling, etc info from the end
   // we're only interested in position information
   fen = fen.replace(/ .+$/, '')
-
   var rows = fen.split('/')
   var position: any = {}
 
@@ -146,6 +165,19 @@ const CBoard = () => {
   const [player, setPlayer] = React.useState('')
   const [boardState, setBoardState] = React.useState<Fen>(fen)
   const [color, setColor] = React.useState('')
+  const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
+  const [capturedPiecesQuery] = useLazyQuery(GET_CAPTURED_PIECES, {
+    variables: {
+      endpoint: 'chess',
+      chainId: chainId,
+    },
+    onCompleted: (data) => {
+      console.log('captured pieces', data)
+      setCapturedPieces(data.capturedPieces)
+    },
+    fetchPolicy: 'network-only',
+  })
+
   const [boardQuery] = useLazyQuery(GET_BOARD, {
     variables: {
       endpoint: 'chess',
@@ -189,6 +221,7 @@ const CBoard = () => {
       playerTurn()
       boardQuery()
       moveQuery()
+      capturedPiecesQuery()
     },
   })
 
@@ -211,6 +244,7 @@ const CBoard = () => {
     playerTurn()
     boardQuery()
     playerColorQuery()
+    capturedPiecesQuery()
   }
 
   // const handleSquareClick = (square: string, piece: string) => {
@@ -304,11 +338,8 @@ const CBoard = () => {
   //   return board
   // }
 
-  const board: SquareToPieceMap = React.useMemo(
-    () => fenToObj(boardState),
-    [boardState]
-  )
-
+  const board: any = React.useMemo(() => fenToObj(boardState), [boardState])
+  const checkStatus = getCheckStatusFromFEN(boardState)
   const [moves, setMoves] = React.useState<
     Array<{ white: string; black: string }>
   >([])
@@ -371,34 +402,47 @@ const CBoard = () => {
       //     </div>
       //   ))}
       // </div>
-      <Board board={board} isBlack={isBlack} />
+      <Board
+        board={board}
+        isBlack={isBlack}
+        color={color}
+        player={player}
+        isKingInCheck={checkStatus}
+      />
     )
   }
 
   return (
     <div className="flex">
-      <div className="min-w-[250px]">
-        <div className="text-2xl tracking-wide font-semibold p-6">Stella</div>
+      <div className="min-w-[250px] p-6">
+        <Link to="/" className="text-2xl tracking-wide font-semibold">
+          Stella
+        </Link>
       </div>
       <div className="flex flex-col p-1 relative">
         <div className="flex flex-col">
           <Ranks color={color} />
         </div>
-        <div className="mb-2">Opponent{owner}</div>
+        <div className="mb-2 text-sm font-semibold font-sans">
+          Opponent {owner}
+        </div>
+
         <div className="w-full max-w-[720px]">{renderSquare()}</div>
         <div className="flex">
           <Files color={color} />
         </div>
-        <div>Player{owner}</div>
+
+        <div className="mt-4 text-sm font-semibold font-sans">
+          Player {owner}
+        </div>
       </div>
       {/* Right Side Menu */}
-      <div className="w-full my-3 rounded-lg mx-5 p-2 flex flex-col bg-slate-300">
-        <div className="p-5 drop-shadow-2xl bg-[#ff2a00bf] rounded-xl w-full max-w-[300px]">
-          Player turn {player}
+      <div className="w-full font-sans my-3 rounded-lg mx-5 p-2 flex flex-col bg-[#cdc6c654]">
+        <div className="p-5 drop-shadow-2xl bg-[#cdc6c6ab] rounded w-full max-w-[300px]">
+          {player} Plays
         </div>
 
-        <span>Moves</span>
-        <div className="bg-slate-200 w-full rounded-lg">
+        <div className="bg-[#cdc6c6ab] mt-5 w-full rounded">
           <div className="w-full">
             <table className="w-full">
               <thead className="">
@@ -409,13 +453,13 @@ const CBoard = () => {
                 </tr>
               </thead>
             </table>
-            <div className="h-[250px] overflow-y-scroll scrollbar-hide">
+            <div className="h-[250px] overflow-y-scroll scrollbar-hide flex flex-col-reverse">
               <table className="w-full">
                 <tbody>
                   {moves.map((move, index) => (
                     <tr
                       className={`flex px-2 w-full ${
-                        index % 2 === 0 ? 'bg-slate-200' : 'bg-white'
+                        index % 2 === 0 ? 'bg-[#d6d1c7]' : 'bg-white'
                       }`}
                       key={index}
                     >
@@ -431,9 +475,20 @@ const CBoard = () => {
             </div>
           </div>
         </div>
-        <button className="p-5 mt-10 drop-shadow-2xl hover:scale-105 transition-all bg-cyan-600 rounded-xl max-w-[300px]">
-          Play
-        </button>
+        {boardState ? (
+          ''
+        ) : (
+          <button className="px-5 py-2 mt-10 drop-shadow-2xl hover:scale-105 transition-all bg-[#cdc6c6ab] rounded max-w-[100px]">
+            Play
+          </button>
+        )}
+        {checkStatus !== null && checkStatus === 'wk_inCheck' && (
+          <div>White King In Check</div>
+        )}
+        {checkStatus !== null && checkStatus === 'bk_inCheck' && (
+          <div>Black King In Check</div>
+        )}
+        <CapturedPieces pieces={capturedPieces} />
       </div>
     </div>
   )
