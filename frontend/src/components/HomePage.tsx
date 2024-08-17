@@ -1,12 +1,11 @@
-import pawn from '../assets/chess_pawn.svg'
 import Games from './Games'
 import Navbar from './Navbar'
 
 export default function HomePage() {
   return (
-    <div className="bg-[#d6d1c7] w-full h-screen flex flex-col items-center">
+    <div className="bg-[#d6d1c7] h-screen w-full flex flex-col items-center">
       <Navbar />
-      <div className=" w-full max-w-[1280px] my-16 flex justify-center">
+      <div className="w-full max-w-[1280px] my-16 flex h-full justify-center">
         <div className="text-5xl content-center relative text-balance font-medium tracking-normal text-center leading-snug h-[250px]">
           Decentralized Games Platform
           <br /> Play Fair, Play Secure, Play On-Chain

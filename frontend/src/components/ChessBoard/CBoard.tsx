@@ -10,6 +10,7 @@ import {
   GET_PLAYER_TURN,
   NEW_GAME,
   NOTIFICATIONS,
+  OPPONENT,
 } from '../../GraphQL/queries'
 import Board from './Board'
 import CapturedPieces from './CapturedPieces'
@@ -167,6 +168,7 @@ const CBoard = () => {
   const [boardState, setBoardState] = React.useState<Fen>(fen)
   const [color, setColor] = React.useState('')
   const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
+  const [opponentId, setOpponentId] = React.useState<string | null>(null)
   const [play] = useMutation(NEW_GAME)
   const [capturedPiecesQuery] = useLazyQuery(GET_CAPTURED_PIECES, {
     variables: {
@@ -176,6 +178,17 @@ const CBoard = () => {
     onCompleted: (data) => {
       console.log('captured pieces', data)
       setCapturedPieces(data.capturedPieces)
+    },
+    fetchPolicy: 'network-only',
+  })
+  const [opponentIdQuery] = useLazyQuery(OPPONENT, {
+    variables: {
+      endpoint: 'chess',
+      chainId: chainId,
+      player: owner,
+    },
+    onCompleted: (data) => {
+      setOpponentId(data.getOpponent)
     },
     fetchPolicy: 'network-only',
   })
@@ -224,6 +237,7 @@ const CBoard = () => {
       boardQuery()
       moveQuery()
       capturedPiecesQuery()
+      opponentIdQuery()
     },
   })
 
@@ -245,6 +259,7 @@ const CBoard = () => {
     boardQuery()
     playerColorQuery()
     capturedPiecesQuery()
+    opponentIdQuery()
   }
 
   async function startGame() {
@@ -294,7 +309,7 @@ const CBoard = () => {
           <Ranks color={color} />
         </div>
         <div className="mb-2 text-sm font-semibold font-sans">
-          Opponent {owner}
+          Opponent {opponentId}
         </div>
 
         <div className="w-full max-w-[720px]">{renderSquare()}</div>
@@ -345,7 +360,7 @@ const CBoard = () => {
             </div>
           </div>
         </div>
-        {!player && (
+        {!opponentId && (
           <button
             onClick={(event) => {
               event.preventDefault()

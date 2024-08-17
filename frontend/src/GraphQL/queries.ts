@@ -66,3 +66,8 @@ export const NEW_GAME = gql`
     newGame(player: $player)
   }
 `
+export const OPPONENT = gql`
+  query GetOpponent($player: ID!) {
+    getOpponent(player: $player)
+  }
+`
