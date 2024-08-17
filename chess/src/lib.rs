@@ -48,14 +48,18 @@ lazy_static! {
 #[derive(Debug, Deserialize, Serialize, Clone, GraphQLMutationRoot)]
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
-    NewGame,
+    NewGame {
+        player: Owner,
+    },
     MakeMove {
         from: String,
         to: String,
         piece: String,
     },
     CapturePiece {
+        // square which captures
         from: String,
+        // square which is being captured
         to: String,
         // piece which captures
         piece: String,
@@ -101,6 +105,7 @@ impl Color {
     }
 }
 
+/// A struct to represent a Clock
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
 pub struct Clock {
     pub time_left: [TimeDelta; 2],
