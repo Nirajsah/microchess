@@ -1,4 +1,4 @@
-use chess::{Color, Game};
+use chess::{Clock, Color, Game};
 use linera_sdk::{
     base::Owner,
     views::{linera_views, MapView, RegisterView, RootView, ViewStorageContext},
@@ -12,4 +12,5 @@ pub struct Chess {
     pub owners: MapView<Owner, Color>,
     /// The current game state
     pub board: RegisterView<Game>,
+    pub clock: RegisterView<Clock>,
 }
