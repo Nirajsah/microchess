@@ -66,6 +66,7 @@ impl ChessService {
         &self.state.clock.get()
     }
     async fn get_opponent(&self, player: Owner) -> Option<Owner> {
+        log::info!("Getting opponent for player {:?}", player);
         self.state.opponent(player)
     }
 }

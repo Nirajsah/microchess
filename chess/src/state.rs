@@ -24,22 +24,17 @@ impl Chess {
         self.players.get()
     }
     pub fn add_player(&mut self, player: Owner) {
-        // let mut new_player = self.players.get();
-        // new_player.push(player);
         self.players.get_mut().push(player);
     }
     pub fn opponent(&self, player: Owner) -> Option<Owner> {
         log::info!("Player: {:?}", player);
-        let players = self.get_players();
+        let players = self.players.get();
+
         if players.len() != 2 {
+            log::warn!("Expected 2 players, found {}", players.len());
             return None;
         }
-        if players[0] == player {
-            log::info!("Player: {:?}", players[1]);
-            Some(players[1])
-        } else {
-            log::info!("Player: {:?}", players[0]);
-            Some(players[0])
-        }
+
+        players.iter().find(|&p| *p != player).cloned()
     }
 }

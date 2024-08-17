@@ -60,6 +60,7 @@ impl Contract for ChessContract {
                 let players = self.state.get_players();
                 if players.len() == 1 {
                     let game = Game::new();
+                    self.state.add_player(player);
                     self.state.board.set(game);
                     log::info!("Adding new Player and strating game: {:?}", player);
                 } else {
