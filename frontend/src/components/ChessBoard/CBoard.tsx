@@ -1,13 +1,14 @@
 import React from 'react'
 import Ranks from './Ranks'
 import Files from './Files'
-import { useLazyQuery, useSubscription } from '@apollo/client'
+import { useLazyQuery, useMutation, useSubscription } from '@apollo/client'
 import {
   GET_BOARD,
   GET_CAPTURED_PIECES,
   GET_MOVES,
   GET_PLAYER,
   GET_PLAYER_TURN,
+  NEW_GAME,
   NOTIFICATIONS,
 } from '../../GraphQL/queries'
 import Board from './Board'
@@ -166,6 +167,7 @@ const CBoard = () => {
   const [boardState, setBoardState] = React.useState<Fen>(fen)
   const [color, setColor] = React.useState('')
   const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
+  const [play] = useMutation(NEW_GAME)
   const [capturedPiecesQuery] = useLazyQuery(GET_CAPTURED_PIECES, {
     variables: {
       endpoint: 'chess',
@@ -225,8 +227,6 @@ const CBoard = () => {
     },
   })
 
-  // const [moveMutation] = useMutation(MOVE_PIECE)
-  // const [captureMutation] = useMutation(CAPTURE_PIECE)
   const [playerColorQuery] = useLazyQuery(GET_PLAYER, {
     variables: {
       endpoint: 'chess',
@@ -247,96 +247,20 @@ const CBoard = () => {
     capturedPiecesQuery()
   }
 
-  // const handleSquareClick = (square: string, piece: string) => {
-  //   // Convert board coordinates to array indices
-  //   console.log('square after click', square, 'piece', piece)
-  //   console.log(
-  //     'selectedSquare',
-  //     selectedSquare,
-  //     'selectedPiece',
-  //     selectedPiece
-  //   )
+  async function startGame() {
+    await play({
+      variables: {
+        player: owner,
+        endpoint: 'chess',
+        chainId: chainId,
+      },
+    })
+  }
 
-  //   if (selectedPiece && selectedSquare && piece) {
-  //     console.log('move piece', selectedSquare, square, selectedPiece, piece)
-  //     capturePiece(selectedSquare, square, selectedPiece, piece)
-  //   }
-
-  //   if (selectedPiece && selectedSquare) {
-  //     console.log('move piece', selectedSquare, square, selectedPiece)
-  //     movePiece(selectedSquare, square, selectedPiece)
-  //     setSelectedPiece(null) // Deselect the piece after moving
-  //     setSelectedSquare(null) // Reset the selected square
-  //   } else if (piece) {
-  //     setSelectedPiece(piece)
-  //     setSelectedSquare(square)
-  //   }
-  // }
-
-  // const capturePiece = async (
-  //   from: string,
-  //   to: string,
-  //   piece: string,
-  //   capturedPiece: string
-  // ) => {
-  //   console.log('captured called')
-  //   await captureMutation({
-  //     variables: {
-  //       piece,
-  //       from: from,
-  //       to: to,
-  //       endpoint: 'chess',
-  //       capturedPiece: capturedPiece,
-  //     },
-  //     onError: (error) => {
-  //       console.error('Message:', error.message)
-  //     },
-  //   })
-  // }
-
-  // const movePiece = async (from: string, to: string, selectedPiece: string) => {
-  //   await moveMutation({
-  //     variables: {
-  //       piece: selectedPiece,
-  //       from: from,
-  //       to: to,
-  //       endpoint: 'chess',
-  //     },
-  //     onError: (error) => {
-  //       console.error('Message:', error.message)
-  //     },
-  //   })
-  // }
   if (!called) {
     void playerColorQuery()
     moveQuery()
   }
-
-  // const bitboardToArray = (
-  //   bitboards: Record<ChessPiece, number | bigint>
-  // ): ChessPiece[] => {
-  //   const board: ChessPiece[] = Array(64).fill(null)
-
-  //   for (let [pieceType, bitboard] of Object.entries(bitboards)) {
-  //     // Skip the __typename field
-  //     if (pieceType === '__typename') continue
-
-  //     // Convert number to BigInt if necessary
-  //     if (typeof bitboard === 'number') {
-  //       bitboard = BigInt(bitboard)
-  //     }
-
-  //     let bigIntBitboard = BigInt(bitboard)
-
-  //     for (let i = 0; i < 64; i++) {
-  //       if ((bigIntBitboard & (BigInt(1) << BigInt(i))) !== BigInt(0)) {
-  //         board[i] = pieceType as ChessPiece
-  //       }
-  //     }
-  //   }
-
-  //   return board
-  // }
 
   const board: any = React.useMemo(() => fenToObj(boardState), [boardState])
   const checkStatus = getCheckStatusFromFEN(boardState)
@@ -345,63 +269,9 @@ const CBoard = () => {
   >([])
 
   const renderSquare = () => {
-    // Determine if the current player is black
     const isBlack = color.toLowerCase() === 'black'
 
     return (
-      // <div className="">
-      //   {ranks.map((rank, rankIndex) => (
-      //     <div key={rank} className="flex">
-      //       {files.map((file, fileIndex) => {
-      //         const index = isBlack
-      //           ? (7 - rankIndex) * 8 + fileIndex
-      //           : fileIndex + rankIndex * 8
-
-      //         const piece = boardArray[index]
-      //         // Calculate the square position
-      //         const square = isBlack
-      //           ? files[7 - fileIndex] + (rankIndex + 1)
-      //           : file + rank
-      //         // Calculate the background color for alternating squares
-      //         const number = fileIndex + rankIndex
-      //         const backgroundColor =
-      //           selectedSquare === square
-      //             ? '#9ae1dc'
-      //             : number % 2 === 0
-      //             ? '#ff685321'
-      //             : '#ff2a00bf'
-
-      //         return (
-      //           <div
-      //             key={file}
-      //             style={{
-      //               backgroundColor,
-      //               width: '90px',
-      //               height: '90px',
-      //             }}
-      //             onClick={(e) => {
-      //               e.preventDefault()
-      //               if (color === player) {
-      //                 handleSquareClick(square, piece)
-      //               }
-
-      //               console.log(
-      //                 'index',
-
-      //                 (7 - rankIndex) * 8 + (7 - fileIndex),
-      //                 'square',
-      //                 square
-      //               )
-      //             }}
-      //             className="flex justify-center items-center"
-      //           >
-      //             {piece && <Tile image={pieceImages[piece]} />}
-      //           </div>
-      //         )
-      //       })}
-      //     </div>
-      //   ))}
-      // </div>
       <Board
         board={board}
         isBlack={isBlack}
@@ -475,10 +345,14 @@ const CBoard = () => {
             </div>
           </div>
         </div>
-        {boardState ? (
-          ''
-        ) : (
-          <button className="px-5 py-2 mt-10 drop-shadow-2xl hover:scale-105 transition-all bg-[#cdc6c6ab] rounded max-w-[100px]">
+        {!player && (
+          <button
+            onClick={(event) => {
+              event.preventDefault()
+              startGame()
+            }}
+            className="px-5 py-2 mt-10 drop-shadow-2xl hover:scale-105 transition-all bg-[#cdc6c6ab] rounded max-w-[100px]"
+          >
             Play
           </button>
         )}
