@@ -1,9 +1,9 @@
 use crate::{Bitboard, Color, Square};
 
-const NOT_A_FILE: Bitboard = 0xFEFEFEFEFEFEFEFE;
-const NOT_H_FILE: Bitboard = 0x7F7F7F7F7F7F7F7F;
-const NOT_HG_FILE: Bitboard = 0x3F3F3F3F3F3F3F3F;
-const NOT_AB_FILE: Bitboard = 0xFCFCFCFCFCFCFCFC;
+pub const NOT_A_FILE: Bitboard = 0xFEFEFEFEFEFEFEFE;
+pub const NOT_H_FILE: Bitboard = 0x7F7F7F7F7F7F7F7F;
+pub const NOT_HG_FILE: Bitboard = 0x3F3F3F3F3F3F3F3F;
+pub const NOT_AB_FILE: Bitboard = 0xFCFCFCFCFCFCFCFC;
 
 /// A function to compute all possible pawn moves
 pub fn computed_pawn_moves(color: &Color) -> Vec<Bitboard> {
@@ -128,7 +128,7 @@ pub fn attacks_king_moves(square: u8) -> Bitboard {
     attacks
 }
 /// possible rook attacks
-pub fn generate_rook_attacks_on_the_fly(square: Square, block: Bitboard) -> Bitboard {
+pub fn rook_attacks_on_the_fly(square: Square, block: Bitboard) -> Bitboard {
     let mut attacks = 0u64;
 
     let target_rank = square as u8 / 8;
@@ -238,7 +238,7 @@ pub fn bishop_attacks_on_the_fly(square: Square, block: Bitboard) -> Bitboard {
 pub fn queen_attacks_on_the_fly(square: Square, block: Bitboard) -> Bitboard {
     let mut attacks = 0u64;
 
-    attacks |= generate_rook_attacks_on_the_fly(square, block);
+    attacks |= rook_attacks_on_the_fly(square, block);
     attacks |= bishop_attacks_on_the_fly(square, block);
 
     attacks
