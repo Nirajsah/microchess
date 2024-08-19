@@ -4,13 +4,16 @@ use std::str::FromStr;
 use async_graphql::{Enum, Request, Response, SimpleObject};
 use lazy_static::lazy_static;
 use linera_sdk::base::{ContractAbi, Owner, ServiceAbi, TimeDelta, Timestamp};
+use piece::Piece;
 use serde::{Deserialize, Serialize};
 pub struct ChessAbi;
 use linera_sdk::graphql::GraphQLMutationRoot;
 pub mod moves;
 use moves::*;
+pub mod chessboard;
+pub mod piece;
 pub mod square;
-use square::*;
+use square::Square;
 
 impl ContractAbi for ChessAbi {
     type Operation = Operation;
@@ -45,6 +48,7 @@ lazy_static! {
     pub static ref KNIGHT_MOVES: Vec<Bitboard> = computed_knight_attacks();
     pub static ref KING_MOVES: Vec<Bitboard> = computed_king_moves();
 }
+
 #[derive(Debug, Deserialize, Serialize, Clone, GraphQLMutationRoot)]
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
@@ -142,28 +146,17 @@ impl Clock {
     }
 }
 
-/// A struct to represent a chess piece
-#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Enum)]
-#[serde(rename_all = "camelCase")]
-pub enum Piece {
-    WhitePawn,
-    WhiteKnight,
-    WhiteBishop,
-    WhiteRook,
-    WhiteQueen,
-    WhiteKing,
-    BlackPawn,
-    BlackKnight,
-    BlackBishop,
-    BlackRook,
-    BlackQueen,
-    BlackKing,
-}
-
 #[derive(Clone, Default, Debug, Serialize, Deserialize, SimpleObject)]
 pub struct Move {
     white: Option<String>,
     black: Option<String>,
+}
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+pub enum MoveType {
+    #[default]
+    Move,
+    Capture(Piece),
 }
 
 /// The state of a Chess game.
@@ -181,7 +174,7 @@ impl Game {
     /// A function to create a new game
     pub fn new() -> Self {
         Game {
-            board: ChessBoard::new_game(),
+            board: ChessBoard::new(),
             active: Color::White,
             moves: vec![],
         }
@@ -229,6 +222,56 @@ impl Game {
     pub fn switch_player_turn(&mut self) {
         self.active = self.active.opposite()
     }
+
+    pub fn make_move(&mut self, from: Square, to: Square, piece: Piece, m: MoveType) {
+        match m {
+            MoveType::Move => {
+                self.move_piece(from, to, piece);
+            }
+            Capture(Piece) => {
+                self.capture_piece(from, to, piece, Piece);
+            }
+        }
+    }
+
+    pub fn move_piece(&mut self, from: Square, to: Square, piece: Piece) {
+        let mut board = self.board.get_mut_board(&piece);
+        match piece {
+            Piece::WhitePawn => self.board.wP_moves(from, to, &mut board),
+            Piece::BlackPawn => self.board.bP_moves(from, to, &mut board),
+            Piece::WhiteKnight | Piece::BlackKnight => {
+                self.board.knight_moves(from, to, &mut board)
+            }
+            Piece::WhiteKing | Piece::BlackKing => {
+                self.board.king_moves(from, to, &mut board);
+            }
+            _ => todo!(),
+        }
+
+        pub fn capture_piece(&self, from: Square, to: Square, piece: Piece, captured_piece: Piece) {
+            let mut board = self.board.get_mut_board(&piece);
+            let mut captured_board = self.board.get_mut_board(&captured_piece);
+            match piece {
+                Piece::WhitePawn => {
+                    self.board
+                        .wP_captures(from, to, &mut board, &mut captured_board)
+                }
+                Piece::BlackPawn => {
+                    self.board
+                        .bP_captures(from, to, &mut board, &mut captured_board)
+                }
+                Piece::WhiteKnight | Piece::BlackKnight => {
+                    self.board
+                        .knight_captures(from, to, &mut board, &mut captured_board)
+                }
+                Piece::WhiteKing | Piece::BlackKing => {
+                    self.board
+                        .king_captures(from, to, &mut board, &mut captured_board)
+                }
+                _ => todo!(),
+            }
+        }
+    }
 }
 
 #[derive(Clone, Default, Debug, Deserialize, Serialize, SimpleObject)]
@@ -258,7 +301,7 @@ pub struct ChessBoard {
 
 impl ChessBoard {
     /// A function to create a new chess board
-    pub fn new_game() -> Self {
+    pub fn new() -> Self {
         ChessBoard {
             wP: 65280,
             wN: 66,
@@ -279,6 +322,10 @@ impl ChessBoard {
             all_pieces: 18446462598732906495,
         }
     }
+
+    // pub fn set(&mut self, square: Square) {
+    //     self.0 |= 1u64 << square as usize;
+    // }
 
     /// A function to generate FEN string using bitboard
     pub fn to_fen(&self) -> String {
