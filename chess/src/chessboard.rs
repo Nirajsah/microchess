@@ -1,7 +1,8 @@
 #![allow(unused_imports)]
 use crate::{
-    computed_king_moves, computed_knight_attacks, computed_pawn_attacks, computed_pawn_moves,
-    lazy_static, Bitboard, Color, Piece, NOT_A_FILE, NOT_H_FILE,
+    bishop_attacks_on_the_fly, computed_king_moves, computed_knight_attacks, computed_pawn_attacks,
+    computed_pawn_moves, lazy_static, rook_attacks_on_the_fly, Bitboard, Color, Piece, NOT_A_FILE,
+    NOT_H_FILE,
 };
 use async_graphql::SimpleObject;
 use serde::{Deserialize, Serialize};
@@ -9,6 +10,12 @@ use serde::{Deserialize, Serialize};
 use crate::Square;
 
 pub type BitBoard = u64;
+
+#[derive(Debug)]
+pub enum ChessError {
+    PieceNotFound,
+    InvalidPiece,
+}
 
 lazy_static! {
     pub static ref WHITE_PMOVES: Vec<BitBoard> = computed_pawn_moves(&Color::White);
@@ -53,6 +60,20 @@ impl ChessBoard {
         }
     }
 
+    /// A function to create capture string
+    pub fn create_capture_string(from: &str, to: &str) -> String {
+        // Extract the file from each square (the first character)
+        let from_file = &from[0..1];
+        let to_file = &to[0..1];
+
+        // Extract the rank from the 'to' square (the second character)
+        let to_rank = &to[1..2];
+
+        // Combine them into the desired format: "cxb4"
+        format!("{}x{}{}", from_file, to_file, to_rank)
+    }
+
+    /// A function to get the mutable bitboard of a piece
     pub fn get_mut_board(&mut self, piece: &Piece) -> &mut BitBoard {
         match piece {
             Piece::WhitePawn => &mut self.wP,
@@ -128,6 +149,27 @@ impl ChessBoard {
         fen
     }
 
+    /// Return a Piece from a string
+    pub fn get_piece(piece: &str) -> Result<Piece, ChessError> {
+        let piece = match piece {
+            "wP" => Piece::WhitePawn,
+            "wN" => Piece::WhiteKnight,
+            "wB" => Piece::WhiteBishop,
+            "wR" => Piece::WhiteRook,
+            "wQ" => Piece::WhiteQueen,
+            "wK" => Piece::WhiteKing,
+            "bP" => Piece::BlackPawn,
+            "bN" => Piece::BlackKnight,
+            "bB" => Piece::BlackBishop,
+            "bR" => Piece::BlackRook,
+            "bQ" => Piece::BlackQueen,
+            "bK" => Piece::BlackKing,
+
+            _ => Err(ChessError::InvalidPiece)?,
+        };
+        Ok(piece)
+    }
+
     #[rustfmt::skip]
     /// Returns the bitboard of all pieces on the board
     pub fn all_pieces(&self) -> BitBoard {
@@ -146,25 +188,27 @@ impl ChessBoard {
     }
 
     /// Caputures a piece on the board
-    const fn capture_piece(to: Square, board: &mut BitBoard) {
-        if *board & (1u64 << to as usize) != 0 {
-            self.clear(to, board);
+    pub fn capture_piece(&mut self, to: Square, piece: &Piece) {
+        let c_board = self.get_mut_board(&piece);
+        if *c_board & (1u64 << to as usize) != 0 {
+            Self::clear(to, c_board);
         } else {
             log::info!("No piece to capture");
         }
     }
     /// Sets a piece on the board
-    const fn set(square: Square, board: &mut BitBoard) {
+    pub fn set(square: Square, board: &mut BitBoard) {
         *board |= 1u64 << square as usize;
     }
 
     /// Clears a piece on the board
-    const fn clear(square: Square, board: &mut BitBoard) {
+    pub fn clear(square: Square, board: &mut BitBoard) {
         *board &= !(1u64 << square as usize);
     }
 
     /// Moves a piece on the board
-    const fn move_piece(from: Square, to: Square, board: &mut BitBoard) {
+    pub fn move_piece(&mut self, from: Square, to: Square, piece: &Piece) {
+        let board = self.get_mut_board(&piece);
         if *board & (1u64 << from as usize) != 0 {
             Self::clear(from, board);
             Self::set(to, board);
@@ -173,45 +217,57 @@ impl ChessBoard {
         }
     }
 
+    /** ---------------------------------------- Piece Move Logic ----------------------------------------- */
+
     /// Moves a white pawn
-    pub fn wP_moves(&self, from: Square, to: Square, board: &mut BitBoard) {
-        if WHITE_PMOVES[from as usize] & (1u64 << to as usize) != 0
-            && *board & (1u64 << to as usize) == 0
-        {
-            Self::move_piece(from, to, board);
+    pub fn wP_moves(&mut self, from: Square, to: Square, piece: &Piece) {
+        if WHITE_PMOVES[from as usize] & (1u64 << to as usize) != 0 {
+            self.move_piece(from, to, piece);
         } else {
             log::info!("Invalid move");
         }
     }
 
     /// Moves a black pawn
-    pub fn bP_moves(&self, from: Square, to: Square, board: &mut BitBoard) {
-        if BLACK_PMOVES[from as usize] & (1u64 << to as usize) != 0
-            && *board & (1u64 << to as usize) == 0
-        {
-            Self::move_piece(from, to, board);
+    pub fn bP_moves(&mut self, from: Square, to: Square, piece: &Piece) {
+        if BLACK_PMOVES[from as usize] & (1u64 << to as usize) != 0 {
+            self.move_piece(from, to, piece);
         } else {
             log::info!("Invalid move");
         }
     }
 
     /// Moves a knight
-    pub fn knight_moves(&self, from: Square, to: Square, board: &mut BitBoard) {
-        if KNIGHT_MOVES[from as usize] & (1u64 << to as usize) != 0
-            && *board & (1u64 << to as usize) == 0
-        {
-            Self::move_piece(from, to, board);
+    pub fn knight_moves(&mut self, from: Square, to: Square, piece: &Piece) {
+        if KNIGHT_MOVES[from as usize] & (1u64 << to as usize) != 0 {
+            self.move_piece(from, to, piece);
         } else {
             log::info!("Invalid move");
         }
     }
 
     /// Moves a King
-    pub fn king_moves(&self, from: Square, to: Square, board: &mut BitBoard) {
-        if KING_MOVES[from as usize] & (1u64 << to as usize) != 0
-            && *board & (1u64 << to as usize) == 0
-        {
-            Self::move_piece(from, to, board);
+    pub fn king_moves(&mut self, from: Square, to: Square, piece: &Piece) {
+        if KING_MOVES[from as usize] & (1u64 << to as usize) != 0 {
+            self.move_piece(from, to, piece);
+        } else {
+            log::info!("Invalid move");
+        }
+    }
+
+    /// Moves a Rook
+    pub fn rook_moves(&mut self, from: Square, to: Square, piece: &Piece) {
+        if rook_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) != 0 {
+            self.move_piece(from, to, piece);
+        } else {
+            log::info!("Invalid move");
+        }
+    }
+
+    /// Moves a Bishop
+    pub fn bishop_moves(&mut self, from: Square, to: Square, piece: &Piece) {
+        if bishop_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) != 0 {
+            self.move_piece(from, to, piece);
         } else {
             log::info!("Invalid move");
         }
@@ -220,79 +276,85 @@ impl ChessBoard {
     /** --------------------------------Piece Capture Logic---------------------------------- */
 
     /// White pawn captures
-    pub fn wP_captures(
-        &self,
-        from: Square,
-        to: Square,
-        board: &mut BitBoard,
-        captured: &mut Bitboard,
-    ) {
-        if WHITE_PCAPTURES[from as usize] & (1u64 << to as usize) != 0
-            && *board & (1u64 << to as usize) != 0
-            && *captured & (1u64 << to as usize) != 0
-        {
-            Self::capture_piece(to, captured);
-            Self::move_piece(from, to, board);
+    pub fn wP_captures(&mut self, from: Square, to: Square, piece: &Piece, c_captured: &Piece) {
+        if WHITE_PATTACKS[from as usize] & (1u64 << to as usize) != 0 {
+            self.capture_piece(to, c_captured);
+            self.move_piece(from, to, piece);
         } else {
-            log::info!("white pawn could'nt capture");
+            log::info!("white pawn couldn't capture");
         }
     }
 
     /// Black pawn captures
-    pub fn bP_captures(
-        &self,
-        from: Square,
-        to: Square,
-        board: &mut BitBoard,
-        captured: &mut Bitboard,
-    ) {
-        if BLACK_PCAPTURES[from as usize] & (1u64 << to as usize) != 0
-            && *board & (1u64 << to as usize) != 0
-            && *captured & (1u64 << to as usize) != 0
-        {
-            Self::capture_piece(to, captured);
-            Self::move_piece(from, to, board);
+    pub fn bP_captures(&mut self, from: Square, to: Square, board: &Piece, c_captured: &Piece) {
+        if BLACK_PATTACKS[from as usize] & (1u64 << to as usize) != 0 {
+            self.capture_piece(to, c_captured);
+            self.move_piece(from, to, board);
         } else {
-            log::info!("black pawn could'nt capture");
+            log::info!("black pawn couldn't capture");
         }
     }
 
     /// Knight Captures
-    pub fn knight_captures(
-        &self,
-        from: Square,
-        to: Square,
-        board: &mut BitBoard,
-        captured: &mut Bitboard,
-    ) {
-        if KNIGHT_MOVES[from as usize] & (1u64 << to as usize) != 0
-            && *board & (1u64 << to as usize) != 0
-            && *captured & (1u64 << to as usize) != 0
-        {
-            Self::capture_piece(to, captured);
-            Self::move_piece(from, to, board);
+    pub fn knight_captures(&mut self, from: Square, to: Square, piece: &Piece, c_captured: &Piece) {
+        if KNIGHT_MOVES[from as usize] & (1u64 << to as usize) != 0 {
+            self.capture_piece(to, c_captured);
+            self.move_piece(from, to, piece);
         } else {
-            log::info!("Knight could'nt capture");
+            log::info!("Knight couldn't capture");
         }
     }
 
     /// King Captures
-    pub fn king_captures(
-        &self,
-        from: Square,
-        to: Square,
-        board: &mut BitBoard,
-        captured: &mut Bitboard,
-    ) {
-        if KING_MOVES[from as usize] & (1u64 << to as usize) != 0
-            && *board & (1u64 << to as usize) != 0
-            && *captured & (1u64 << to as usize) != 0
-        {
-            Self::capture_piece(to, captured);
-            Self::move_piece(from, to, board);
+    pub fn king_captures(&mut self, from: Square, to: Square, piece: &Piece, c_captured: &Piece) {
+        if KING_MOVES[from as usize] & (1u64 << to as usize) != 0 {
+            self.capture_piece(to, c_captured);
+            self.move_piece(from, to, piece);
         } else {
-            log::info!("Knight could'nt capture");
+            log::info!("Knight couldn't capture");
         }
+    }
+
+    /// Rook Captures
+    pub fn rook_captures(&mut self, from: Square, to: Square, piece: &Piece, c_captured: &Piece) {
+        if rook_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) != 0 {
+            self.capture_piece(to, c_captured);
+            self.move_piece(from, to, piece);
+        } else {
+            log::info!("Rook couldn't capture");
+        }
+    }
+
+    /// Bishop Captures
+    pub fn bishop_captures(&mut self, from: Square, to: Square, piece: &Piece, c_captured: &Piece) {
+        if bishop_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) != 0 {
+            self.capture_piece(to, c_captured);
+            self.move_piece(from, to, piece);
+        } else {
+            log::info!("Bishop couldn't capture");
+        }
+    }
+
+    /** ----------------------------------------- Castling Logic ---------------------------------------------- */
+
+    /// White King castling king side
+    pub fn wK_castle_king_side(&mut self) {
+        todo!()
+    }
+
+    /// White King castling queen side
+    pub fn wK_castle_queen_side(&mut self) {
+        todo!()
+    }
+
+    /// Black King castling king side
+    pub fn bK_castle_king_side(&mut self) {
+        todo!()
+    }
+
+    /// Black King castling queen side
+    pub fn bK_castle_queen_side(&mut self) {
+        todo!()
     }
 
     // pub fn white_attack_mask(&self) -> Bitboard {
