@@ -3,7 +3,12 @@
 
 mod state;
 
-use chess::{ChessBoard, Clock, Color, Game, InstantiationArgument, Operation, Piece};
+use std::str::FromStr;
+
+use chess::{
+    chessboard::ChessBoard, piece::Piece, square::Square, CastleType, Clock, Color, Game,
+    InstantiationArgument, MoveType, Operation,
+};
 use linera_sdk::{
     base::{Owner, TimeDelta, WithContractAbi},
     util::BlockingWait,
@@ -115,14 +120,15 @@ impl Contract for ChessContract {
 
                 let piece = ChessBoard::get_piece(&piece).expect("Invalid piece");
                 let captured_piece = ChessBoard::get_piece(&captured_piece).expect("Invalid piece");
+                let from_sq = Square::from_str(&from).expect("Invalid square");
+                let to_sq = Square::from_str(&to).expect("Invalid square");
+                let m: MoveType = MoveType::Capture(captured_piece);
 
-                let success = self.state.board.get_mut().board.capture_piece(
-                    &from,
-                    &to,
-                    piece,
-                    captured_piece,
-                );
-
+                let success = self
+                    .state
+                    .board
+                    .get_mut()
+                    .make_move(from_sq, to_sq, piece, m);
                 if success {
                     self.state.board.get_mut().switch_player_turn();
                     let moves = ChessBoard::create_capture_string(&from, &to);
@@ -130,7 +136,6 @@ impl Contract for ChessContract {
                     self.state
                         .board
                         .get_mut()
-                        .board
                         .captured_pieces
                         .push(captured_piece);
 
@@ -175,29 +180,46 @@ impl Contract for ChessContract {
                 }
 
                 let piece = ChessBoard::get_piece(&piece).expect("Invalid piece");
+                let from_sq = Square::from_str(&from).expect("Invalid square");
+                let to_sq = Square::from_str(&to).expect("Invalid square");
+                let mut m: MoveType = MoveType::Move;
+
+                match piece {
+                    Piece::WhiteKing => {
+                        if from_sq == Square::E1 && to_sq == Square::G1 {
+                            m = MoveType::Castle(CastleType::KingSide);
+                        } else if from_sq == Square::E1 && to_sq == Square::C1 {
+                            m = MoveType::Castle(CastleType::QueenSide);
+                        }
+                    }
+                    Piece::BlackKing => {
+                        if from_sq == Square::E8 && to_sq == Square::G8 {
+                            m = MoveType::Castle(CastleType::KingSide);
+                        } else if from_sq == Square::E8 && to_sq == Square::C8 {
+                            m = MoveType::Castle(CastleType::QueenSide);
+                        }
+                    }
+                    _ => {}
+                }
 
                 let success = self
                     .state
                     .board
                     .get_mut()
-                    .board
-                    .select_piece_to_move(&from, &to, piece);
+                    .make_move(from_sq, to_sq, piece, m);
 
-                match success {
-                    Ok(true) => {
-                        self.state.board.get_mut().switch_player_turn();
-                        self.state.board.get_mut().create_move_string(active, to);
-                        self.runtime
-                            .assert_before(block_time.saturating_add(clock.block_delay));
+                if success {
+                    self.state.board.get_mut().switch_player_turn();
+                    self.state.board.get_mut().create_move_string(active, to);
+                    self.runtime
+                        .assert_before(block_time.saturating_add(clock.block_delay));
 
-                        // self.state
-                        //     .clock
-                        //     .get_mut()
-                        //     .make_move(block_time, active_player);
-                    }
-                    _ => {
-                        log::info!("Invalid move");
-                    }
+                    // self.state
+                    //     .clock
+                    //     .get_mut()
+                    //     .make_move(block_time, active_player);
+                } else {
+                    log::info!("Invalid move");
                 }
             }
         }
