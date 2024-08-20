@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use self::state::Chess;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema};
-use chess::{Clock, Color, Move, Operation, Piece};
+use chess::{piece::Piece, Clock, Color, Move, Operation};
 use linera_sdk::{
     base::{Owner, WithServiceAbi},
     graphql::GraphQLMutationRoot,
@@ -60,7 +60,7 @@ impl ChessService {
         &self.state.board.get().moves
     }
     async fn captured_pieces(&self) -> &Vec<Piece> {
-        &self.state.board.get().board.captured_pieces
+        &self.state.board.get().captured_pieces
     }
     async fn timer(&self) -> &Clock {
         &self.state.clock.get()
