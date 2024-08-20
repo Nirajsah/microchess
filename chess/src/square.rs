@@ -19,6 +19,7 @@ impl FromStr for Square {
     type Err = String;
 
 #[rustfmt::skip]
+    /// Converts a string to a square.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "a1" => Ok(Square::A1), "b1" => Ok(Square::B1), "c1" => Ok(Square::C1), "d1" => Ok(Square::D1),
