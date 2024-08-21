@@ -1,8 +1,8 @@
 #![allow(unused_imports)]
 use crate::{
     bishop_attacks_on_the_fly, computed_king_moves, computed_knight_attacks, computed_pawn_attacks,
-    computed_pawn_moves, lazy_static, rook_attacks_on_the_fly, Bitboard, Color, Piece, NOT_A_FILE,
-    NOT_H_FILE,
+    computed_pawn_moves, lazy_static, queen_attacks_on_the_fly, rook_attacks_on_the_fly, Bitboard,
+    ChessError, Color, Game, Piece, NOT_A_FILE, NOT_H_FILE,
 };
 use async_graphql::SimpleObject;
 use serde::{Deserialize, Serialize};
@@ -10,12 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::Square;
 
 pub type BitBoard = u64;
-
-#[derive(Debug)]
-pub enum ChessError {
-    PieceNotFound,
-    InvalidPiece,
-}
+pub type Result<T> = std::result::Result<T, ChessError>;
 
 lazy_static! {
     pub static ref WHITE_PMOVES: Vec<BitBoard> = computed_pawn_moves(&Color::White);
@@ -40,9 +35,13 @@ pub struct ChessBoard {
     pub bR: BitBoard,
     pub bQ: BitBoard,
     pub bK: BitBoard,
+
+    /// Castling rights
+    pub castling_rights: [bool; 2],
 }
 
 impl ChessBoard {
+    /// Generates a new Board
     pub fn new() -> Self {
         ChessBoard {
             wP: 0x000000000000FF00,
@@ -57,7 +56,14 @@ impl ChessBoard {
             bR: 0x8100000000000000,
             bQ: 0x0800000000000000,
             bK: 0x1000000000000000,
+
+            castling_rights: [true; 2],
         }
+    }
+
+    /// A function to update the castling right of a color
+    pub fn update_castling_rights(&mut self, color: Color) {
+        self.castling_rights[color.index()] = false;
     }
 
     /// A function to create capture string
@@ -135,22 +141,54 @@ impl ChessBoard {
             }
         }
 
+        // if self.castling_rights[0] {
+        //     fen.push_str(" K");
+        // }
+
+        // if self.castling_rights[1] {
+        //     fen.push_str(" Q");
+        // }
+
         // Add placeholder values for the rest of the FEN string
-        fen.push_str(" w KQkq - 0 1");
 
-        // if self.white_attack_mask() & self.bK != 0 {
-        //     fen.push_str(";bk_inCheck");
-        // }
+        if self.castling_rights[Color::White.index()] {
+            fen.push_str(" KQ");
+        } else {
+            fen.push_str(" -");
+        }
 
-        // if self.black_attack_mask() & self.wK != 0 {
-        //     fen.push_str(";wk_inCheck");
-        // }
+        if self.castling_rights[Color::Black.index()] {
+            fen.push_str(" kq");
+        } else {
+            fen.push_str(" -");
+        }
+
+        fen.push_str(" - 0 1");
+
+        if self.is_check(Color::White) {
+            fen.push_str(" ;wK");
+        }
+
+        if self.is_check(Color::Black) {
+            fen.push_str(" ;bK");
+        }
 
         fen
     }
 
+    /// Returns true if the king of the given color is in check
+    pub fn is_check(&self, color: Color) -> bool {
+        let king = match color {
+            Color::White => self.wK,
+            Color::Black => self.bK,
+        };
+
+        let attack_mask = self.attack_mask(color.opposite());
+        (attack_mask & king) != 0
+    }
+
     /// Return a Piece from a string
-    pub fn get_piece(piece: &str) -> Result<Piece, ChessError> {
+    pub fn get_piece(piece: &str) -> Result<Piece> {
         let piece = match piece {
             "wP" => Piece::WhitePawn,
             "wN" => Piece::WhiteKnight,
@@ -164,8 +202,7 @@ impl ChessBoard {
             "bR" => Piece::BlackRook,
             "bQ" => Piece::BlackQueen,
             "bK" => Piece::BlackKing,
-
-            _ => Err(ChessError::InvalidPiece)?,
+            _ => return Err(ChessError::InvalidPiece),
         };
         Ok(piece)
     }
@@ -188,14 +225,15 @@ impl ChessBoard {
     }
 
     /// Caputures a piece on the board
-    pub fn capture_piece(&mut self, to: Square, piece: &Piece) {
+    pub fn capture_piece(&mut self, to: Square, piece: &Piece) -> Result<()> {
         let c_board = self.get_mut_board(&piece);
-        if *c_board & (1u64 << to as usize) != 0 {
-            Self::clear(to, c_board);
-        } else {
-            log::info!("No piece to capture");
+        if *c_board & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidPiece);
         }
+        Self::clear(to, c_board);
+        Ok(())
     }
+
     /// Sets a piece on the board
     pub fn set(square: Square, board: &mut BitBoard) {
         *board |= 1u64 << square as usize;
@@ -207,260 +245,410 @@ impl ChessBoard {
     }
 
     /// Moves a piece on the board
-    pub fn move_piece(&mut self, from: Square, to: Square, piece: &Piece) {
+    pub fn move_piece(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
         let board = self.get_mut_board(&piece);
-        if *board & (1u64 << from as usize) != 0 {
-            Self::clear(from, board);
-            Self::set(to, board);
-        } else {
-            log::info!("No piece to move");
+        if *board & (1u64 << from as usize) == 0 {
+            return Err(ChessError::InvalidMove);
         }
+        Self::clear(to, board);
+        Self::set(from, board);
+        Ok(())
     }
 
     /** ---------------------------------------- Piece Move Logic ----------------------------------------- */
 
     /// Moves a white pawn
-    pub fn wP_moves(&mut self, from: Square, to: Square, piece: &Piece) {
-        if WHITE_PMOVES[from as usize] & (1u64 << to as usize) != 0 {
-            self.move_piece(from, to, piece);
-        } else {
-            log::info!("Invalid move");
+    pub fn wP_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        if WHITE_PMOVES[from as usize] & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidMove);
         }
+        self.move_piece(from, to, piece)
     }
 
     /// Moves a black pawn
-    pub fn bP_moves(&mut self, from: Square, to: Square, piece: &Piece) {
-        if BLACK_PMOVES[from as usize] & (1u64 << to as usize) != 0 {
-            self.move_piece(from, to, piece);
-        } else {
-            log::info!("Invalid move");
+    pub fn bP_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        if BLACK_PMOVES[from as usize] & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidMove);
         }
+        self.move_piece(from, to, piece)
     }
 
     /// Moves a knight
-    pub fn knight_moves(&mut self, from: Square, to: Square, piece: &Piece) {
-        if KNIGHT_MOVES[from as usize] & (1u64 << to as usize) != 0 {
-            self.move_piece(from, to, piece);
-        } else {
-            log::info!("Invalid move");
+    pub fn knight_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        if KNIGHT_MOVES[from as usize] & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidMove);
         }
+        self.move_piece(from, to, piece)
     }
 
     /// Moves a King
-    pub fn king_moves(&mut self, from: Square, to: Square, piece: &Piece) {
-        if KING_MOVES[from as usize] & (1u64 << to as usize) != 0 {
-            self.move_piece(from, to, piece);
-        } else {
-            log::info!("Invalid move");
+    pub fn king_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        let color = piece.color();
+        if KING_MOVES[from as usize] & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidMove);
         }
+        self.update_castling_rights(color);
+        self.move_piece(from, to, piece)
     }
 
     /// Moves a Rook
-    pub fn rook_moves(&mut self, from: Square, to: Square, piece: &Piece) {
-        if rook_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) != 0 {
-            self.move_piece(from, to, piece);
-        } else {
-            log::info!("Invalid move");
+    pub fn rook_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        let color = piece.color();
+        if rook_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidMove);
         }
+        self.update_castling_rights(color);
+        self.move_piece(from, to, piece)
     }
 
     /// Moves a Bishop
-    pub fn bishop_moves(&mut self, from: Square, to: Square, piece: &Piece) {
-        if bishop_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) != 0 {
-            self.move_piece(from, to, piece);
-        } else {
-            log::info!("Invalid move");
+    pub fn bishop_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        if bishop_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidMove);
         }
+        self.move_piece(from, to, piece)
+    }
+
+    pub fn queen_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        if queen_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidMove);
+        }
+        self.move_piece(from, to, piece)
     }
 
     /** --------------------------------Piece Capture Logic---------------------------------- */
 
     /// White pawn captures
-    pub fn wP_captures(&mut self, from: Square, to: Square, piece: &Piece, c_captured: &Piece) {
-        if WHITE_PATTACKS[from as usize] & (1u64 << to as usize) != 0 {
-            self.capture_piece(to, c_captured);
-            self.move_piece(from, to, piece);
-        } else {
-            log::info!("white pawn couldn't capture");
+    pub fn wP_captures(
+        &mut self,
+        from: Square,
+        to: Square,
+        piece: &Piece,
+        c_captured: &Piece,
+    ) -> Result<()> {
+        if WHITE_PATTACKS[from as usize] & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidCapture);
         }
+        self.capture_piece(to, c_captured)
+            .and_then(|_| self.move_piece(from, to, piece))
     }
 
     /// Black pawn captures
-    pub fn bP_captures(&mut self, from: Square, to: Square, board: &Piece, c_captured: &Piece) {
-        if BLACK_PATTACKS[from as usize] & (1u64 << to as usize) != 0 {
-            self.capture_piece(to, c_captured);
-            self.move_piece(from, to, board);
-        } else {
-            log::info!("black pawn couldn't capture");
+    pub fn bP_captures(
+        &mut self,
+        from: Square,
+        to: Square,
+        piece: &Piece,
+        c_captured: &Piece,
+    ) -> Result<()> {
+        if BLACK_PATTACKS[from as usize] & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidCapture);
         }
+        self.capture_piece(to, c_captured)
+            .and_then(|_| self.move_piece(from, to, piece))
     }
 
     /// Knight Captures
-    pub fn knight_captures(&mut self, from: Square, to: Square, piece: &Piece, c_captured: &Piece) {
-        if KNIGHT_MOVES[from as usize] & (1u64 << to as usize) != 0 {
-            self.capture_piece(to, c_captured);
-            self.move_piece(from, to, piece);
-        } else {
-            log::info!("Knight couldn't capture");
+    pub fn knight_captures(
+        &mut self,
+        from: Square,
+        to: Square,
+        piece: &Piece,
+        c_captured: &Piece,
+    ) -> Result<()> {
+        if KNIGHT_MOVES[from as usize] & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidCapture);
         }
+        self.capture_piece(to, c_captured)
+            .and_then(|_| self.move_piece(from, to, piece))
     }
 
     /// King Captures
-    pub fn king_captures(&mut self, from: Square, to: Square, piece: &Piece, c_captured: &Piece) {
-        if KING_MOVES[from as usize] & (1u64 << to as usize) != 0 {
-            self.capture_piece(to, c_captured);
-            self.move_piece(from, to, piece);
-        } else {
-            log::info!("Knight couldn't capture");
+    pub fn king_captures(
+        &mut self,
+        from: Square,
+        to: Square,
+        piece: &Piece,
+        c_captured: &Piece,
+    ) -> Result<()> {
+        let color = piece.color();
+        if KING_MOVES[from as usize] & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidCapture);
         }
+        self.capture_piece(to, c_captured).and_then(|_| {
+            self.update_castling_rights(color);
+            self.move_piece(from, to, piece)
+        })
     }
 
     /// Rook Captures
-    pub fn rook_captures(&mut self, from: Square, to: Square, piece: &Piece, c_captured: &Piece) {
-        if rook_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) != 0 {
-            self.capture_piece(to, c_captured);
-            self.move_piece(from, to, piece);
-        } else {
-            log::info!("Rook couldn't capture");
+    pub fn rook_captures(
+        &mut self,
+        from: Square,
+        to: Square,
+        piece: &Piece,
+        c_captured: &Piece,
+    ) -> Result<()> {
+        let color = piece.color();
+        if rook_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidCapture);
         }
+        self.capture_piece(to, c_captured).and_then(|_| {
+            self.update_castling_rights(color);
+            self.move_piece(from, to, piece)
+        })
     }
 
     /// Bishop Captures
-    pub fn bishop_captures(&mut self, from: Square, to: Square, piece: &Piece, c_captured: &Piece) {
-        if bishop_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) != 0 {
-            self.capture_piece(to, c_captured);
-            self.move_piece(from, to, piece);
-        } else {
-            log::info!("Bishop couldn't capture");
+    pub fn bishop_captures(
+        &mut self,
+        from: Square,
+        to: Square,
+        piece: &Piece,
+        c_captured: &Piece,
+    ) -> Result<()> {
+        if bishop_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidCapture);
+        }
+        self.capture_piece(to, c_captured)
+            .and_then(|_| self.move_piece(from, to, piece))
+    }
+
+    pub fn queen_captures(
+        &mut self,
+        from: Square,
+        to: Square,
+        piece: &Piece,
+        c_captured: &Piece,
+    ) -> Result<()> {
+        if queen_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidCapture);
+        }
+        self.capture_piece(to, c_captured)
+            .and_then(|_| self.move_piece(from, to, piece))
+    }
+
+    pub fn is_under_attack(&self, sq: Square, color: Color) -> bool {
+        match color {
+            Color::White => {
+                if self.white_attack_mask() & (1u64 << sq as usize) == 0 {
+                    return false;
+                }
+                return true;
+            }
+            Color::Black => {
+                if self.black_attack_mask() & (1u64 << sq as usize) == 0 {
+                    return false;
+                }
+                return true;
+            }
         }
     }
 
     /** ----------------------------------------- Castling Logic ---------------------------------------------- */
 
     /// White King castling king side
-    pub fn wK_castle_king_side(&mut self) {
-        todo!()
+    pub fn wK_castle_king_side(&mut self) -> Result<()> {
+        let all_pieces = self.all_pieces();
+        let mask_under_attack = [Square::E1, Square::F1, Square::G1];
+        let mask_clear = (1 << Square::F1 as usize) | (1 << Square::G1 as usize);
+        if all_pieces & mask_clear == 0
+            && self.wR & (1 << Square::H1 as usize) != 0
+            && mask_under_attack
+                .iter()
+                .all(|&x| self.is_under_attack(x, Color::White))
+        {
+            self.move_piece(Square::E1, Square::G1, &Piece::WhiteKing)
+                .and_then(|_| {
+                    self.update_castling_rights(Color::White);
+                    self.move_piece(Square::H1, Square::F1, &Piece::WhiteRook)
+                })
+        } else {
+            return Err(ChessError::InvalidCastle);
+        }
     }
 
     /// White King castling queen side
-    pub fn wK_castle_queen_side(&mut self) {
-        todo!()
+    pub fn wK_castle_queen_side(&mut self) -> Result<()> {
+        let all_pieces = self.all_pieces();
+        let mask_under_attack = [Square::E1, Square::D1, Square::C1];
+        let mask_clear =
+            (1 << Square::C1 as usize) | (1 << Square::D1 as usize) | (1 << Square::B1 as usize);
+
+        if all_pieces & mask_clear == 0
+            && self.wR & (1 << Square::A1 as usize) != 0
+            && mask_under_attack
+                .iter()
+                .all(|&x| self.is_under_attack(x, Color::White))
+        {
+            self.move_piece(Square::E1, Square::C1, &Piece::WhiteKing)
+                .and_then(|_| {
+                    self.update_castling_rights(Color::White);
+                    self.move_piece(Square::A1, Square::D1, &Piece::WhiteRook)
+                })
+        } else {
+            return Err(ChessError::InvalidCastle);
+        }
     }
 
     /// Black King castling king side
-    pub fn bK_castle_king_side(&mut self) {
-        todo!()
+    pub fn bK_castle_king_side(&mut self) -> Result<()> {
+        let all_pieces = self.all_pieces();
+        let mask_under_attack = [Square::E8, Square::F8];
+        let mask_clear = (1 << Square::F8 as usize) | (1 << Square::G8 as usize);
+        if all_pieces & mask_clear == 0
+            && self.bR & (1 << Square::H8 as usize) != 0
+            && mask_under_attack
+                .iter()
+                .all(|&x| self.is_under_attack(x, Color::Black))
+        {
+            self.move_piece(Square::E8, Square::G8, &Piece::BlackKing)
+                .and_then(|_| {
+                    self.update_castling_rights(Color::Black);
+                    self.move_piece(Square::H8, Square::F8, &Piece::BlackRook)
+                })
+        } else {
+            Err(ChessError::InvalidCastle)
+        }
     }
 
     /// Black King castling queen side
-    pub fn bK_castle_queen_side(&mut self) {
-        todo!()
+    pub fn bK_castle_queen_side(&mut self) -> Result<()> {
+        let all_pieces = self.all_pieces();
+        let mask_under_attack = [Square::E8, Square::D8, Square::C8];
+        let mask_clear =
+            (1 << Square::C8 as usize) | (1 << Square::D8 as usize) | (1 << Square::B8 as usize);
+
+        if all_pieces & mask_clear == 0
+            && self.bR & (1 << Square::A8 as usize) != 0
+            && mask_under_attack
+                .iter()
+                .all(|&x| self.is_under_attack(x, Color::Black))
+        {
+            self.move_piece(Square::E8, Square::C8, &Piece::BlackKing)
+                .and_then(|_| {
+                    self.update_castling_rights(Color::Black);
+                    self.move_piece(Square::A8, Square::D8, &Piece::BlackRook)
+                })
+        } else {
+            Err(ChessError::InvalidCastle)
+        }
     }
 
-    // pub fn white_attack_mask(&self) -> Bitboard {
-    //     let mut attacks = 0u64;
+    /** ----------------------------------------- Compute Attack Mask for current pieces-------------------------------- */
 
-    //     // Pawn attacks
-    //     attacks |= (self.wP << 7) & NOT_H_FILE;
-    //     attacks |= (self.wP << 9) & NOT_A_FILE;
+    pub fn attack_mask(&self, color: Color) -> Bitboard {
+        match color {
+            Color::White => self.white_attack_mask(),
+            Color::Black => self.black_attack_mask(),
+        }
+    }
 
-    //     // Knight attacks
-    //     let mut knights = self.wN;
-    //     while knights != 0 {
-    //         let knight_pos = knights.trailing_zeros() as usize;
-    //         attacks |= KNIGHT_MOVES[knight_pos as usize];
-    //         knights &= knights - 1; // Remove the LSB
-    //     }
+    /// A function to calculate the attack mask for white pieces
+    pub fn white_attack_mask(&self) -> Bitboard {
+        let mut attacks = 0u64;
 
-    //     // King attacks
-    //     let mut kings = self.wK;
-    //     while kings != 0 {
-    //         let king_pos = kings.trailing_zeros() as usize;
-    //         attacks |= KING_MOVES[king_pos as usize];
-    //         kings &= kings - 1; // Remove the LSB
-    //     }
+        // Pawn attacks
+        attacks |= (self.wP << 7) & NOT_H_FILE;
+        attacks |= (self.wP << 9) & NOT_A_FILE;
 
-    //     // Bishop attacks
-    //     let mut bishops = self.wB;
-    //     while bishops != 0 {
-    //         let bishop_pos = bishops.trailing_zeros() as usize;
-    //         let square = Square::usize_to_square(bishop_pos);
-    //         attacks |= bishop_attacks_on_the_fly(square, self.all_pieces);
-    //         bishops &= bishops - 1; // Remove the LSB
-    //     }
+        // Knight attacks
+        let mut knights = self.wN;
+        while knights != 0 {
+            let knight_pos = knights.trailing_zeros() as usize;
+            attacks |= KNIGHT_MOVES[knight_pos as usize];
+            knights &= knights - 1; // Remove the LSB
+        }
 
-    //     // Rook attacks
-    //     let mut rooks = self.wR;
-    //     while rooks != 0 {
-    //         let rook_pos = rooks.trailing_zeros() as usize;
-    //         let square = Square::usize_to_square(rook_pos);
-    //         attacks |= rook_attacks_on_the_fly(square, self.all_pieces);
-    //         rooks &= rooks - 1; // Remove the LSB
-    //     }
+        // King attacks
+        let mut kings = self.wK;
+        while kings != 0 {
+            let king_pos = kings.trailing_zeros() as usize;
+            attacks |= KING_MOVES[king_pos as usize];
+            kings &= kings - 1; // Remove the LSB
+        }
 
-    //     // Queen attacks
-    //     let mut queens = self.wQ;
-    //     while queens != 0 {
-    //         let queen_pos = queens.trailing_zeros() as usize;
-    //         let square = Square::usize_to_square(queen_pos);
-    //         attacks |= queen_attacks_on_the_fly(square, self.all_pieces);
-    //         queens &= queens - 1; // Remove the LSB
-    //     }
+        // Bishop attacks
+        let mut bishops = self.wB;
+        while bishops != 0 {
+            let bishop_pos = bishops.trailing_zeros() as usize;
+            let square = Square::usize_to_square(bishop_pos);
+            attacks |= bishop_attacks_on_the_fly(square, self.all_pieces());
+            bishops &= bishops - 1; // Remove the LSB
+        }
 
-    //     attacks
-    // }
+        // Rook attacks
+        let mut rooks = self.wR;
+        while rooks != 0 {
+            let rook_pos = rooks.trailing_zeros() as usize;
+            let square = Square::usize_to_square(rook_pos);
+            attacks |= rook_attacks_on_the_fly(square, self.all_pieces());
+            rooks &= rooks - 1; // Remove the LSB
+        }
 
-    // /// A function to calculate attacks mask for black pieces
-    // pub fn black_attack_mask(&self) -> Bitboard {
-    //     let mut attacks = 0;
+        // Queen attacks
+        let mut queens = self.wQ;
+        while queens != 0 {
+            let queen_pos = queens.trailing_zeros() as usize;
+            let square = Square::usize_to_square(queen_pos);
+            attacks |= queen_attacks_on_the_fly(square, self.all_pieces());
+            queens &= queens - 1; // Remove the LSB
+        }
 
-    //     // Pawn attacks
-    //     attacks |= (self.bP >> 7) & NOT_A_FILE;
-    //     attacks |= (self.bP >> 9) & NOT_H_FILE;
+        attacks
+    }
 
-    //     // Knight attacks
-    //     let mut knights = self.bN;
-    //     while knights != 0 {
-    //         let knight_pos = knights.trailing_zeros() as usize;
-    //         attacks |= KNIGHT_MOVES[knight_pos as usize];
-    //         knights &= knights - 1; // Remove the LSB
-    //     }
+    /// A function to calculate attacks mask for black pieces
+    pub fn black_attack_mask(&self) -> Bitboard {
+        let mut attacks = 0;
 
-    //     // King attacks
-    //     let mut kings = self.bK;
-    //     while kings != 0 {
-    //         let king_pos = kings.trailing_zeros() as usize;
-    //         attacks |= KING_MOVES[king_pos as usize];
-    //         kings &= kings - 1; // Remove the LSB
-    //     }
+        // Pawn attacks
+        attacks |= (self.bP >> 7) & NOT_A_FILE;
+        attacks |= (self.bP >> 9) & NOT_H_FILE;
 
-    //     // Bishop attacks
-    //     let mut bishops = self.bB;
-    //     while bishops != 0 {
-    //         let bishop_pos = bishops.trailing_zeros() as usize;
-    //         let square = Square::usize_to_square(bishop_pos);
-    //         attacks |= bishop_attacks_on_the_fly(square, self.all_pieces);
-    //         bishops &= bishops - 1; // Remove the LSB
-    //     }
+        // Knight attacks
+        let mut knights = self.bN;
+        while knights != 0 {
+            let knight_pos = knights.trailing_zeros() as usize;
+            attacks |= KNIGHT_MOVES[knight_pos as usize];
+            knights &= knights - 1; // Remove the LSB
+        }
 
-    //     // Rook attacks
-    //     let mut rooks = self.bR;
-    //     while rooks != 0 {
-    //         let rook_pos = rooks.trailing_zeros() as usize;
-    //         let square = Square::usize_to_square(rook_pos);
-    //         attacks |= rook_attacks_on_the_fly(square, self.all_pieces);
-    //         rooks &= rooks - 1; // Remove the LSB
-    //     }
+        // King attacks
+        let mut kings = self.bK;
+        while kings != 0 {
+            let king_pos = kings.trailing_zeros() as usize;
+            attacks |= KING_MOVES[king_pos as usize];
+            kings &= kings - 1; // Remove the LSB
+        }
 
-    //     // Queen attacks
-    //     let mut queens = self.bQ;
-    //     while queens != 0 {
-    //         let queen_pos = queens.trailing_zeros() as usize;
-    //         let square = Square::usize_to_square(queen_pos);
-    //         attacks |= queen_attacks_on_the_fly(square, self.all_pieces);
-    //         queens &= queens - 1; // Remove the LSB
-    //     }
+        // Bishop attacks
+        let mut bishops = self.bB;
+        while bishops != 0 {
+            let bishop_pos = bishops.trailing_zeros() as usize;
+            let square = Square::usize_to_square(bishop_pos);
+            attacks |= bishop_attacks_on_the_fly(square, self.all_pieces());
+            bishops &= bishops - 1; // Remove the LSB
+        }
 
-    //     attacks
-    // }
+        // Rook attacks
+        let mut rooks = self.bR;
+        while rooks != 0 {
+            let rook_pos = rooks.trailing_zeros() as usize;
+            let square = Square::usize_to_square(rook_pos);
+            attacks |= rook_attacks_on_the_fly(square, self.all_pieces());
+            rooks &= rooks - 1; // Remove the LSB
+        }
+
+        // Queen attacks
+        let mut queens = self.bQ;
+        while queens != 0 {
+            let queen_pos = queens.trailing_zeros() as usize;
+            let square = Square::usize_to_square(queen_pos);
+            attacks |= queen_attacks_on_the_fly(square, self.all_pieces());
+            queens &= queens - 1; // Remove the LSB
+        }
+
+        attacks
+    }
 }
