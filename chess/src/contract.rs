@@ -6,8 +6,10 @@ mod state;
 use std::str::FromStr;
 
 use chess::{
-    chessboard::ChessBoard, piece::Piece, square::Square, CastleType, Clock, Color, Game,
-    InstantiationArgument, MoveType, Operation,
+    chessboard::ChessBoard,
+    piece::{Color, Piece},
+    square::Square,
+    CastleType, ChessError, Clock, Game, InstantiationArgument, MoveType, Operation,
 };
 use linera_sdk::{
     base::{Owner, TimeDelta, WithContractAbi},
@@ -97,24 +99,15 @@ impl Contract for ChessContract {
                     "Only the active player can make a move."
                 );
 
-                log::info!(
-                    "Capture piece: {} {} {} {}",
-                    from,
-                    to,
-                    piece,
-                    captured_piece
-                );
-
-                if piece.starts_with("w")
-                    && active_player != Color::White
-                    && captured_piece.starts_with("w")
-                {
+                // If the active player is White and tries to capture a white piece, return early
+                if active_player == Color::White && captured_piece.starts_with("w") {
+                    log::info!("Returning early: White cannot capture their own piece.");
                     return;
                 }
-                if piece.starts_with("b")
-                    && active_player != Color::Black
-                    && captured_piece.starts_with("b")
-                {
+
+                // If the active player is Black and tries to capture a black piece, return early
+                if active_player == Color::Black && captured_piece.starts_with("b") {
+                    log::info!("Returning early: Black cannot capture their own piece.");
                     return;
                 }
 
@@ -129,24 +122,28 @@ impl Contract for ChessContract {
                     .board
                     .get_mut()
                     .make_move(from_sq, to_sq, piece, m);
-                if success {
-                    self.state.board.get_mut().switch_player_turn();
-                    let moves = ChessBoard::create_capture_string(&from, &to);
-                    self.state.board.get_mut().create_move_string(active, moves);
-                    self.state
-                        .board
-                        .get_mut()
-                        .captured_pieces
-                        .push(captured_piece);
 
-                    self.runtime
-                        .assert_before(block_time.saturating_add(clock.block_delay));
-                    // self.state
-                    //     .clock
-                    //     .get_mut()
-                    //     .make_move(block_time, active_player);
-                } else {
-                    log::info!("Invalid move");
+                match success {
+                    Ok(_) => {
+                        self.state.board.get_mut().switch_player_turn();
+                        let moves = ChessBoard::create_capture_string(&from, &to);
+                        self.state.board.get_mut().create_move_string(active, moves);
+                        self.state
+                            .board
+                            .get_mut()
+                            .captured_pieces
+                            .push(captured_piece);
+
+                        self.runtime
+                            .assert_before(block_time.saturating_add(clock.block_delay));
+                        // self.state
+                        //     .clock
+                        //     .get_mut()
+                        //     .make_move(block_time, active_player);
+                    }
+                    Err(e) => {
+                        log::info!("Invalid move: {:?}", e);
+                    }
                 }
             }
 
@@ -202,24 +199,27 @@ impl Contract for ChessContract {
                     _ => {}
                 }
 
+                // self.state
+                //     .clock
+                //     .get_mut()
+                //     .make_move(block_time, active_player);
+
                 let success = self
                     .state
                     .board
                     .get_mut()
                     .make_move(from_sq, to_sq, piece, m);
 
-                if success {
-                    self.state.board.get_mut().switch_player_turn();
-                    self.state.board.get_mut().create_move_string(active, to);
-                    self.runtime
-                        .assert_before(block_time.saturating_add(clock.block_delay));
-
-                    // self.state
-                    //     .clock
-                    //     .get_mut()
-                    //     .make_move(block_time, active_player);
-                } else {
-                    log::info!("Invalid move");
+                match success {
+                    Ok(_) => {
+                        self.state.board.get_mut().switch_player_turn();
+                        self.state.board.get_mut().create_move_string(active, to);
+                        self.runtime
+                            .assert_before(block_time.saturating_add(clock.block_delay));
+                    }
+                    Err(e) => {
+                        log::info!("Invalid move: {:?}", e);
+                    }
                 }
             }
         }
