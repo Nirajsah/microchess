@@ -15,8 +15,9 @@ import {
 import Board from './Board'
 import CapturedPieces from './CapturedPieces'
 import { Link } from 'react-router-dom'
+import Timer from './Timer'
 
-let COLUMNS = 'abcdefgh'.split('')
+const COLUMNS = 'abcdefgh'.split('')
 type Fen = string
 export type Piece =
   | 'wP'
@@ -133,23 +134,23 @@ function fenToObj(fen: string): {
   // cut off any move, castling, etc info from the end
   // we're only interested in position information
   fen = fen.replace(/ .+$/, '')
-  var rows = fen.split('/')
-  var position: any = {}
+  const rows = fen.split('/')
+  const position: any = {}
 
-  var currentRow = 8
-  for (var i = 0; i < 8; i++) {
-    var row = rows[i].split('')
-    var colIdx = 0
+  let currentRow = 8
+  for (let i = 0; i < 8; i++) {
+    const row = rows[i].split('')
+    let colIdx = 0
 
     // loop through each character in the FEN section
-    for (var j = 0; j < row.length; j++) {
+    for (let j = 0; j < row.length; j++) {
       // number / empty squares
       if (row[j].search(/[1-8]/) !== -1) {
-        var numEmptySquares = parseInt(row[j], 10)
+        const numEmptySquares = parseInt(row[j], 10)
         colIdx = colIdx + numEmptySquares
       } else {
         // piece
-        var square = COLUMNS[colIdx] + currentRow
+        const square = COLUMNS[colIdx] + currentRow
         position[square] = fenToPieceCode(row[j])
         colIdx = colIdx + 1
       }
@@ -237,7 +238,6 @@ const CBoard = () => {
       boardQuery()
       moveQuery()
       capturedPiecesQuery()
-      opponentIdQuery()
     },
   })
 
@@ -320,7 +320,10 @@ const CBoard = () => {
         <div className="mt-4 text-sm font-semibold font-sans">
           Player {owner}
         </div>
+        {player &&
+          (player === color ? <Timer start={true} /> : <Timer start={false} />)}
       </div>
+
       {/* Right Side Menu */}
       <div className="w-full font-sans my-3 rounded-lg mx-5 p-2 flex flex-col bg-[#cdc6c654]">
         <div className="p-5 drop-shadow-2xl bg-[#cdc6c6ab] rounded w-full max-w-[300px]">
@@ -371,10 +374,10 @@ const CBoard = () => {
             Play
           </button>
         )}
-        {checkStatus !== null && checkStatus === 'wk_inCheck' && (
+        {checkStatus !== null && checkStatus === 'wK' && (
           <div>White King In Check</div>
         )}
-        {checkStatus !== null && checkStatus === 'bk_inCheck' && (
+        {checkStatus !== null && checkStatus === 'bK' && (
           <div>Black King In Check</div>
         )}
         <CapturedPieces pieces={capturedPieces} />

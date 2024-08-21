@@ -129,8 +129,8 @@ export default function Board({
   player: string
   isKingInCheck?: string | null
 }) {
-  const chainId = window.sessionStorage.getItem('chainId') ?? ''
-  const owner = window.sessionStorage.getItem('owner') ?? ''
+  // const chainId = window.sessionStorage.getItem('chainId') ?? ''
+  // const owner = window.sessionStorage.getItem('owner') ?? ''
   const [selectedPiece, setSelectedPiece] = React.useState<any>(null)
   const [selectedSquare, setSelectedSquare] = React.useState<string | null>(
     null
@@ -141,10 +141,10 @@ export default function Board({
 
   function getKingPosition(board: SquareToPieceMap) {
     for (const [square, piece] of Object.entries(board)) {
-      if (piece === 'wK' && isKingInCheck === 'wk_inCheck') {
+      if (piece === 'wK' && isKingInCheck === 'wK') {
         return square
       }
-      if (piece === 'bK' && isKingInCheck === 'bk_inCheck') {
+      if (piece === 'bK' && isKingInCheck === 'bK') {
         return square
       }
     }
@@ -243,10 +243,10 @@ export default function Board({
               square === KingInCheck
                 ? '#af26bf'
                 : selectedSquare === square || square === piece
-                ? '#91bf26'
-                : number % 2 === 0
-                ? '#ff685321'
-                : '#ff2a00bf'
+                  ? '#91bf26'
+                  : number % 2 === 0
+                    ? '#ff685321'
+                    : '#ff2a00bf'
             return (
               <div
                 key={file}
