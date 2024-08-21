@@ -64,7 +64,7 @@ bun preview
 - [x] Implement pawn double move.
 - [x] Implement turn-based play (White moves first).
 - [x] Detect and handle check.
-- [ ] Implement castling.
+- [x] Implement castling.
 - [ ] Implement en passant.
 - [ ] Detect and handle checkmate.
 - [ ] Implement pawn promotion.
