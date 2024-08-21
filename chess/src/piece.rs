@@ -3,8 +3,10 @@ use std::str::FromStr;
 use async_graphql::Enum;
 use serde::{Deserialize, Serialize};
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Enum)]
+/// A struct to represent a color
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Enum)]
 pub enum Color {
+    #[default]
     White,
     Black,
 }
@@ -23,6 +25,34 @@ pub enum Piece {
     BlackRook,
     BlackQueen,
     BlackKing,
+}
+
+impl Piece {
+    #[rustfmt::skip]
+    pub fn color(&self) -> Color {
+    match self {
+      Piece::WhitePawn | Piece::WhiteKnight | Piece::WhiteBishop | Piece::WhiteRook | Piece::WhiteQueen | Piece::WhiteKing => Color::White,
+      Piece::BlackPawn | Piece::BlackKnight | Piece::BlackBishop | Piece::BlackRook | Piece::BlackQueen | Piece::BlackKing => Color::Black,
+    }
+  }
+}
+
+impl Color {
+    /// A function to get the opposite color
+    pub fn opposite(&self) -> Self {
+        match self {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
+        }
+    }
+
+    /// A function to get the index of the color
+    pub fn index(&self) -> usize {
+        match self {
+            Color::White => 0,
+            Color::Black => 1,
+        }
+    }
 }
 
 impl FromStr for Piece {
