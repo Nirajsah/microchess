@@ -6,7 +6,10 @@ use std::sync::Arc;
 
 use self::state::Chess;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema};
-use chess::{piece::Piece, Clock, Color, Move, Operation};
+use chess::{
+    piece::{Color, Piece},
+    Clock, Move, Operation,
+};
 use linera_sdk::{
     base::{Owner, WithServiceAbi},
     graphql::GraphQLMutationRoot,
