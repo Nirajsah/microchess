@@ -209,7 +209,7 @@ impl Game {
         match m {
             MoveType::Move => match self.move_piece(from, to, piece) {
                 Ok(_) => {
-                    if self.board.is_check(color) {
+                    if self.board.in_check(color) {
                         self.board.update_castling_rights(color)
                     }
                     Ok(())
@@ -218,7 +218,7 @@ impl Game {
             },
             MoveType::Capture(Piece) => match self.capture_piece(from, to, piece, Piece) {
                 Ok(_) => {
-                    if self.board.is_check(color) {
+                    if self.board.in_check(color) {
                         self.board.update_castling_rights(color)
                     }
                     Ok(())
