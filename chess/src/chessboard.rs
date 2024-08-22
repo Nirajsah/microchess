@@ -97,6 +97,24 @@ impl ChessBoard {
         }
     }
 
+    /// A function to get the bitboard of a piece as immutable reference
+    pub fn get_board(&mut self, piece: &Piece) -> &BitBoard {
+        match piece {
+            Piece::WhitePawn => &self.wP,
+            Piece::WhiteKnight => &self.wN,
+            Piece::WhiteBishop => &self.wB,
+            Piece::WhiteRook => &self.wR,
+            Piece::WhiteQueen => &self.wQ,
+            Piece::WhiteKing => &self.wK,
+            Piece::BlackPawn => &self.bP,
+            Piece::BlackKnight => &self.bN,
+            Piece::BlackBishop => &self.bB,
+            Piece::BlackRook => &self.bR,
+            Piece::BlackQueen => &self.bQ,
+            Piece::BlackKing => &self.bK,
+        }
+    }
+
     ///A function to generate FEN string using bitboard
     pub fn to_fen(&self) -> String {
         let bitboards = [
@@ -165,11 +183,11 @@ impl ChessBoard {
 
         fen.push_str(" - 0 1");
 
-        if self.is_check(Color::White) {
+        if self.in_check(Color::White) {
             fen.push_str(" ;wK");
         }
 
-        if self.is_check(Color::Black) {
+        if self.in_check(Color::Black) {
             fen.push_str(" ;bK");
         }
 
@@ -177,7 +195,7 @@ impl ChessBoard {
     }
 
     /// Returns true if the king of the given color is in check
-    pub fn is_check(&self, color: Color) -> bool {
+    pub fn in_check(&self, color: Color) -> bool {
         let king = match color {
             Color::White => self.wK,
             Color::Black => self.bK,
@@ -244,14 +262,26 @@ impl ChessBoard {
         *board &= !(1u64 << square as usize);
     }
 
-    /// Moves a piece on the board
+    /// Moves a piece on the board, while checking if the king is in check
     pub fn move_piece(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
-        let board = self.get_mut_board(&piece);
+        let color = piece.color();
+        let board = self.get_board(&piece);
+
+        // Check if the piece is at the 'from' square
         if *board & (1u64 << from as usize) == 0 {
             return Err(ChessError::InvalidMove);
         }
-        Self::clear(to, board);
-        Self::set(from, board);
+
+        if !self.in_check(color) {
+            Self::clear(from, self.get_mut_board(&piece));
+            if self.in_check(color) {
+                Self::set(from, self.get_mut_board(&piece));
+                return Err(ChessError::InvalidMove);
+            }
+        }
+
+        Self::clear(from, self.get_mut_board(&piece));
+        Self::set(to, self.get_mut_board(&piece));
         Ok(())
     }
 
@@ -259,6 +289,13 @@ impl ChessBoard {
 
     /// Moves a white pawn
     pub fn wP_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        let sq = from as usize + 8 as usize;
+        if to as usize == from as usize + 16 {
+            // Ensure the square directly in front is unoccupied
+            if self.all_pieces() & (1u64 << sq) != 0 {
+                return Err(ChessError::InvalidMove);
+            }
+        }
         if WHITE_PMOVES[from as usize] & (1u64 << to as usize) == 0 {
             return Err(ChessError::InvalidMove);
         }
@@ -267,6 +304,13 @@ impl ChessBoard {
 
     /// Moves a black pawn
     pub fn bP_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        let sq = from as usize - 8 as usize;
+        if to as usize == from as usize - 16 {
+            // Ensure the square directly in front is unoccupied
+            if self.all_pieces() & (1u64 << sq) != 0 {
+                return Err(ChessError::InvalidMove);
+            }
+        }
         if BLACK_PMOVES[from as usize] & (1u64 << to as usize) == 0 {
             return Err(ChessError::InvalidMove);
         }
