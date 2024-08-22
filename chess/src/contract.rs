@@ -66,6 +66,9 @@ impl Contract for ChessContract {
             Operation::NewGame { player } => {
                 let players = self.state.get_players();
                 if players.len() == 1 {
+                    if player == players[0] {
+                        return;
+                    }
                     let game = Game::new();
                     self.state.add_player(player);
                     self.state.board.set(game);
@@ -101,13 +104,11 @@ impl Contract for ChessContract {
 
                 // If the active player is White and tries to capture a white piece, return early
                 if active_player == Color::White && captured_piece.starts_with("w") {
-                    log::info!("Returning early: White cannot capture their own piece.");
                     return;
                 }
 
                 // If the active player is Black and tries to capture a black piece, return early
                 if active_player == Color::Black && captured_piece.starts_with("b") {
-                    log::info!("Returning early: Black cannot capture their own piece.");
                     return;
                 }
 
