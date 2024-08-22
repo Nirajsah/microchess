@@ -310,6 +310,12 @@ const CBoard = () => {
         </div>
         <div className="mb-2 text-sm font-semibold font-sans">
           Opponent {opponentId}
+          {player &&
+            (player !== color ? (
+              <Timer start={true} />
+            ) : (
+              <Timer start={false} />
+            ))}
         </div>
 
         <div className="w-full max-w-[720px]">{renderSquare()}</div>
