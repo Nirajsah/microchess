@@ -129,11 +129,6 @@ impl Contract for ChessContract {
                         self.state.board.get_mut().switch_player_turn();
                         let moves = ChessBoard::create_capture_string(&from, &to);
                         self.state.board.get_mut().create_move_string(active, moves);
-                        self.state
-                            .board
-                            .get_mut()
-                            .captured_pieces
-                            .push(captured_piece);
 
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
@@ -181,6 +176,10 @@ impl Contract for ChessContract {
                 let from_sq = Square::from_str(&from).expect("Invalid square");
                 let to_sq = Square::from_str(&to).expect("Invalid square");
                 let mut m: MoveType = MoveType::Move;
+
+                if self.state.board.get().board.en_passant & (1u64 << to_sq as usize) != 0 {
+                    m = MoveType::EnPassant;
+                }
 
                 match piece {
                     Piece::WhiteKing => {
