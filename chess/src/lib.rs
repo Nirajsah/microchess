@@ -71,6 +71,7 @@ pub enum ChessError {
     InvalidCapture,
     InvalidPromotion,
     InvalidCastle,
+    InvalidEnPassant,
     CastleRights,
 }
 
@@ -134,6 +135,7 @@ pub enum MoveType {
     Move,
     Capture(Piece),
     Castle(CastleType),
+    EnPassant,
 }
 
 /// The state of a Chess game.
@@ -158,6 +160,10 @@ impl Game {
             moves: vec![],
             captured_pieces: vec![],
         }
+    }
+
+    pub fn insert_captured_pieces(&mut self, piece: &Piece) {
+        self.captured_pieces.push(*piece);
     }
 
     /// A function to create a move string
@@ -221,12 +227,23 @@ impl Game {
                     if self.board.in_check(color) {
                         self.board.update_castling_rights(color)
                     }
+                    self.insert_captured_pieces(&Piece);
                     Ok(())
                 }
                 Err(_) => Err(ChessError::InvalidCapture),
             },
             MoveType::Castle(CastleType::KingSide) => self.castle(&piece, CastleType::KingSide),
             MoveType::Castle(CastleType::QueenSide) => self.castle(&piece, CastleType::QueenSide),
+            MoveType::EnPassant => match self.board.en_passant_capture(from, to, &piece) {
+                Ok(_) => {
+                    if self.board.in_check(color) {
+                        self.board.update_castling_rights(color)
+                    }
+                    self.insert_captured_pieces(&piece.opp_piece()); // In case of en passant, only pawns can be captured
+                    Ok(())
+                }
+                Err(_) => Err(ChessError::InvalidEnPassant),
+            },
         }
     }
 
