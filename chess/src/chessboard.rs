@@ -38,6 +38,8 @@ pub struct ChessBoard {
 
     /// Castling rights
     pub castling_rights: [bool; 2],
+    /// En passant
+    pub en_passant: BitBoard,
 }
 
 impl ChessBoard {
@@ -58,6 +60,7 @@ impl ChessBoard {
             bK: 0x1000000000000000,
 
             castling_rights: [true; 2],
+            en_passant: 0x00,
         }
     }
 
@@ -295,6 +298,7 @@ impl ChessBoard {
             if self.all_pieces() & (1u64 << sq) != 0 {
                 return Err(ChessError::InvalidMove);
             }
+            self.en_passant = 1u64 << sq;
         }
         if WHITE_PMOVES[from as usize] & (1u64 << to as usize) == 0 {
             return Err(ChessError::InvalidMove);
@@ -310,6 +314,8 @@ impl ChessBoard {
             if self.all_pieces() & (1u64 << sq) != 0 {
                 return Err(ChessError::InvalidMove);
             }
+
+            self.en_passant = 1u64 << sq;
         }
         if BLACK_PMOVES[from as usize] & (1u64 << to as usize) == 0 {
             return Err(ChessError::InvalidMove);
@@ -361,6 +367,42 @@ impl ChessBoard {
     }
 
     /** --------------------------------Piece Capture Logic---------------------------------- */
+
+    /// En passant capture
+    pub fn en_passant_capture(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        let color = piece.color();
+        // Ensure en passant is possible and the destination is the en passant square
+        if self.en_passant == 0 || self.en_passant & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidCapture);
+        }
+        // Determine the attack pattern based on the piece color
+        let valid_attack = if color == Color::White {
+            WHITE_PATTACKS[from as usize]
+        } else {
+            BLACK_PATTACKS[from as usize]
+        };
+
+        // Validate that the move is a valid en passant capture
+        if valid_attack & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidCapture);
+        }
+
+        let en_piece: Piece = if color == Color::Black {
+            Piece::WhitePawn
+        } else {
+            Piece::BlackPawn
+        };
+
+        // Calculate the captured pawn's square (it is behind the en passant target square)
+        let captured_square = if color == Color::White {
+            to as usize - 8 as usize // White pawns move "up" the board, so capture square is "down"
+        } else {
+            to as usize + 8 as usize // Black pawns move "down" the board, so capture square is "up"
+        };
+
+        self.capture_piece(Square::usize_to_square(captured_square), &en_piece)
+            .and_then(|_| self.move_piece(from, to, piece))
+    }
 
     /// White pawn captures
     pub fn wP_captures(
