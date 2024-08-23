@@ -30,11 +30,28 @@ pub enum Piece {
 impl Piece {
     #[rustfmt::skip]
     pub fn color(&self) -> Color {
-    match self {
-      Piece::WhitePawn | Piece::WhiteKnight | Piece::WhiteBishop | Piece::WhiteRook | Piece::WhiteQueen | Piece::WhiteKing => Color::White,
-      Piece::BlackPawn | Piece::BlackKnight | Piece::BlackBishop | Piece::BlackRook | Piece::BlackQueen | Piece::BlackKing => Color::Black,
+      match self {
+        Piece::WhitePawn | Piece::WhiteKnight | Piece::WhiteBishop | Piece::WhiteRook | Piece::WhiteQueen | Piece::WhiteKing => Color::White,
+        Piece::BlackPawn | Piece::BlackKnight | Piece::BlackBishop | Piece::BlackRook | Piece::BlackQueen | Piece::BlackKing => Color::Black,
+      }
     }
-  }
+    /// A function to get the opposite piece
+    pub fn opp_piece(&self) -> Piece {
+        match self {
+            Piece::WhitePawn => Piece::BlackPawn,
+            Piece::BlackPawn => Piece::WhitePawn,
+            Piece::WhiteKnight => Piece::BlackKnight,
+            Piece::BlackKnight => Piece::WhiteKnight,
+            Piece::WhiteBishop => Piece::BlackBishop,
+            Piece::BlackBishop => Piece::WhiteBishop,
+            Piece::WhiteRook => Piece::BlackRook,
+            Piece::BlackRook => Piece::WhiteRook,
+            Piece::WhiteQueen => Piece::BlackQueen,
+            Piece::BlackQueen => Piece::WhiteQueen,
+            Piece::WhiteKing => Piece::BlackKing,
+            Piece::BlackKing => Piece::WhiteKing,
+        }
+    }
 }
 
 impl Color {
