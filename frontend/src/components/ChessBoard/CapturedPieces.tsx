@@ -76,13 +76,18 @@ const PieceMap: any = {
 
 const CapturedPieces = ({ pieces }: { pieces: string[] }) => {
   return (
-    <div className="flex mt-4 rounded flex-wrap p-2 gap-1 bg-[#cdc6c6ab]">
-      {pieces &&
-        pieces.map((piece: any, index: any) => (
-          <div key={index} className="text-5xl rounded">
-            {PieceMap[piece] || '?'}
-          </div>
-        ))}
+    <div>
+      <h3 className="text-sm font-medium mb-2 text-muted-foreground">
+        Captured Pieces
+      </h3>
+      <div className="flex mt-4 rounded flex-wrap p-2 gap-1">
+        {pieces &&
+          pieces.map((piece: string, index: number) => (
+            <div key={index} className="text-5xl rounded">
+              {PieceMap[piece] || '?'}
+            </div>
+          ))}
+      </div>
     </div>
   )
 }

@@ -11,11 +11,15 @@ import {
   NEW_GAME,
   NOTIFICATIONS,
   OPPONENT,
+  TIME_LEFT,
 } from '../../GraphQL/queries'
 import Board from './Board'
 import CapturedPieces from './CapturedPieces'
 import { Link } from 'react-router-dom'
 import Timer from './Timer'
+import { ClockIcon } from 'lucide-react'
+import { RightSideMenu } from './RightSideMenu'
+import { LeftSideMenu } from './LeftSideMenu'
 
 const COLUMNS = 'abcdefgh'.split('')
 type Fen = string
@@ -121,7 +125,7 @@ function getCheckStatusFromFEN(fen: string): string | null {
   // The last part contains the check status
   if (parts.length > 1) {
     const statusPart = parts[1].trim()
-    return statusPart // 'bk_inCheck' or any other status
+    return statusPart // 'bK' or any other status
   }
 
   return null // No check status found
@@ -171,6 +175,21 @@ const CBoard = () => {
   const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
   const [opponentId, setOpponentId] = React.useState<string | null>(null)
   const [play] = useMutation(NEW_GAME)
+  const [whiteTime, setWhiteTime] = React.useState(0) // 10 minutes
+  const [blackTime, setBlackTime] = React.useState(0)
+
+  const [timeQuery] = useLazyQuery(TIME_LEFT, {
+    variables: {
+      endpoint: 'chess',
+      chainId: chainId,
+      player: color,
+    },
+    onCompleted: (data) => {
+      console.log('time left', data.timeLeft)
+      setWhiteTime(data.timeLeft)
+    },
+    fetchPolicy: 'network-only',
+  })
   const [capturedPiecesQuery] = useLazyQuery(GET_CAPTURED_PIECES, {
     variables: {
       endpoint: 'chess',
@@ -238,6 +257,7 @@ const CBoard = () => {
       boardQuery()
       moveQuery()
       capturedPiecesQuery()
+      timeQuery()
     },
   })
 
@@ -260,6 +280,7 @@ const CBoard = () => {
     playerColorQuery()
     capturedPiecesQuery()
     opponentIdQuery()
+    timeQuery()
   }
 
   async function startGame() {
@@ -287,107 +308,60 @@ const CBoard = () => {
     const isBlack = color.toLowerCase() === 'black'
 
     return (
-      <Board
-        board={board}
-        isBlack={isBlack}
-        color={color}
-        player={player}
-        isKingInCheck={checkStatus}
-      />
+      <div className="w-full h-full">
+        <div className="flex flex-col">
+          <Ranks color={color} />
+        </div>
+        <Board
+          board={board}
+          isBlack={isBlack}
+          color={color}
+          player={player}
+          isKingInCheck={checkStatus}
+        />
+        <div className="flex">
+          <Files color={color} />
+        </div>
+      </div>
     )
   }
 
   return (
-    <div className="flex">
+    <div className="flex justify-center">
       <div className="min-w-[250px] p-6">
         <Link to="/" className="text-2xl tracking-wide font-semibold">
           Stella
         </Link>
+
+        {/* Left Side Menu */}
+        <LeftSideMenu />
       </div>
-      <div className="flex flex-col p-1 relative">
-        <div className="flex flex-col">
-          <Ranks color={color} />
-        </div>
-        <div className="mb-2 text-sm font-semibold font-sans">
+
+      {/*<div className="flex flex-col p-1 relative">
+        <div className="flex w-full justify-between my-2 text-sm font-semibold font-sans">
           Opponent {opponentId}
-          {player &&
-            (player !== color ? (
-              <Timer start={true} />
-            ) : (
-              <Timer start={false} />
-            ))}
+          <Timer initialTimeMs={whiteTime} start={true} />
         </div>
 
-        <div className="w-full max-w-[720px]">{renderSquare()}</div>
-        <div className="flex">
-          <Files color={color} />
-        </div>
+        <div className="w-full relative max-w-[720px]">{renderSquare()}</div>
 
-        <div className="mt-4 text-sm font-semibold font-sans">
+        <div className="flex w-full justify-between my-2 text-sm font-semibold font-sans">
           Player {owner}
+          <Timer initialTimeMs={whiteTime} start={true} />
         </div>
-        {player &&
-          (player === color ? <Timer start={true} /> : <Timer start={false} />)}
       </div>
+      */}
 
       {/* Right Side Menu */}
-      <div className="w-full font-sans my-3 rounded-lg mx-5 p-2 flex flex-col bg-[#cdc6c654]">
-        <div className="p-5 drop-shadow-2xl bg-[#cdc6c6ab] rounded w-full max-w-[300px]">
-          {player} Plays
-        </div>
-
-        <div className="bg-[#cdc6c6ab] mt-5 w-full rounded">
-          <div className="w-full">
-            <table className="w-full">
-              <thead className="">
-                <tr>
-                  <th className="w-[33.3%] text-left p-2">Move</th>
-                  <th className="w-[33.3%] text-center p-2">White</th>
-                  <th className="w-[33.3%] text-right p-2">Black</th>
-                </tr>
-              </thead>
-            </table>
-            <div className="h-[250px] overflow-y-scroll scrollbar-hide flex flex-col-reverse">
-              <table className="w-full">
-                <tbody>
-                  {moves.map((move, index) => (
-                    <tr
-                      className={`flex px-2 w-full ${
-                        index % 2 === 0 ? 'bg-[#d6d1c7]' : 'bg-white'
-                      }`}
-                      key={index}
-                    >
-                      <td className="w-[33.3%]">{index + 1}</td>
-                      <td className="w-[33.3%] text-center">
-                        {move.white || ''}
-                      </td>
-                      <td className="w-[33.3%] text-end">{move.black || ''}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        {!opponentId && (
-          <button
-            onClick={(event) => {
-              event.preventDefault()
-              startGame()
-            }}
-            className="px-5 py-2 mt-10 drop-shadow-2xl hover:scale-105 transition-all bg-[#cdc6c6ab] rounded max-w-[100px]"
-          >
-            Play
-          </button>
-        )}
-        {checkStatus !== null && checkStatus === 'wK' && (
-          <div>White King In Check</div>
-        )}
-        {checkStatus !== null && checkStatus === 'bK' && (
-          <div>Black King In Check</div>
-        )}
-        <CapturedPieces pieces={capturedPieces} />
-      </div>
+      <RightSideMenu
+        checkStatus={checkStatus}
+        player={player}
+        opponentId={opponentId}
+        capturedPieces={capturedPieces}
+        moves={moves}
+        startGame={startGame}
+        key={chainId}
+      />
     </div>
   )
 }
