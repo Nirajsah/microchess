@@ -2,7 +2,7 @@
 use crate::{
     bishop_attacks_on_the_fly, computed_king_moves, computed_knight_attacks, computed_pawn_attacks,
     computed_pawn_moves, lazy_static, queen_attacks_on_the_fly, rook_attacks_on_the_fly, Bitboard,
-    ChessError, Color, Game, Piece, NOT_A_FILE, NOT_H_FILE,
+    ChessError, Color, Game, MagicEntry, Piece, NOT_A_FILE, NOT_H_FILE,
 };
 use async_graphql::SimpleObject;
 use serde::{Deserialize, Serialize};
@@ -62,6 +62,135 @@ impl ChessBoard {
             castling_rights: [true; 2],
             en_passant: 0x00,
         }
+    }
+
+    /// Pawn moves for a given color and square
+    pub fn get_pawn_moves(&self, sq: Square, color: Color) -> Vec<Square> {
+        let mut moves = Vec::new();
+        let (moves_bitboard, attacks_bitboard) = match color {
+            Color::White => (&WHITE_PMOVES[sq as usize], &WHITE_PATTACKS[sq as usize]),
+            Color::Black => (&BLACK_PMOVES[sq as usize], &BLACK_PATTACKS[sq as usize]),
+        };
+
+        for i in 0..64 {
+            if (moves_bitboard & (1u64 << i)) != 0 || (attacks_bitboard & (1u64 << i)) != 0 {
+                moves.push(Square::usize_to_square(i));
+            }
+        }
+        moves
+    }
+
+    /// Knight moves for a given square
+    pub fn get_knight_moves(&self, sq: Square) -> Vec<Square> {
+        let mut moves = Vec::new();
+        let bitboard = KNIGHT_MOVES[sq as usize];
+
+        for i in 0..64 {
+            if (bitboard & (1u64 << i)) != 0 {
+                moves.push(Square::usize_to_square(i));
+            }
+        }
+        moves
+    }
+
+    /// King moves for a given square
+    pub fn get_king_moves(&self, sq: Square) -> Vec<Square> {
+        let mut moves = Vec::new();
+        let bitboard = KING_MOVES[sq as usize];
+
+        for i in 0..64 {
+            if (bitboard & (1u64 << i)) != 0 {
+                moves.push(Square::usize_to_square(i));
+            }
+        }
+        moves
+    }
+
+    /// Collect all pieces and their positions using bitboards.
+    pub fn collect_pieces(&self, opponent_color: Color) -> Vec<(Square, Piece)> {
+        let mut opponent_pieces = Vec::new();
+
+        // Get the bitboard representing all of the opponent's pieces
+        let opponent_bitboard = match opponent_color {
+            Color::White => self.white_pieces(),
+            Color::Black => self.black_pieces(),
+        };
+
+        // Iterate over each bit set in the opponent's bitboard
+        let mut bitboard = opponent_bitboard;
+        while bitboard != 0 {
+            // Isolate the least significant bit
+            let square_index = bitboard.trailing_zeros() as usize;
+
+            // Convert the index to a square
+            let square = Square::usize_to_square(square_index);
+
+            // Identify the piece at this position
+            if let Some(piece) = self.get_piece_at(Square::usize_to_square(square_index)) {
+                if piece.color() == opponent_color {
+                    opponent_pieces.push((square, piece));
+                }
+            }
+
+            // Remove the least significant bit from the bitboard
+            bitboard &= bitboard - 1;
+        }
+
+        opponent_pieces
+    }
+
+    /// Check if a square is empty
+    fn is_square_empty(&self, square: isize) -> bool {
+        self.all_pieces() & (1 << square) == 0
+    }
+
+    /// Get the rank of a square (0 to 7)
+    fn rank_of(&self, square: usize) -> usize {
+        square / 8
+    }
+
+    /// Returns the piece at a given square
+    pub fn get_piece_at(&self, square: Square) -> Option<Piece> {
+        let bit = 1u64 << square as usize;
+
+        if self.wP & bit != 0 {
+            return Some(Piece::WhitePawn);
+        }
+        if self.wN & bit != 0 {
+            return Some(Piece::WhiteKnight);
+        }
+        if self.wB & bit != 0 {
+            return Some(Piece::WhiteBishop);
+        }
+        if self.wR & bit != 0 {
+            return Some(Piece::WhiteRook);
+        }
+        if self.wQ & bit != 0 {
+            return Some(Piece::WhiteQueen);
+        }
+        if self.wK & bit != 0 {
+            return Some(Piece::WhiteKing);
+        }
+        if self.bP & bit != 0 {
+            return Some(Piece::BlackPawn);
+        }
+        if self.bN & bit != 0 {
+            return Some(Piece::BlackKnight);
+        }
+        if self.bB & bit != 0 {
+            return Some(Piece::BlackBishop);
+        }
+        if self.bR & bit != 0 {
+            return Some(Piece::BlackRook);
+        }
+        if self.bQ & bit != 0 {
+            return Some(Piece::BlackQueen);
+        }
+        if self.bK & bit != 0 {
+            return Some(Piece::BlackKing);
+        }
+
+        None // No piece at this square
     }
 
     /// A function to update the castling right of a color
@@ -205,6 +334,7 @@ impl ChessBoard {
         };
 
         let attack_mask = self.attack_mask(color.opposite());
+
         (attack_mask & king) != 0
     }
 
