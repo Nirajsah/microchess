@@ -9,7 +9,7 @@ use chess::{
     chessboard::ChessBoard,
     piece::{Color, Piece},
     square::Square,
-    CastleType, ChessError, Clock, Game, InstantiationArgument, MoveType, Operation,
+    CastleType, ChessError, Clock, Game, GameState, InstantiationArgument, MoveType, Operation,
 };
 use linera_sdk::{
     base::{Owner, TimeDelta, WithContractAbi},
@@ -85,6 +85,19 @@ impl Contract for ChessContract {
                 piece,
                 captured_piece,
             } => {
+                // check if the game is still ongoing
+                match self.state.board.get().state {
+                    GameState::Checkmate => {
+                        log::info!("Game is over: Checkmate");
+                        return;
+                    }
+                    GameState::Stalemate => {
+                        log::info!("Game is over: Stalemate");
+                        return;
+                    }
+                    _ => {}
+                }
+
                 let block_time = self.runtime.system_time();
                 let clock = self.state.clock.get_mut();
                 let owner = self.runtime.authenticated_signer().unwrap();
@@ -132,10 +145,8 @@ impl Contract for ChessContract {
 
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
-                        // self.state
-                        //     .clock
-                        //     .get_mut()
-                        //     .make_move(block_time, active_player);
+
+                        clock.make_move(block_time, active_player);
                     }
                     Err(e) => {
                         log::info!("Invalid move: {:?}", e);
@@ -144,11 +155,18 @@ impl Contract for ChessContract {
             }
 
             Operation::MakeMove { from, to, piece } => {
-                let block_time = self.runtime.system_time();
-                let clock = self.state.clock.get_mut();
-
-                self.runtime
-                    .assert_before(block_time.saturating_add(clock.block_delay));
+                // check if the game is still ongoing
+                match self.state.board.get().state {
+                    GameState::Checkmate => {
+                        log::info!("Game is over: Checkmate");
+                        return;
+                    }
+                    GameState::Stalemate => {
+                        log::info!("Game is over: Stalemate");
+                        return;
+                    }
+                    _ => {}
+                }
 
                 let owner = self.runtime.authenticated_signer().unwrap();
                 let active_player = self.state.board.get().active;
@@ -172,16 +190,18 @@ impl Contract for ChessContract {
                     return;
                 }
 
-                let piece = ChessBoard::get_piece(&piece).expect("Invalid piece");
+                let p = ChessBoard::get_piece(&piece).expect("Invalid piece");
                 let from_sq = Square::from_str(&from).expect("Invalid square");
                 let to_sq = Square::from_str(&to).expect("Invalid square");
                 let mut m: MoveType = MoveType::Move;
 
-                if self.state.board.get().board.en_passant & (1u64 << to_sq as usize) != 0 {
+                if self.state.board.get().board.en_passant & (1u64 << to_sq as usize) != 0
+                    && piece.ends_with("P")
+                {
                     m = MoveType::EnPassant;
                 }
 
-                match piece {
+                match p {
                     Piece::WhiteKing => {
                         if from_sq == Square::E1 && to_sq == Square::G1 {
                             m = MoveType::Castle(CastleType::KingSide);
@@ -199,21 +219,17 @@ impl Contract for ChessContract {
                     _ => {}
                 }
 
-                // self.state
-                //     .clock
-                //     .get_mut()
-                //     .make_move(block_time, active_player);
+                let clock = self.state.clock.get_mut();
+                let block_time = self.runtime.system_time();
 
-                let success = self
-                    .state
-                    .board
-                    .get_mut()
-                    .make_move(from_sq, to_sq, piece, m);
+                let success = self.state.board.get_mut().make_move(from_sq, to_sq, p, m);
 
                 match success {
                     Ok(_) => {
                         self.state.board.get_mut().switch_player_turn();
                         self.state.board.get_mut().create_move_string(active, to);
+
+                        clock.make_move(block_time, active_player);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
                     }
