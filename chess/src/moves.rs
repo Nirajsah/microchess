@@ -1,4 +1,4 @@
-use crate::{Bitboard, Color, Square};
+use crate::{piece::Piece, prng::generate_magic_number, Bitboard, Color, Square};
 
 pub const NOT_A_FILE: Bitboard = 0xFEFEFEFEFEFEFEFE;
 pub const NOT_H_FILE: Bitboard = 0x7F7F7F7F7F7F7F7F;
@@ -242,4 +242,154 @@ pub fn queen_attacks_on_the_fly(square: Square, block: Bitboard) -> Bitboard {
     attacks |= bishop_attacks_on_the_fly(square, block);
 
     attacks
+}
+
+pub fn mask_bishop_attacks(square: u8) -> Bitboard {
+    let mut attacks = 0u64;
+
+    let target_rank = square / 8;
+    let target_file = square % 8;
+
+    // Up-right
+    for rank in (target_rank + 1)..8 {
+        let file = target_file as i8 + ((rank - target_rank) as i8);
+        if rank <= 6 && file <= 6 {
+            attacks |= 1u64 << (rank * 8 + file as u8);
+        } else {
+            break;
+        }
+    }
+    // Up-left
+    for rank in (target_rank + 1)..8 {
+        let file = target_file as i8 - ((rank - target_rank) as i8);
+        if rank <= 6 && file >= 1 {
+            attacks |= 1u64 << (rank * 8 + file as u8);
+        } else {
+            break;
+        }
+    }
+
+    // Down-right
+    for rank in (0..target_rank).rev() {
+        let file = target_file as i8 + ((target_rank - rank) as i8);
+        if rank >= 1 && file <= 6 {
+            attacks |= 1u64 << (rank * 8 + file as u8);
+        } else {
+            break;
+        }
+    }
+
+    // Down-left
+    for rank in (0..target_rank).rev() {
+        let file = target_file as i8 - ((target_rank - rank) as i8);
+        if rank >= 1 && file >= 1 {
+            attacks |= 1u64 << (rank * 8 + file as u8);
+        } else {
+            break;
+        }
+    }
+    attacks
+}
+
+pub fn mask_rook_attacks(square: u8) -> Bitboard {
+    let mut attacks = 0u64;
+
+    let target_rank = square / 8;
+    let target_file = square % 8;
+
+    // Up
+    for rank in (target_rank + 1)..8 {
+        if rank <= 6 {
+            attacks |= 1u64 << (rank * 8 + target_file);
+        }
+    }
+    // Down
+    for rank in (0..target_rank).rev() {
+        if rank >= 1 {
+            attacks |= 1u64 << (rank * 8 + target_file);
+        }
+    }
+    // Right
+    for file in (target_file + 1)..8 {
+        if file <= 6 {
+            attacks |= 1u64 << (target_rank * 8 + file);
+        }
+    }
+    // Left
+    for file in (0..target_file).rev() {
+        if file >= 1 {
+            attacks |= 1u64 << (target_rank * 8 + file);
+        }
+    }
+    attacks
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct MagicEntry {
+    pub relevant_occupancy: u64,
+    pub magic: u64,
+    pub index_bits: u8,
+    pub offset: usize,
+}
+
+pub struct TableFillError;
+
+pub fn magic_index(entry: &MagicEntry, blockers: Bitboard) -> usize {
+    let relevant_blockers = blockers & entry.relevant_occupancy;
+    let hash = relevant_blockers.wrapping_mul(entry.magic);
+    let index = (hash >> (64 - entry.index_bits)) as usize + entry.offset;
+    index
+}
+
+fn try_make_table(
+    sq: usize,
+    slider: Piece,
+    magic: &MagicEntry,
+) -> Result<Vec<Bitboard>, TableFillError> {
+    let mut table = vec![0u64; 1 << magic.index_bits];
+
+    let mut subset: u64 = 0;
+    loop {
+        let table_entry = &mut table[magic_index(magic, subset.into())];
+        let moves = match slider {
+            Piece::WhiteRook | Piece::BlackRook => mask_rook_attacks(sq as u8),
+            Piece::WhiteBishop | Piece::BlackBishop => mask_bishop_attacks(sq as u8),
+            _ => panic!("{:?} is not a sliding Piece", slider),
+        };
+
+        if *table_entry == 0 {
+            *table_entry = moves.into();
+        } else if *table_entry != moves {
+            return Err(TableFillError);
+        }
+
+        subset = subset.wrapping_sub(magic.relevant_occupancy) & magic.relevant_occupancy;
+        if subset == 0 {
+            break;
+        }
+    }
+
+    Ok(table)
+}
+
+pub fn find_magic(sq: usize, slider: Piece) -> Vec<Bitboard> {
+    let relevant_occupancy = match slider.clone() {
+        Piece::WhiteRook | Piece::BlackRook => mask_rook_attacks(sq as u8),
+        Piece::WhiteBishop | Piece::BlackBishop => mask_bishop_attacks(sq as u8),
+        _ => panic!("{:?} is not a sliding Piece", slider),
+    };
+
+    loop {
+        let magic = generate_magic_number();
+        let index_bits = relevant_occupancy.count_ones() as u8;
+        let magic_entry = MagicEntry {
+            relevant_occupancy,
+            magic,
+            index_bits,
+            offset: 0,
+        };
+        if let Ok(table) = try_make_table(sq, slider, &magic_entry) {
+            return table;
+        }
+    }
 }
