@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use async_graphql::{Request, Response, SimpleObject};
+use async_graphql::{Enum, Request, Response, SimpleObject};
 use chessboard::ChessBoard;
 use lazy_static::lazy_static;
 use linera_sdk::base::{ContractAbi, Owner, ServiceAbi, TimeDelta, Timestamp};
@@ -14,6 +14,7 @@ pub mod chessboard;
 pub mod piece;
 pub mod square;
 use square::Square;
+pub mod prng;
 
 impl ContractAbi for ChessAbi {
     type Operation = Operation;
@@ -63,6 +64,14 @@ pub enum Operation {
     },
 }
 
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Enum)]
+pub enum GameState {
+    #[default]
+    InPlay,
+    Checkmate,
+    Stalemate,
+}
+
 #[derive(Debug)]
 pub enum ChessError {
     PieceNotFound,
@@ -92,8 +101,9 @@ pub struct Clock {
 impl Clock {
     /// Initializes the clock.
     pub fn new(block_time: Timestamp, arg: &InstantiationArgument) -> Self {
+        let total_time = TimeDelta::from_secs(900);
         Self {
-            time_left: [arg.start_time, arg.start_time],
+            time_left: [total_time, total_time],
             increment: arg.increment,
             current_turn_start: block_time,
             block_delay: arg.block_delay,
@@ -104,11 +114,13 @@ impl Clock {
     pub fn make_move(&mut self, block_time: Timestamp, player: Color) {
         let duration = block_time.delta_since(self.current_turn_start);
         let i = player.index();
-        assert!(self.time_left[i] >= duration);
-        self.time_left[i] = self.time_left[i]
-            .saturating_sub(duration)
-            .saturating_add(self.increment);
+        self.time_left[i] = self.time_left[i].saturating_sub(duration);
         self.current_turn_start = block_time;
+    }
+
+    /// Returns the time left for a given player.
+    pub fn time_left_for_player(&self, player: Color) -> TimeDelta {
+        self.time_left[player.index()]
     }
 
     /// Returns whether the given player has timed out.
@@ -149,6 +161,8 @@ pub struct Game {
     pub moves: Vec<Move>,
     /// Captured Pieces Table
     pub captured_pieces: Vec<Piece>,
+    /// Game State
+    pub state: GameState,
 }
 
 impl Game {
@@ -159,6 +173,7 @@ impl Game {
             active: Color::White,
             moves: vec![],
             captured_pieces: vec![],
+            state: GameState::InPlay,
         }
     }
 
@@ -216,7 +231,10 @@ impl Game {
             MoveType::Move => match self.move_piece(from, to, piece) {
                 Ok(_) => {
                     if self.board.in_check(color) {
-                        self.board.update_castling_rights(color)
+                        self.board.update_castling_rights(color);
+                        if self.is_checkmate(color) {
+                            self.state = GameState::Checkmate;
+                        }
                     }
                     Ok(())
                 }
@@ -225,7 +243,10 @@ impl Game {
             MoveType::Capture(Piece) => match self.capture_piece(from, to, piece, Piece) {
                 Ok(_) => {
                     if self.board.in_check(color) {
-                        self.board.update_castling_rights(color)
+                        self.board.update_castling_rights(color);
+                        if self.is_checkmate(color) {
+                            self.state = GameState::Checkmate;
+                        }
                     }
                     self.insert_captured_pieces(&Piece);
                     Ok(())
@@ -237,7 +258,10 @@ impl Game {
             MoveType::EnPassant => match self.board.en_passant_capture(from, to, &piece) {
                 Ok(_) => {
                     if self.board.in_check(color) {
-                        self.board.update_castling_rights(color)
+                        self.board.update_castling_rights(color);
+                        if self.is_checkmate(color) {
+                            self.state = GameState::Checkmate;
+                        }
                     }
                     self.insert_captured_pieces(&piece.opp_piece()); // In case of en passant, only pawns can be captured
                     Ok(())
@@ -314,5 +338,49 @@ impl Game {
                 self.board.queen_captures(from, to, &piece, &captured_piece)
             }
         }
+    }
+
+    /// A function to determine if the game is in checkmate
+    pub fn is_checkmate(&self, color: Color) -> bool {
+        // First, check if the king is in check
+        if !self.board.in_check(color) {
+            return false;
+        }
+
+        let mut temp_board = self.clone();
+
+        for (from, piece) in self.board.collect_pieces(color) {
+            // Generate possible moves based on the piece type
+            let possible_moves = match piece {
+                Piece::WhitePawn | Piece::BlackPawn => {
+                    temp_board.board.get_pawn_moves(from, piece.color())
+                }
+                Piece::WhiteKnight | Piece::BlackKnight => temp_board.board.get_knight_moves(from),
+                Piece::WhiteKing | Piece::BlackKing => temp_board.board.get_king_moves(from),
+                _ => todo!(),
+                // Piece::WhiteBishop | Piece::BlackBishop => {
+                //     temp_board.board.get_bishop_moves(from)
+                // }
+                // Piece::WhiteRook | Piece::BlackRook => temp_board.board.get_rook_moves(from),
+                // Piece::WhiteQueen | Piece::BlackQueen => {
+                //     temp_board.board.get_queen_moves(from)
+                // }
+            };
+
+            for to in possible_moves {
+                let result = if let Some(c_p) = self.board.get_piece_at(to) {
+                    temp_board.capture_piece(from, to, piece, c_p)
+                } else {
+                    temp_board.move_piece(from, to, piece)
+                };
+
+                if let Ok(_) = result {
+                    if !temp_board.board.in_check(color) {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
     }
 }
