@@ -9,7 +9,7 @@ import CBoard from './components/ChessBoard/CBoard.tsx'
 const client = createApolloClient()
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <ApolloProvider client={client}>
-    <div className="font-montserrat">
+    <div className="font-montserrat h-full">
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<App />} />
