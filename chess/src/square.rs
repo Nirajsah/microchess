@@ -1,9 +1,10 @@
 use async_graphql::Enum;
 use serde::{Deserialize, Serialize};
+use std::hash::Hash;
 use std::str::FromStr;
 
 #[rustfmt::skip]
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, Enum, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Enum, Eq, PartialEq, Hash)]
 pub enum Square {
     A1, B1, C1, D1, E1, F1, G1, H1,
     A2, B2, C2, D2, E2, F2, G2, H2,
