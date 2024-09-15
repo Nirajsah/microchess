@@ -7,7 +7,7 @@ function isValidSquare(square: string): square is Square {
   return /^[a-h][1-8]$/.test(square)
 }
 
-function generatePossibleMoves(
+export function generatePossibleMoves(
   piece: Piece,
   square: Square,
   board: SquareToPieceMap

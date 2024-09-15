@@ -10,6 +10,7 @@ interface Props {
   opponentId: string | null
   startGame: () => void
 }
+
 export const RightSideMenu: React.FC<Props> = ({
   player,
   moves,
@@ -19,12 +20,12 @@ export const RightSideMenu: React.FC<Props> = ({
   startGame,
 }) => {
   return (
-    <div className="w-full items-center max-w-[400px] font-sans mx-5 my-3 flex flex-col border border-black rounded-lg">
-      <div className="py-5 px-2 font-bold drop-shadow-2xl rounded w-full max-w-[300px]">
+    <div className="w-full items-center max-w-[400px] font-sans mx-5 my-3 flex flex-col gap-4 rounded-lg">
+      <div className="bg-white py-5 px-2 font-bold rounded-lg w-full border border-black card relative">
         {player} Plays
       </div>
 
-      <div className="mt-5 w-full rounded-lg">
+      <div className="w-full border border-black rounded-lg card relative bg-white">
         <div className="w-full">
           <table className="w-full">
             <thead className="">
@@ -39,12 +40,7 @@ export const RightSideMenu: React.FC<Props> = ({
             <table className="w-full">
               <tbody>
                 {moves.map((move, index) => (
-                  <tr
-                    className={`flex px-2 w-full ${
-                      index % 2 === 0 ? 'bg-[#d6d1c7]' : 'bg-white'
-                    }`}
-                    key={index}
-                  >
+                  <tr className="flex px-2 w-full" key={index}>
                     <td className="w-[33.3%]">{index + 1}</td>
                     <td className="w-[33.3%] text-center">
                       {move.white || ''}
@@ -58,7 +54,7 @@ export const RightSideMenu: React.FC<Props> = ({
         </div>
       </div>
       {!opponentId && (
-        <div className="w-[300px] h-[70px]">
+        <div className="w-[300px] h-[70px] card relative">
           <PlayButton startGame={startGame} />
         </div>
       )}
@@ -75,7 +71,7 @@ export const RightSideMenu: React.FC<Props> = ({
         </div>
       )}
 
-      <div>
+      <div className="card relative bg-white border border-black rounded-lg w-full">
         <div className="flex flex-wrap gap-2 p-2 bg-secondary/10 rounded-md">
           <CapturedPieces pieces={capturedPieces} />
         </div>
