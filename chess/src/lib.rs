@@ -14,6 +14,7 @@ pub mod chessboard;
 pub mod piece;
 pub mod square;
 use square::Square;
+pub mod magic;
 pub mod prng;
 
 impl ContractAbi for ChessAbi {
@@ -62,6 +63,12 @@ pub enum Operation {
         // piece which is being captured
         captured_piece: String,
     },
+    PawnPromotion {
+        from: String,
+        to: String,
+        piece: String,
+        promotion: String,
+    },
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Enum)]
@@ -72,7 +79,13 @@ pub enum GameState {
     Stalemate,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
+pub struct PlayerTime {
+    pub white: TimeDelta,
+    pub black: TimeDelta,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum ChessError {
     PieceNotFound,
     InvalidPiece,
@@ -82,6 +95,7 @@ pub enum ChessError {
     InvalidCastle,
     InvalidEnPassant,
     CastleRights,
+    KingInCheck,
 }
 
 pub type Result<T> = std::result::Result<T, ChessError>;
@@ -119,8 +133,11 @@ impl Clock {
     }
 
     /// Returns the time left for a given player.
-    pub fn time_left_for_player(&self, player: Color) -> TimeDelta {
-        self.time_left[player.index()]
+    pub fn time_left_for_player(&self) -> PlayerTime {
+        PlayerTime {
+            white: self.time_left[Color::White.index()],
+            black: self.time_left[Color::Black.index()],
+        }
     }
 
     /// Returns whether the given player has timed out.
@@ -135,19 +152,45 @@ pub struct Move {
     black: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum CastleType {
     KingSide,
     QueenSide,
 }
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Default, Debug, Serialize, Deserialize)]
 pub enum MoveType {
     #[default]
     Move,
     Capture(Piece),
     Castle(CastleType),
     EnPassant,
+    Promotion(Piece),
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct MoveData {
+    pub from: Square,
+    pub to: Square,
+    pub piece: Piece,
+    pub move_type: MoveType, // Changed to `move_type` to avoid confusion with the `m` field
+}
+
+impl MoveData {
+    pub fn new(from: Square, to: Square, piece: Piece, board: &ChessBoard) -> Self {
+        let move_type = if let Some(captured_piece) = board.get_piece_at(to) {
+            MoveType::Capture(captured_piece)
+        } else {
+            MoveType::Move
+        };
+
+        MoveData {
+            from,
+            to,
+            piece,
+            move_type,
+        }
+    }
 }
 
 /// The state of a Chess game.
@@ -170,6 +213,16 @@ impl Game {
     pub fn new() -> Self {
         Game {
             board: ChessBoard::new(),
+            active: Color::White,
+            moves: vec![],
+            captured_pieces: vec![],
+            state: GameState::InPlay,
+        }
+    }
+
+    pub fn with_fen(fen: &str) -> Self {
+        Game {
+            board: ChessBoard::with_fen(fen),
             active: Color::White,
             moves: vec![],
             captured_pieces: vec![],
@@ -224,7 +277,7 @@ impl Game {
         self.active = self.active.opposite()
     }
 
-    /// A function to make move (MoveType)
+    /// A function to make move
     pub fn make_move(&mut self, from: Square, to: Square, piece: Piece, m: MoveType) -> Result<()> {
         let color = piece.color().opposite();
         match m {
@@ -232,9 +285,6 @@ impl Game {
                 Ok(_) => {
                     if self.board.in_check(color) {
                         self.board.update_castling_rights(color);
-                        if self.is_checkmate(color) {
-                            self.state = GameState::Checkmate;
-                        }
                     }
                     Ok(())
                 }
@@ -242,12 +292,6 @@ impl Game {
             },
             MoveType::Capture(Piece) => match self.capture_piece(from, to, piece, Piece) {
                 Ok(_) => {
-                    if self.board.in_check(color) {
-                        self.board.update_castling_rights(color);
-                        if self.is_checkmate(color) {
-                            self.state = GameState::Checkmate;
-                        }
-                    }
                     self.insert_captured_pieces(&Piece);
                     Ok(())
                 }
@@ -259,15 +303,16 @@ impl Game {
                 Ok(_) => {
                     if self.board.in_check(color) {
                         self.board.update_castling_rights(color);
-                        if self.is_checkmate(color) {
-                            self.state = GameState::Checkmate;
-                        }
                     }
                     self.insert_captured_pieces(&piece.opp_piece()); // In case of en passant, only pawns can be captured
                     Ok(())
                 }
                 Err(_) => Err(ChessError::InvalidEnPassant),
             },
+            MoveType::Promotion(Piece) => self
+                .board
+                .move_piece(from, to, &piece)
+                .and_then(|_| self.board.pawn_promotion(to, Piece)),
         }
     }
 
@@ -309,7 +354,7 @@ impl Game {
         }
     }
 
-    /// A function to capture piece
+    /// a function to capture piece
     pub fn capture_piece(
         &mut self,
         from: Square,
@@ -317,6 +362,13 @@ impl Game {
         piece: Piece,
         captured_piece: Piece,
     ) -> Result<()> {
+        if piece.color() == captured_piece.color() {
+            return Err(ChessError::InvalidCapture);
+        }
+
+        if self.board.get_piece_at(to).is_none() {
+            return Err(ChessError::InvalidCapture);
+        }
         match piece {
             Piece::WhitePawn => self.board.wP_captures(from, to, &piece, &captured_piece),
             Piece::BlackPawn => self.board.bP_captures(from, to, &piece, &captured_piece),
@@ -340,47 +392,68 @@ impl Game {
         }
     }
 
-    /// A function to determine if the game is in checkmate
-    pub fn is_checkmate(&self, color: Color) -> bool {
-        // First, check if the king is in check
+    /// Check if the current player is in checkmate
+    pub fn is_checkmate(&mut self) -> bool {
+        let color = self.active;
+
         if !self.board.in_check(color) {
             return false;
         }
 
-        let mut temp_board = self.clone();
+        let mut pieces = match color {
+            Color::White => self.board.white_pieces(),
+            Color::Black => self.board.black_pieces(),
+        };
 
-        for (from, piece) in self.board.collect_pieces(color) {
-            // Generate possible moves based on the piece type
-            let possible_moves = match piece {
-                Piece::WhitePawn | Piece::BlackPawn => {
-                    temp_board.board.get_pawn_moves(from, piece.color())
-                }
-                Piece::WhiteKnight | Piece::BlackKnight => temp_board.board.get_knight_moves(from),
-                Piece::WhiteKing | Piece::BlackKing => temp_board.board.get_king_moves(from),
-                _ => todo!(),
-                // Piece::WhiteBishop | Piece::BlackBishop => {
-                //     temp_board.board.get_bishop_moves(from)
-                // }
-                // Piece::WhiteRook | Piece::BlackRook => temp_board.board.get_rook_moves(from),
-                // Piece::WhiteQueen | Piece::BlackQueen => {
-                //     temp_board.board.get_queen_moves(from)
-                // }
-            };
-
-            for to in possible_moves {
-                let result = if let Some(c_p) = self.board.get_piece_at(to) {
-                    temp_board.capture_piece(from, to, piece, c_p)
-                } else {
-                    temp_board.move_piece(from, to, piece)
-                };
-
-                if let Ok(_) = result {
-                    if !temp_board.board.in_check(color) {
-                        return false;
+        // Try all possible moves for all pieces of the current player
+        while pieces != 0 {
+            let from: usize = pieces.trailing_zeros() as usize;
+            let square = Square::usize_to_square(from);
+            if let Some(piece) = self.board.get_piece_at(square) {
+                if let Some(possible_moves) = self.get_possible_moves(square, piece) {
+                    for mv in possible_moves {
+                        // Create a copy of the board to test moves
+                        let mut temp_board = self.clone();
+                        match temp_board.make_move(mv.from, mv.to, mv.piece, mv.move_type) {
+                            Ok(_) => {
+                                log::info!("move made: {:?}", mv);
+                                if !temp_board.board.in_check(color) {
+                                    return false;
+                                }
+                            }
+                            Err(e) => {
+                                log::trace!("Error: {:?}", e);
+                            }
+                        }
                     }
                 }
             }
+
+            pieces &= pieces - 1;
         }
+        log::info!("No legal moves found. Checkmate.");
         true
+    }
+
+    /// Get all possible moves for a piece
+    fn get_possible_moves(&self, from: Square, piece: Piece) -> Option<Vec<MoveData>> {
+        let color = piece.color();
+        let moves = match piece {
+            Piece::WhitePawn | Piece::BlackPawn => self.board.get_pawn_moves(from, color),
+            Piece::WhiteKnight | Piece::BlackKnight => self.board.get_knight_moves(from, color),
+            Piece::WhiteKing | Piece::BlackKing => self.board.get_king_moves(from, color),
+            Piece::WhiteBishop | Piece::BlackBishop => self.board.get_bishop_moves(from, color),
+            Piece::WhiteRook | Piece::BlackRook => self.board.get_rook_moves(from, color),
+            Piece::WhiteQueen | Piece::BlackQueen => self.board.get_queen_moves(from, color),
+        };
+
+        let move_data: Option<Vec<MoveData>> = moves.map(|moves_vec| {
+            moves_vec
+                .into_iter()
+                .map(|to| MoveData::new(from, to, piece, &self.board))
+                .collect()
+        });
+
+        move_data
     }
 }
