@@ -65,14 +65,19 @@ impl Contract for ChessContract {
         match operation {
             Operation::NewGame { player } => {
                 let players = self.state.get_players();
+                if players.len() == 2 {
+                    return;
+                }
                 if players.len() == 1 {
                     if player == players[0] {
                         return;
                     }
                     let game = Game::new();
+                    // let game = Game::with_fen(
+                    //     "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -",
+                    // );
                     self.state.add_player(player);
                     self.state.board.set(game);
-                    log::info!("Adding new Player and strating game: {:?}", player);
                 } else {
                     log::info!("No players found: Adding new Player: {:?}", player);
                     self.state.add_player(player);
@@ -115,13 +120,16 @@ impl Contract for ChessContract {
                     "Only the active player can make a move."
                 );
 
-                // If the active player is White and tries to capture a white piece, return early
-                if active_player == Color::White && captured_piece.starts_with("w") {
+                if piece.starts_with("w")
+                    && active_player != Color::White
+                    && captured_piece.starts_with("w")
+                {
                     return;
                 }
-
-                // If the active player is Black and tries to capture a black piece, return early
-                if active_player == Color::Black && captured_piece.starts_with("b") {
+                if piece.starts_with("b")
+                    && active_player != Color::Black
+                    && captured_piece.starts_with("b")
+                {
                     return;
                 }
 
@@ -145,8 +153,9 @@ impl Contract for ChessContract {
 
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
-
                         clock.make_move(block_time, active_player);
+
+                        self.state.board.get_mut().is_checkmate(); // check if the current player is checkmate, i.e if white makes a move after switch turn black is active player and we check if active player is in checkmate
                     }
                     Err(e) => {
                         log::info!("Invalid move: {:?}", e);
@@ -183,9 +192,12 @@ impl Contract for ChessContract {
                     "Only the active player can make a move."
                 );
 
+                // Early return if the piece is not owned by the active player
                 if piece.starts_with("w") && active_player != Color::White {
                     return;
                 }
+
+                // Early return if the piece is not owned by the active player
                 if piece.starts_with("b") && active_player != Color::Black {
                     return;
                 }
@@ -232,11 +244,37 @@ impl Contract for ChessContract {
                         clock.make_move(block_time, active_player);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
+
+                        self.state.board.get_mut().is_checkmate();
                     }
                     Err(e) => {
                         log::info!("Invalid move: {:?}", e);
                     }
                 }
+            }
+            Operation::PawnPromotion {
+                from,
+                to,
+                piece,
+                promotion,
+            } => {
+                let from_sq = Square::from_str(&from).expect("Invalid square");
+                let to_sq = Square::from_str(&to).expect("Invalid square");
+                let p = ChessBoard::get_piece(&piece).expect("Invalid piece");
+
+                if p != Piece::WhitePawn && p != Piece::BlackPawn {
+                    return;
+                }
+
+                if to_sq / 8 != 0 && to_sq / 8 != 7 {
+                    return;
+                }
+
+                let promoting_to = Piece::from_str(&promotion).expect("Invalid piece");
+
+                let m: MoveType = MoveType::Promotion(promoting_to);
+
+                self.state.board.get_mut().make_move(from_sq, to_sq, p, m);
             }
         }
     }
