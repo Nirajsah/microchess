@@ -64,10 +64,10 @@ bun preview
 - [x] Implement pawn double move.
 - [x] Implement turn-based play (White moves first).
 - [x] Detect and handle check.
-- [ ] Implement castling.
-- [ ] Implement en passant.
-- [ ] Detect and handle checkmate.
-- [ ] Implement pawn promotion.
+- [x] Implement castling.
+- [x] Implement en passant.
+- [x] Detect and handle checkmate.
+- [x] Implement pawn promotion.
 - [ ] Implement stalemate detection.
 - [ ] Implement draw by threefold repetition.
 - [ ] Implement draw by the fifty-move rule.

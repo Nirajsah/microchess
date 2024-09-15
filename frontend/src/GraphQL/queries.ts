@@ -71,3 +71,9 @@ export const OPPONENT = gql`
     getOpponent(player: $player)
   }
 `
+
+export const TIME_LEFT = gql`
+  query TimeLeft($player: Color!) {
+    timeLeft(player: $player)
+  }
+`

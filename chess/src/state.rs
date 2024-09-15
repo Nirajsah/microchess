@@ -1,4 +1,4 @@
-use chess::{Clock, Color, Game};
+use chess::{piece::Color, Clock, Game};
 use linera_sdk::{
     base::Owner,
     views::{linera_views, MapView, RegisterView, RootView, ViewStorageContext},
