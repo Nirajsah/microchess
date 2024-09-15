@@ -14,11 +14,11 @@ import {
   TIME_LEFT,
 } from '../../GraphQL/queries'
 import Board from './Board'
-import CapturedPieces from './CapturedPieces'
 import { Link } from 'react-router-dom'
 import Timer from './Timer'
-import { ClockIcon } from 'lucide-react'
 import { RightSideMenu } from './RightSideMenu'
+import Modal from '../Modal'
+import { Welcome } from '../popup/Welcome'
 import { LeftSideMenu } from './LeftSideMenu'
 
 const COLUMNS = 'abcdefgh'.split('')
@@ -182,14 +182,15 @@ const CBoard = () => {
     variables: {
       endpoint: 'chess',
       chainId: chainId,
-      player: color,
     },
     onCompleted: (data) => {
       console.log('time left', data.timeLeft)
-      setWhiteTime(data.timeLeft)
+      setWhiteTime(data.timeLeft.white)
+      setBlackTime(data.timeLeft.black)
     },
     fetchPolicy: 'network-only',
   })
+
   const [capturedPiecesQuery] = useLazyQuery(GET_CAPTURED_PIECES, {
     variables: {
       endpoint: 'chess',
@@ -219,7 +220,6 @@ const CBoard = () => {
       chainId: chainId,
     },
     onCompleted: (data) => {
-      console.log(data)
       setBoardState(data.board)
     },
     fetchPolicy: 'network-only',
@@ -231,7 +231,6 @@ const CBoard = () => {
       chainId: chainId,
     },
     onCompleted: (data) => {
-      console.log(data)
       setPlayer(data.playerTurn)
     },
     fetchPolicy: 'network-only',
@@ -309,7 +308,7 @@ const CBoard = () => {
 
     return (
       <div className="w-full h-full">
-        <div className="flex flex-col">
+        <div className="flex flex-col z-50 absolute">
           <Ranks color={color} />
         </div>
         <Board
@@ -325,43 +324,58 @@ const CBoard = () => {
       </div>
     )
   }
+  const [open, setOpen] = React.useState(true)
+  const unselect = () => {
+    setOpen(!open)
+  }
 
   return (
-    <div className="flex justify-center">
-      <div className="min-w-[250px] p-6">
-        <Link to="/" className="text-2xl tracking-wide font-semibold">
-          Stella
-        </Link>
+    <div>
+      <div className="flex justify-center z-[100px]">
+        <Modal select={open} unselect={unselect}>
+          <Welcome />
+        </Modal>
+        <div className="min-w-[250px] p-6">
+          <Link to="/" className="text-2xl tracking-wide font-semibold">
+            Stella
+          </Link>
 
-        {/* Left Side Menu */}
-        <LeftSideMenu />
-      </div>
-
-      {/*<div className="flex flex-col p-1 relative">
-        <div className="flex w-full justify-between my-2 text-sm font-semibold font-sans">
-          Opponent {opponentId}
-          <Timer initialTimeMs={whiteTime} start={true} />
+          <LeftSideMenu />
         </div>
 
-        <div className="w-full relative max-w-[720px]">{renderSquare()}</div>
+        <div className="flex flex-col p-1 relative">
+          <div className="flex w-full justify-between my-2 text-sm font-semibold font-sans">
+            Opponent {opponentId}
+            <Timer
+              initialTimeMs={color === 'BLACK' ? blackTime : whiteTime}
+              start
+            />
+          </div>
 
-        <div className="flex w-full justify-between my-2 text-sm font-semibold font-sans">
-          Player {owner}
-          <Timer initialTimeMs={whiteTime} start={true} />
+          <div className="w-full relative max-w-[720px] -z-10">
+            {renderSquare()}
+          </div>
+
+          <div className="flex w-full justify-between my-2 text-sm font-semibold font-sans">
+            Player {owner}
+            <Timer
+              initialTimeMs={color === 'WHITE' ? whiteTime : blackTime}
+              start
+            />
+          </div>
         </div>
-      </div>
-      */}
 
-      {/* Right Side Menu */}
-      <RightSideMenu
-        checkStatus={checkStatus}
-        player={player}
-        opponentId={opponentId}
-        capturedPieces={capturedPieces}
-        moves={moves}
-        startGame={startGame}
-        key={chainId}
-      />
+        {/* Right Side Menu */}
+        <RightSideMenu
+          checkStatus={checkStatus}
+          player={player}
+          opponentId={opponentId}
+          capturedPieces={capturedPieces}
+          moves={moves}
+          startGame={startGame}
+          key={chainId}
+        />
+      </div>
     </div>
   )
 }
