@@ -66,8 +66,8 @@ bun preview
 - [x] Detect and handle check.
 - [x] Implement castling.
 - [x] Implement en passant.
-- [ ] Detect and handle checkmate.
-- [ ] Implement pawn promotion.
+- [x] Detect and handle checkmate.
+- [x] Implement pawn promotion.
 - [ ] Implement stalemate detection.
 - [ ] Implement draw by threefold repetition.
 - [ ] Implement draw by the fifty-move rule.
