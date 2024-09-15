@@ -6,7 +6,7 @@ export default function Ranks({ color }: { color: string }) {
         {ranks.map((rank) => (
           <div
             key={rank}
-            className="h-[90px] p-1 font-bold flex justify-center items-center"
+            className="h-[90px] p-1 font-bold flex justify-center"
           >
             {rank}
           </div>
@@ -19,7 +19,7 @@ export default function Ranks({ color }: { color: string }) {
         {ranks.reverse().map((rank) => (
           <div
             key={rank}
-            className="h-[90px] p-1 font-bold flex justify-center items-center"
+            className="h-[90px] p-1 font-bold flex justify-center"
           >
             {rank}
           </div>

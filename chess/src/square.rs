@@ -1,9 +1,10 @@
 use async_graphql::Enum;
 use serde::{Deserialize, Serialize};
+use std::hash::Hash;
 use std::str::FromStr;
 
 #[rustfmt::skip]
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, Enum, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Enum, Eq, PartialEq, Hash)]
 pub enum Square {
     A1, B1, C1, D1, E1, F1, G1, H1,
     A2, B2, C2, D2, E2, F2, G2, H2,
@@ -19,6 +20,7 @@ impl FromStr for Square {
     type Err = String;
 
 #[rustfmt::skip]
+    /// Converts a string to a square.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "a1" => Ok(Square::A1), "b1" => Ok(Square::B1), "c1" => Ok(Square::C1), "d1" => Ok(Square::D1),

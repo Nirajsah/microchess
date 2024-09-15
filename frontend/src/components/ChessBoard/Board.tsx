@@ -14,7 +14,8 @@ import blackKing from '../../assets/new_assets/bk.png'
 import React from 'react'
 import { useMutation } from '@apollo/client'
 import { CAPTURE_PIECE, MOVE_PIECE } from '../../GraphQL/queries'
-
+// import generatePossibleMoves from './GeneratePossibleMoves'
+// import Ranks from './Ranks'
 export type Piece =
   | 'wP'
   | 'wN'
@@ -129,10 +130,10 @@ export default function Board({
   player: string
   isKingInCheck?: string | null
 }) {
-  const chainId = window.sessionStorage.getItem('chainId') ?? ''
-  const owner = window.sessionStorage.getItem('owner') ?? ''
-  const [selectedPiece, setSelectedPiece] = React.useState<any>(null)
-  const [selectedSquare, setSelectedSquare] = React.useState<string | null>(
+  const [possMoves, setPossMoves] = React.useState<Square[]>([])
+
+  const [selectedPiece, setSelectedPiece] = React.useState<Piece | null>(null)
+  const [selectedSquare, setSelectedSquare] = React.useState<Square | null>(
     null
   )
 
@@ -141,47 +142,37 @@ export default function Board({
 
   function getKingPosition(board: SquareToPieceMap) {
     for (const [square, piece] of Object.entries(board)) {
-      if (piece === 'wK' && isKingInCheck === 'wk_inCheck') {
+      if (piece === 'wK' && isKingInCheck === 'wK') {
         return square
       }
-      if (piece === 'bK' && isKingInCheck === 'bk_inCheck') {
+      if (piece === 'bK' && isKingInCheck === 'bK') {
         return square
       }
     }
     return null // Return null if no white king is found
   }
 
-  const handleSquareClick = (square: string, piece: string | undefined) => {
-    console.log('square after click', square, 'piece', piece)
-    console.log(
-      'selectedSquare',
-      selectedSquare,
-      'selectedPiece',
-      selectedPiece
-    )
-
-    if (selectedPiece && selectedSquare) {
-      if (piece) {
-        // A piece is on the destination square, so capture it
-        console.log(
-          'capture piece',
-          selectedSquare,
-          square,
-          selectedPiece,
-          piece
-        )
-        capturePiece(selectedSquare, square, selectedPiece, piece)
+  const handleSquareClick = (
+    square: Square,
+    piece: Piece,
+    capturedPiece: Piece | undefined
+  ) => {
+    if (piece && selectedSquare) {
+      if (possMoves.includes(square)) {
+        if (capturedPiece) {
+          capturePiece(selectedSquare, square, piece, capturedPiece) // from, to, piece, capturedPiece
+        } else {
+          movePiece(selectedSquare, square, piece) // from, to, piece
+        }
+        setSelectedPiece(null)
+        setSelectedSquare(null)
+        setPossMoves([])
       } else {
-        // No piece on the destination square, so just move the piece
-        console.log('move piece', selectedSquare, square, selectedPiece)
-        movePiece(selectedSquare, square, selectedPiece)
+        setSelectedPiece(null)
+        setSelectedSquare(null)
+        setPossMoves([])
       }
-
-      // Deselect the piece and reset the selected square after moving/capturing
-      setSelectedPiece(null)
-      setSelectedSquare(null)
     } else if (piece) {
-      // Select the piece and square if nothing is currently selected
       setSelectedPiece(piece)
       setSelectedSquare(square)
     }
@@ -193,7 +184,6 @@ export default function Board({
     piece: string,
     capturedPiece: string
   ) => {
-    console.log('captured called')
     await captureMutation({
       variables: {
         piece,
@@ -208,10 +198,10 @@ export default function Board({
     })
   }
 
-  const movePiece = async (from: string, to: string, selectedPiece: string) => {
+  const movePiece = async (from: string, to: string, piece: string) => {
     await moveMutation({
       variables: {
-        piece: selectedPiece,
+        piece: piece,
         from: from,
         to: to,
         endpoint: 'chess',
@@ -221,8 +211,11 @@ export default function Board({
       },
     })
   }
+
+  const boardRef = React.useRef<HTMLDivElement>(null)
+
   return (
-    <div className="">
+    <div ref={boardRef} className="">
       {ranks.map((rank, rankIndex) => (
         <div key={rank} className="flex">
           {files.map((file, fileIndex) => {
@@ -234,43 +227,85 @@ export default function Board({
             // Get the piece from the map using the square notation
             const piece = board[square as Square]
 
-            // Calculate the background color for alternating squares
             const number = fileIndex + rankIndex
 
             const KingInCheck = getKingPosition(board)
 
             const backgroundColor =
               square === KingInCheck
-                ? '#af26bf'
-                : selectedSquare === square || square === piece
-                ? '#91bf26'
-                : number % 2 === 0
-                ? '#ff685321'
-                : '#ff2a00bf'
+                ? 'purple'
+                : selectedSquare === square
+                  ? '#69ba53'
+                  : number % 2 === 0
+                    ? '#ff685321'
+                    : '#ff2a00bf'
+
+            const onDrop = (
+              e: React.DragEvent<HTMLDivElement>,
+              to: Square,
+              capturedPiece: Piece
+            ) => {
+              e.preventDefault()
+              const [piece] = e.dataTransfer.getData('text').split(',')
+              setSelectedPiece(piece as Piece)
+              setSelectedSquare(null)
+              setPossMoves([])
+              handleSquareClick(to, piece as Piece, capturedPiece)
+            }
+
+            const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+              e.preventDefault()
+            }
+
             return (
               <div
+                onDrop={(e) => {
+                  onDrop(e, square as Square, piece as Piece)
+                }}
+                onDragOver={(e) => {
+                  onDragOver(e)
+                }}
+                className="flex w-full justify-center items-center relative pieces"
                 key={file}
                 style={{
                   backgroundColor,
                   width: '90px',
                   height: '90px',
+                  borderRadius: '4px',
                 }}
-                onClick={(e) => {
+                // onClick={(e) => {
+                //   e.preventDefault()
+                //   if (color === player) {
+                //     handleSquareClick(square as Square, piece)
+                //   }
+                // }}
+                onDrag={(e) => {
                   e.preventDefault()
-                  if (color === player) {
-                    handleSquareClick(square, piece)
-                  }
-
-                  console.log(
-                    'index',
-                    (7 - rankIndex) * 8 + (7 - fileIndex),
-                    'square',
-                    square
-                  )
                 }}
-                className="flex w-full justify-center items-center"
               >
-                {piece && <Tile image={pieceImages[piece]} />}
+                {piece && (
+                  <Tile
+                    image={pieceImages[piece]}
+                    piece={piece}
+                    square={square as Square}
+                    setSelectedSquare={setSelectedSquare}
+                    board={board}
+                    setPossMoves={setPossMoves}
+                  />
+                )}
+
+                {possMoves.includes(square as Square) && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      width: '10px',
+                      height: '10px',
+                      backgroundColor: 'red', // Adjust color if needed
+                      borderRadius: '50%',
+                      zIndex: 1,
+                    }}
+                  ></div>
+                )}
               </div>
             )
           })}
