@@ -1,4 +1,4 @@
-use crate::{piece::Piece, prng::generate_magic_number, Bitboard, Color, Square};
+use crate::{Bitboard, Color, Square};
 
 pub const NOT_A_FILE: Bitboard = 0xFEFEFEFEFEFEFEFE;
 pub const NOT_H_FILE: Bitboard = 0x7F7F7F7F7F7F7F7F;
@@ -131,42 +131,58 @@ pub fn attacks_king_moves(square: u8) -> Bitboard {
 pub fn rook_attacks_on_the_fly(square: Square, block: Bitboard) -> Bitboard {
     let mut attacks = 0u64;
 
-    let target_rank = square as u8 / 8;
-    let target_file = square as u8 % 8;
+    let rank = square as u8 / 8;
+    let file = square as u8 % 8;
+
+    let mut square_mask = 1u64 << square as u8;
 
     // Up
-    for rank in (target_rank + 1)..8 {
-        let square = 1u64 << rank * 8 + target_file;
-        attacks |= square;
-        if rank <= 7 && (block & square) != 0 {
+    let mut tmp_rank = rank;
+    while tmp_rank < 7 {
+        tmp_rank += 1;
+        square_mask <<= 8;
+        attacks |= square_mask;
+        if block & square_mask != 0 {
             break;
         }
     }
+
     // Down
-    for rank in (0..target_rank).rev() {
-        let square = 1u64 << rank * 8 + target_file;
-        attacks |= square;
-        if (block & square) != 0 {
+    square_mask = 1u64 << square as u8;
+    tmp_rank = rank;
+    while tmp_rank > 0 {
+        tmp_rank -= 1;
+        square_mask >>= 8;
+        attacks |= square_mask;
+        if block & square_mask != 0 {
             break;
         }
     }
+
     // Right
-    for file in (target_file + 1)..8 {
-        let square = 1u64 << target_rank * 8 + file;
-        attacks |= square;
-        if file <= 7 && (block & square) != 0 {
+    square_mask = 1u64 << square as u8;
+    let mut tmp_file = file;
+    while tmp_file < 7 {
+        tmp_file += 1;
+        square_mask <<= 1;
+        attacks |= square_mask;
+        if block & square_mask != 0 {
             break;
         }
     }
+
     // Left
-    for file in (0..target_file).rev() {
-        let square = 1u64 << target_rank * 8 + file;
-        // if file >= 0 {
-        attacks |= square;
-        if (block & square) != 0 {
+    square_mask = 1u64 << square as u8;
+    tmp_file = file;
+    while tmp_file > 0 {
+        tmp_file -= 1;
+        square_mask >>= 1;
+        attacks |= square_mask;
+        if block & square_mask != 0 {
             break;
         }
     }
+
     attacks
 }
 
@@ -174,74 +190,72 @@ pub fn rook_attacks_on_the_fly(square: Square, block: Bitboard) -> Bitboard {
 pub fn bishop_attacks_on_the_fly(square: Square, block: Bitboard) -> Bitboard {
     let mut attacks = 0u64;
 
-    let target_rank = square as u8 / 8;
-    let target_file = square as u8 % 8;
+    let rank = square as u8 / 8;
+    let file = square as u8 % 8;
+
+    let mut square_mask = 1u64 << square as u8;
 
     // Up-right
-    for rank in (target_rank + 1)..8 {
-        let file = target_file as i8 + ((rank - target_rank) as i8);
-        let square = rank * 8 + file as u8;
-        if file >= 0 && file < 8 {
-            attacks |= 1u64 << square;
-            if (block & (1u64 << square)) != 0 {
-                break;
-            }
-        } else {
+    let mut tmp_rank = rank;
+    let mut tmp_file = file;
+    while tmp_rank < 7 && tmp_file < 7 {
+        tmp_rank += 1;
+        tmp_file += 1;
+        square_mask <<= 9;
+        attacks |= square_mask;
+        if block & square_mask != 0 {
             break;
         }
     }
+
     // Up-left
-    for rank in (target_rank + 1)..8 {
-        let file = target_file as i8 - ((rank - target_rank) as i8);
-        let square = rank * 8 + file as u8;
-        if rank <= 7 && file >= 0 {
-            attacks |= 1u64 << square;
-            if (block & (1u64 << square)) != 0 {
-                break;
-            }
-        } else {
+    square_mask = 1u64 << square as u8;
+    tmp_rank = rank;
+    tmp_file = file;
+    while tmp_rank < 7 && tmp_file > 0 {
+        tmp_rank += 1;
+        tmp_file -= 1;
+        square_mask <<= 7;
+        attacks |= square_mask;
+        if block & square_mask != 0 {
             break;
         }
     }
 
     // Down-right
-    for rank in (0..target_rank).rev() {
-        let file = target_file as i8 + ((target_rank - rank) as i8);
-
-        let square = rank * 8 + file as u8;
-        if file <= 7 {
-            attacks |= 1u64 << (rank * 8 + file as u8);
-            if (block & (1u64 << square)) != 0 {
-                break;
-            }
-        } else {
+    square_mask = 1u64 << square as u8;
+    tmp_rank = rank;
+    tmp_file = file;
+    while tmp_rank > 0 && tmp_file < 7 {
+        tmp_rank -= 1;
+        tmp_file += 1;
+        square_mask >>= 7;
+        attacks |= square_mask;
+        if block & square_mask != 0 {
             break;
         }
     }
 
     // Down-left
-    for rank in (0..target_rank).rev() {
-        let file = target_file as i8 - ((target_rank - rank) as i8);
-        let square = rank * 8 + file as u8;
-        if file >= 0 {
-            attacks |= 1u64 << (rank * 8 + file as u8);
-            if (block & (1u64 << square)) != 0 {
-                break;
-            }
-        } else {
+    square_mask = 1u64 << square as u8;
+    tmp_rank = rank;
+    tmp_file = file;
+    while tmp_rank > 0 && tmp_file > 0 {
+        tmp_rank -= 1;
+        tmp_file -= 1;
+        square_mask >>= 9;
+        attacks |= square_mask;
+        if block & square_mask != 0 {
             break;
         }
     }
+
     attacks
 }
 
+/// possible queen attacks
 pub fn queen_attacks_on_the_fly(square: Square, block: Bitboard) -> Bitboard {
-    let mut attacks = 0u64;
-
-    attacks |= rook_attacks_on_the_fly(square, block);
-    attacks |= bishop_attacks_on_the_fly(square, block);
-
-    attacks
+    rook_attacks_on_the_fly(square, block) | bishop_attacks_on_the_fly(square, block)
 }
 
 pub fn mask_bishop_attacks(square: u8) -> Bitboard {
@@ -322,74 +336,4 @@ pub fn mask_rook_attacks(square: u8) -> Bitboard {
         }
     }
     attacks
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub struct MagicEntry {
-    pub relevant_occupancy: u64,
-    pub magic: u64,
-    pub index_bits: u8,
-    pub offset: usize,
-}
-
-pub struct TableFillError;
-
-pub fn magic_index(entry: &MagicEntry, blockers: Bitboard) -> usize {
-    let relevant_blockers = blockers & entry.relevant_occupancy;
-    let hash = relevant_blockers.wrapping_mul(entry.magic);
-    let index = (hash >> (64 - entry.index_bits)) as usize + entry.offset;
-    index
-}
-
-fn try_make_table(
-    sq: usize,
-    slider: Piece,
-    magic: &MagicEntry,
-) -> Result<Vec<Bitboard>, TableFillError> {
-    let mut table = vec![0u64; 1 << magic.index_bits];
-
-    let mut subset: u64 = 0;
-    loop {
-        let table_entry = &mut table[magic_index(magic, subset.into())];
-        let moves = match slider {
-            Piece::WhiteRook | Piece::BlackRook => mask_rook_attacks(sq as u8),
-            Piece::WhiteBishop | Piece::BlackBishop => mask_bishop_attacks(sq as u8),
-            _ => panic!("{:?} is not a sliding Piece", slider),
-        };
-
-        if *table_entry == 0 {
-            *table_entry = moves.into();
-        } else if *table_entry != moves {
-            return Err(TableFillError);
-        }
-
-        subset = subset.wrapping_sub(magic.relevant_occupancy) & magic.relevant_occupancy;
-        if subset == 0 {
-            break;
-        }
-    }
-
-    Ok(table)
-}
-
-pub fn find_magic(sq: usize, slider: Piece) -> Vec<Bitboard> {
-    let relevant_occupancy = match slider.clone() {
-        Piece::WhiteRook | Piece::BlackRook => mask_rook_attacks(sq as u8),
-        Piece::WhiteBishop | Piece::BlackBishop => mask_bishop_attacks(sq as u8),
-        _ => panic!("{:?} is not a sliding Piece", slider),
-    };
-
-    loop {
-        let magic = generate_magic_number();
-        let index_bits = relevant_occupancy.count_ones() as u8;
-        let magic_entry = MagicEntry {
-            relevant_occupancy,
-            magic,
-            index_bits,
-            offset: 0,
-        };
-        if let Ok(table) = try_make_table(sq, slider, &magic_entry) {
-            return table;
-        }
-    }
 }
