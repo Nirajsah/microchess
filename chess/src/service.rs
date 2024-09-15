@@ -8,11 +8,11 @@ use self::state::Chess;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema};
 use chess::{
     piece::{Color, Piece},
-    Clock, GameState, Move, Operation,
+    Clock, GameState, Move, Operation, PlayerTime,
 };
 
 use linera_sdk::{
-    base::{Owner, TimeDelta, WithServiceAbi},
+    base::{Owner, WithServiceAbi},
     graphql::GraphQLMutationRoot,
     views::{View, ViewStorageContext},
     Service, ServiceRuntime,
@@ -75,7 +75,7 @@ impl ChessService {
     async fn game_state(&self) -> &GameState {
         &self.state.board.get().state
     }
-    async fn time_left(&self, player: Color) -> TimeDelta {
-        self.state.clock.get().time_left_for_player(player)
+    async fn time_left(&self) -> PlayerTime {
+        self.state.clock.get().time_left_for_player()
     }
 }
