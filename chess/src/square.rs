@@ -69,6 +69,11 @@ impl Square {
     pub const fn mirror(&self) -> Self {
         MIRROR[*self as usize]
     }
+
+    pub const fn rank(&self) -> u8 {
+        ((*self as usize / 8) as u8) + 1
+    }
+
     #[rustfmt::skip]
     pub const fn usize_to_square(i: usize) -> Self {
         match i {

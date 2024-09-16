@@ -67,7 +67,7 @@ pub enum Operation {
         from: String,
         to: String,
         piece: String,
-        promotion: String,
+        promoted_piece: String,
     },
 }
 
@@ -309,10 +309,17 @@ impl Game {
                 }
                 Err(_) => Err(ChessError::InvalidEnPassant),
             },
-            MoveType::Promotion(Piece) => self
-                .board
-                .move_piece(from, to, &piece)
-                .and_then(|_| self.board.pawn_promotion(to, Piece)),
+            MoveType::Promotion(Piece) => {
+                if let Some(captured_piece) = self.board.get_piece_at(to) {
+                    log::info!("Promotion: {:?}", captured_piece);
+                    self.capture_piece(from, to, piece, captured_piece)
+                        .and_then(|_| self.board.add_piece(to, piece, Piece))
+                } else {
+                    log::info!("Promotion: {:?}", Piece);
+                    self.move_piece(from, to, piece)
+                        .and_then(|_| self.board.add_piece(to, piece, Piece))
+                }
+            }
         }
     }
 

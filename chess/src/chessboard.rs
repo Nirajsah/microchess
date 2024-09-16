@@ -624,9 +624,10 @@ impl ChessBoard {
         Ok(())
     }
 
-    pub fn pawn_promotion(&self, to: Square, piece: Piece) -> Result<()> {
-        let board = self.get_mut_board(&piece);
-        Self::set(to, board);
+    /// A function to add a piece to the board
+    pub fn add_piece(&mut self, at: Square, piece: Piece, promoted_to: Piece) -> Result<()> {
+        Self::clear(at, self.get_mut_board(&piece));
+        Self::set(at, self.get_mut_board(&promoted_to));
         Ok(())
     }
 

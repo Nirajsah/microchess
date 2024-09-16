@@ -72,10 +72,8 @@ impl Contract for ChessContract {
                     if player == players[0] {
                         return;
                     }
-                    let game = Game::new();
-                    // let game = Game::with_fen(
-                    //     "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -",
-                    // );
+                    // let game = Game::new();
+                    let game = Game::with_fen("8/7P/7P/8/8/8/8/7r w - - 0 1");
                     self.state.add_player(player);
                     self.state.board.set(game);
                 } else {
@@ -256,25 +254,87 @@ impl Contract for ChessContract {
                 from,
                 to,
                 piece,
-                promotion,
+                promoted_piece,
             } => {
+                // check if the game is still ongoing
+                match self.state.board.get().state {
+                    GameState::Checkmate => {
+                        log::info!("Game is over: Checkmate");
+                        return;
+                    }
+                    GameState::Stalemate => {
+                        log::info!("Game is over: Stalemate");
+                        return;
+                    }
+                    _ => {}
+                }
+
                 let from_sq = Square::from_str(&from).expect("Invalid square");
+                let piece = Piece::from_str(&piece).expect("Invalid piece");
+
+                if piece != Piece::WhitePawn && piece != Piece::BlackPawn {
+                    return;
+                }
+
+                if piece == Piece::WhitePawn {
+                    if from_sq.rank() != 7 {
+                        log::info!("Invalid move: White pawn can only promote on rank 7 current rank: {:?}", from_sq.rank());
+                        return;
+                    }
+                } else if piece == Piece::BlackPawn {
+                    if from_sq.rank() != 2 {
+                        log::info!("Invalid move: Black pawn can only promote on rank 2");
+                        return;
+                    }
+                }
+
+                let block_time = self.runtime.system_time();
+                let clock = self.state.clock.get_mut();
+                let owner = self.runtime.authenticated_signer().unwrap();
+                let active_player = self.state.board.get().active;
+                let active = self
+                    .state
+                    .owners
+                    .get(&owner)
+                    .await
+                    .expect("Failed to get active player")
+                    .expect("Active player not found");
+
+                assert_eq!(
+                    active_player, active,
+                    "Only the active player can make a move."
+                );
+
                 let to_sq = Square::from_str(&to).expect("Invalid square");
-                let p = ChessBoard::get_piece(&piece).expect("Invalid piece");
+                let promoting_to = Piece::from_str(&promoted_piece).expect("Invalid piece");
 
-                if p != Piece::WhitePawn && p != Piece::BlackPawn {
-                    return;
+                log::info!("Promoting {:?} to {:?}", piece, promoting_to);
+
+                let success = self.state.board.get_mut().make_move(
+                    from_sq,
+                    to_sq,
+                    piece,
+                    MoveType::Promotion(promoting_to),
+                );
+
+                match success {
+                    Ok(_) => {
+                        self.state.board.get_mut().switch_player_turn();
+                        self.state.board.get_mut().create_move_string(active, to);
+
+                        clock.make_move(block_time, active_player);
+                        self.runtime
+                            .assert_before(block_time.saturating_add(clock.block_delay));
+
+                        self.state.board.get_mut().is_checkmate();
+                        clock.make_move(block_time, active_player);
+                        self.runtime
+                            .assert_before(block_time.saturating_add(clock.block_delay));
+                    }
+                    Err(e) => {
+                        log::info!("Invalid move: {:?}", e);
+                    }
                 }
-
-                if to_sq / 8 != 0 && to_sq / 8 != 7 {
-                    return;
-                }
-
-                let promoting_to = Piece::from_str(&promotion).expect("Invalid piece");
-
-                let m: MoveType = MoveType::Promotion(promoting_to);
-
-                self.state.board.get_mut().make_move(from_sq, to_sq, p, m);
             }
         }
     }
