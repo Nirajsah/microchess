@@ -15,7 +15,8 @@ import React from 'react'
 import { useMutation } from '@apollo/client'
 import { CAPTURE_PIECE, MOVE_PIECE } from '../../GraphQL/queries'
 import generatePossibleMoves from './GeneratePossibleMoves'
-import { Piece, Square, SquareToPieceMap } from './types'
+import { Color, Piece, Square, SquareToPieceMap } from './types'
+import { useChess } from '../../context/ChessProvider'
 // import generatePossibleMoves from './GeneratePossibleMoves'
 // import Ranks from './Ranks'
 
@@ -47,8 +48,8 @@ export default function Board({
 }: {
   board: SquareToPieceMap
   isBlack: boolean
-  color: string
-  player: string
+  color: Color
+  player: Color
   isKingInCheck?: string | null
   setPromoteData: React.Dispatch<
     React.SetStateAction<{
@@ -63,6 +64,7 @@ export default function Board({
   const [selectedSquare, setSelectedSquare] = React.useState<Square | null>(
     null
   )
+  const { chessSettings } = useChess()
 
   const [moveMutation] = useMutation(MOVE_PIECE)
   const [captureMutation] = useMutation(CAPTURE_PIECE)
@@ -88,12 +90,10 @@ export default function Board({
     piece: Piece,
     capturedPiece: Piece | null
   ) => {
-    if (piece && selectedSquare) {
-      setPromoteData({
-        from: selectedSquare,
-        to: to_square,
-        show: true,
-      })
+    if (
+      (piece && selectedSquare && chessSettings.dragNdrop) ||
+      (selectedPiece && selectedSquare)
+    ) {
       if (possMoves.includes(to_square)) {
         if (piece === 'wP' && getRank(to_square) === 8) {
           // Show pop up of avaiable promotion, if promotionPiece is selected run the mutation
@@ -190,9 +190,11 @@ export default function Board({
             const backgroundColor =
               square === KingInCheck
                 ? 'purple'
-                : number % 2 === 0
-                  ? '#ff685321'
-                  : '#ff2a00bf'
+                : selectedSquare === square
+                  ? 'green'
+                  : number % 2 === 0
+                    ? '#ff685321'
+                    : '#ff2a00bf'
 
             const onDrop = (
               e: React.DragEvent<HTMLDivElement>,
@@ -227,8 +229,7 @@ export default function Board({
                 className="md:h-[90px] w-[12vw] h-[12vw] md:w-[90px] flex justify-center items-center relative pieces"
                 onClick={(e) => {
                   e.preventDefault()
-                  if (color === 'WHITE') {
-                    // color === player
+                  if (color === player && !chessSettings.dragNdrop) {
                     handleSquareClick(square as Square, piece as Piece, null)
                   }
                 }}
