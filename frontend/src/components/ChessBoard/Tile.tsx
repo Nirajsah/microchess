@@ -1,5 +1,5 @@
 import React from 'react'
-import { Piece, Square, SquareToPieceMap } from './Board'
+import { Piece, Square, SquareToPieceMap } from './types'
 import generatePossibleMoves from './GeneratePossibleMoves'
 
 export default function Tile({
@@ -18,6 +18,8 @@ export default function Tile({
   board: SquareToPieceMap
 }) {
   const [isGrabbing, setIsGrabbing] = React.useState(false)
+  const dragNdrop = parseInt(sessionStorage.getItem('dragNdrop') ?? '0', 10)
+  const isDraggable = Boolean(dragNdrop)
 
   const [position, setPosition] = React.useState({ x: 0, y: 0 })
   const tileRef = React.useRef<HTMLDivElement>(null)
@@ -70,7 +72,7 @@ export default function Tile({
       onMouseDown={() => setIsGrabbing(true)}
       onMouseUp={() => setIsGrabbing(false)}
       onMouseLeave={() => setIsGrabbing(false)}
-      draggable="true"
+      draggable={isDraggable}
       onDragStart={(e) => {
         onDragStart(e)
       }}
@@ -78,7 +80,12 @@ export default function Tile({
         onDragEnd(e)
       }}
     >
-      <img src={image} alt={image} className="object-contain" />
+      <img
+        src={image}
+        alt={image}
+        className="object-contain"
+        draggable={isDraggable}
+      />
     </div>
   )
 }

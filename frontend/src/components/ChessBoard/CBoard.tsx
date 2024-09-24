@@ -16,7 +16,6 @@ import {
 import Board from './Board'
 import { Link } from 'react-router-dom'
 import Timer from './Timer'
-import { RightSideMenu } from './RightSideMenu'
 import Modal from '../Modal'
 import { Welcome } from '../popup/Welcome'
 import { LeftSideMenu } from './LeftSideMenu'
@@ -123,7 +122,6 @@ const CBoard = () => {
       chainId: chainId,
     },
     onCompleted: (data) => {
-      console.log('captured pieces', data)
       setCapturedPieces(data.capturedPieces)
     },
     fetchPolicy: 'network-only',
@@ -161,6 +159,7 @@ const CBoard = () => {
     },
     fetchPolicy: 'network-only',
   })
+
   const [moveQuery] = useLazyQuery(GET_MOVES, {
     variables: {
       endpoint: 'chess',
@@ -177,7 +176,6 @@ const CBoard = () => {
       chainId: chainId,
     },
     onData: () => {
-      console.log('Notification received')
       playerTurn()
       boardQuery()
       moveQuery()
@@ -241,7 +239,7 @@ const CBoard = () => {
           board={board}
           isBlack={isBlack}
           color={color}
-          player={player}
+          player={player as Color}
           isKingInCheck={checkStatus}
           setPromoteData={setPromoteData}
         />
@@ -265,7 +263,7 @@ const CBoard = () => {
         <Modal select={open} unselect={() => setOpen(!open)}>
           <Welcome />
         </Modal>
-        <div className="p-6 w-full">
+        <div className="p-2 w-full flex border border-black items-center justify-between">
           <Link to="/" className="text-2xl tracking-wide font-semibold">
             Stella
           </Link>
