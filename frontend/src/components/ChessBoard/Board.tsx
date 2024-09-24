@@ -14,91 +14,11 @@ import blackKing from '../../assets/new_assets/bk.png'
 import React from 'react'
 import { useMutation } from '@apollo/client'
 import { CAPTURE_PIECE, MOVE_PIECE } from '../../GraphQL/queries'
+import generatePossibleMoves from './GeneratePossibleMoves'
+import { Piece, Square, SquareToPieceMap } from './types'
 // import generatePossibleMoves from './GeneratePossibleMoves'
 // import Ranks from './Ranks'
-export type Piece =
-  | 'wP'
-  | 'wN'
-  | 'wB'
-  | 'wR'
-  | 'wQ'
-  | 'wK'
-  | 'bP'
-  | 'bN'
-  | 'bB'
-  | 'bR'
-  | 'bQ'
-  | 'bK'
 
-export type Square =
-  | 'a1'
-  | 'b1'
-  | 'c1'
-  | 'd1'
-  | 'e1'
-  | 'f1'
-  | 'g1'
-  | 'h1'
-  | 'a2'
-  | 'b2'
-  | 'c2'
-  | 'd2'
-  | 'e2'
-  | 'f2'
-  | 'g2'
-  | 'h2'
-  | 'a3'
-  | 'b3'
-  | 'c3'
-  | 'd3'
-  | 'e3'
-  | 'f3'
-  | 'g3'
-  | 'h3'
-  | 'a4'
-  | 'b4'
-  | 'c4'
-  | 'd4'
-  | 'e4'
-  | 'f4'
-  | 'g4'
-  | 'h4'
-  | 'a5'
-  | 'b5'
-  | 'c5'
-  | 'd5'
-  | 'e5'
-  | 'f5'
-  | 'g5'
-  | 'h5'
-  | 'a6'
-  | 'b6'
-  | 'c6'
-  | 'd6'
-  | 'e6'
-  | 'f6'
-  | 'g6'
-  | 'h6'
-  | 'a7'
-  | 'b7'
-  | 'c7'
-  | 'd7'
-  | 'e7'
-  | 'f7'
-  | 'g7'
-  | 'h7'
-  | 'a8'
-  | 'b8'
-  | 'c8'
-  | 'd8'
-  | 'e8'
-  | 'f8'
-  | 'g8'
-  | 'h8'
-
-export type SquareToPieceMap = {
-  [key in Square]?: Piece
-}
 const pieceImages: any = {
   wP: whitePawn,
   wR: whiteRook,
@@ -123,15 +43,22 @@ export default function Board({
   color,
   player,
   isKingInCheck,
+  setPromoteData,
 }: {
   board: SquareToPieceMap
   isBlack: boolean
   color: string
   player: string
   isKingInCheck?: string | null
+  setPromoteData: React.Dispatch<
+    React.SetStateAction<{
+      from: string
+      to: string
+      show: boolean
+    }>
+  >
 }) {
   const [possMoves, setPossMoves] = React.useState<Square[]>([])
-
   const [selectedPiece, setSelectedPiece] = React.useState<Piece | null>(null)
   const [selectedSquare, setSelectedSquare] = React.useState<Square | null>(
     null
@@ -152,17 +79,44 @@ export default function Board({
     return null // Return null if no white king is found
   }
 
+  function getRank(square: Square): number {
+    return parseInt(square.charAt(1))
+  }
+
   const handleSquareClick = (
-    square: Square,
+    to_square: Square,
     piece: Piece,
-    capturedPiece: Piece | undefined
+    capturedPiece: Piece | null
   ) => {
     if (piece && selectedSquare) {
-      if (possMoves.includes(square)) {
+      setPromoteData({
+        from: selectedSquare,
+        to: to_square,
+        show: true,
+      })
+      if (possMoves.includes(to_square)) {
+        if (piece === 'wP' && getRank(to_square) === 8) {
+          // Show pop up of avaiable promotion, if promotionPiece is selected run the mutation
+          setPromoteData({
+            from: selectedSquare,
+            to: to_square,
+            show: true,
+          })
+        }
+
+        if (piece === 'bP' && getRank(to_square) === 1) {
+          // Show pop up of avaiable promotion, if promotionPiece is selected run the mutation
+          setPromoteData({
+            from: selectedSquare,
+            to: to_square,
+            show: true,
+          })
+        }
+
         if (capturedPiece) {
-          capturePiece(selectedSquare, square, piece, capturedPiece) // from, to, piece, capturedPiece
+          capturePiece(selectedSquare, to_square, piece, capturedPiece) // from, to, piece, capturedPiece
         } else {
-          movePiece(selectedSquare, square, piece) // from, to, piece
+          movePiece(selectedSquare, to_square, piece) // from, to, piece
         }
         setSelectedPiece(null)
         setSelectedSquare(null)
@@ -173,8 +127,10 @@ export default function Board({
         setPossMoves([])
       }
     } else if (piece) {
+      const moves = generatePossibleMoves(piece, to_square, board)
+      setPossMoves(moves)
       setSelectedPiece(piece)
-      setSelectedSquare(square)
+      setSelectedSquare(to_square)
     }
   }
 
@@ -215,9 +171,9 @@ export default function Board({
   const boardRef = React.useRef<HTMLDivElement>(null)
 
   return (
-    <div ref={boardRef} className="">
+    <div ref={boardRef} className="w-full h-full">
       {ranks.map((rank, rankIndex) => (
-        <div key={rank} className="flex">
+        <div key={rank} className="flex w-full h-full">
           {files.map((file, fileIndex) => {
             // Calculate the square position
             const square = isBlack
@@ -234,11 +190,9 @@ export default function Board({
             const backgroundColor =
               square === KingInCheck
                 ? 'purple'
-                : selectedSquare === square
-                  ? '#69ba53'
-                  : number % 2 === 0
-                    ? '#ff685321'
-                    : '#ff2a00bf'
+                : number % 2 === 0
+                  ? '#ff685321'
+                  : '#ff2a00bf'
 
             const onDrop = (
               e: React.DragEvent<HTMLDivElement>,
@@ -265,34 +219,33 @@ export default function Board({
                 onDragOver={(e) => {
                   onDragOver(e)
                 }}
-                className="flex w-full justify-center items-center relative pieces"
                 key={file}
                 style={{
                   backgroundColor,
-                  width: '90px',
-                  height: '90px',
                   borderRadius: '4px',
                 }}
-                // onClick={(e) => {
-                //   e.preventDefault()
-                //   if (color === player) {
-                //     handleSquareClick(square as Square, piece)
-                //   }
-                // }}
+                className="md:h-[90px] w-[12vw] h-[12vw] md:w-[90px] flex justify-center items-center relative pieces"
+                onClick={(e) => {
+                  e.preventDefault()
+                  if (color === 'WHITE') {
+                    // color === player
+                    handleSquareClick(square as Square, piece as Piece, null)
+                  }
+                }}
                 onDrag={(e) => {
                   e.preventDefault()
                 }}
               >
-                {piece && (
+                {
                   <Tile
-                    image={pieceImages[piece]}
-                    piece={piece}
+                    image={pieceImages[piece as Piece]}
+                    piece={piece as Piece}
                     square={square as Square}
                     setSelectedSquare={setSelectedSquare}
                     board={board}
                     setPossMoves={setPossMoves}
                   />
-                )}
+                }
 
                 {possMoves.includes(square as Square) && (
                   <div

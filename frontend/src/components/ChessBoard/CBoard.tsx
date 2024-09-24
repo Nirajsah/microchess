@@ -20,92 +20,18 @@ import { RightSideMenu } from './RightSideMenu'
 import Modal from '../Modal'
 import { Welcome } from '../popup/Welcome'
 import { LeftSideMenu } from './LeftSideMenu'
+import { PromotionCard } from './PromotionCard'
+import {
+  Color,
+  Fen,
+  Piece,
+  PromoteData,
+  Square,
+  SquareToPieceMap,
+} from './types'
 
 const COLUMNS = 'abcdefgh'.split('')
-type Fen = string
-export type Piece =
-  | 'wP'
-  | 'wN'
-  | 'wB'
-  | 'wR'
-  | 'wQ'
-  | 'wK'
-  | 'bP'
-  | 'bN'
-  | 'bB'
-  | 'bR'
-  | 'bQ'
-  | 'bK'
 
-export type Square =
-  | 'a1'
-  | 'b1'
-  | 'c1'
-  | 'd1'
-  | 'e1'
-  | 'f1'
-  | 'g1'
-  | 'h1'
-  | 'a2'
-  | 'b2'
-  | 'c2'
-  | 'd2'
-  | 'e2'
-  | 'f2'
-  | 'g2'
-  | 'h2'
-  | 'a3'
-  | 'b3'
-  | 'c3'
-  | 'd3'
-  | 'e3'
-  | 'f3'
-  | 'g3'
-  | 'h3'
-  | 'a4'
-  | 'b4'
-  | 'c4'
-  | 'd4'
-  | 'e4'
-  | 'f4'
-  | 'g4'
-  | 'h4'
-  | 'a5'
-  | 'b5'
-  | 'c5'
-  | 'd5'
-  | 'e5'
-  | 'f5'
-  | 'g5'
-  | 'h5'
-  | 'a6'
-  | 'b6'
-  | 'c6'
-  | 'd6'
-  | 'e6'
-  | 'f6'
-  | 'g6'
-  | 'h6'
-  | 'a7'
-  | 'b7'
-  | 'c7'
-  | 'd7'
-  | 'e7'
-  | 'f7'
-  | 'g7'
-  | 'h7'
-  | 'a8'
-  | 'b8'
-  | 'c8'
-  | 'd8'
-  | 'e8'
-  | 'f8'
-  | 'g8'
-  | 'h8'
-
-export type SquareToPieceMap = {
-  [key in Square]?: Piece
-}
 const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
 function fenToPieceCode(piece: any) {
@@ -171,12 +97,12 @@ const CBoard = () => {
   const owner = window.sessionStorage.getItem('owner') ?? ''
   const [player, setPlayer] = React.useState('')
   const [boardState, setBoardState] = React.useState<Fen>(fen)
-  const [color, setColor] = React.useState('')
+  const [color, setColor] = React.useState<Color>('WHITE')
   const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
   const [opponentId, setOpponentId] = React.useState<string | null>(null)
   const [play] = useMutation(NEW_GAME)
-  const [whiteTime, setWhiteTime] = React.useState(0) // 10 minutes
-  const [blackTime, setBlackTime] = React.useState(0)
+  const [whiteTime, setWhiteTime] = React.useState(900701910) // 10 minutes
+  const [blackTime, setBlackTime] = React.useState(900701910)
 
   const [timeQuery] = useLazyQuery(TIME_LEFT, {
     variables: {
@@ -307,8 +233,8 @@ const CBoard = () => {
     const isBlack = color.toLowerCase() === 'black'
 
     return (
-      <div className="w-full h-full">
-        <div className="flex flex-col z-50 absolute">
+      <div className="w-full">
+        <div className="h-[12.5%] z-50 absolute">
           <Ranks color={color} />
         </div>
         <Board
@@ -317,6 +243,7 @@ const CBoard = () => {
           color={color}
           player={player}
           isKingInCheck={checkStatus}
+          setPromoteData={setPromoteData}
         />
         <div className="flex">
           <Files color={color} />
@@ -324,48 +251,55 @@ const CBoard = () => {
       </div>
     )
   }
+
   const [open, setOpen] = React.useState(true)
-  const unselect = () => {
-    setOpen(!open)
-  }
+  const [promoteData, setPromoteData] = React.useState<PromoteData>({
+    from: '',
+    to: '',
+    show: false,
+  })
 
   return (
-    <div>
-      <div className="flex justify-center z-[100px]">
-        <Modal select={open} unselect={unselect}>
+    <div className="w-full h-full p-3">
+      <div className="md:flex flex-col justify-center w-full">
+        <Modal select={open} unselect={() => setOpen(!open)}>
           <Welcome />
         </Modal>
-        <div className="min-w-[250px] p-6">
+        <div className="p-6 w-full">
           <Link to="/" className="text-2xl tracking-wide font-semibold">
             Stella
           </Link>
-
           <LeftSideMenu />
         </div>
-
-        <div className="flex flex-col p-1 relative">
-          <div className="flex w-full justify-between my-2 text-sm font-semibold font-sans">
-            Opponent {opponentId}
-            <Timer
-              initialTimeMs={color === 'BLACK' ? blackTime : whiteTime}
-              start
-            />
-          </div>
-
-          <div className="w-full relative max-w-[720px] -z-10">
+        <div className="flex w-full justify-between my-2 text-sm font-semibold font-sans">
+          Opponent {opponentId}
+          <Timer
+            initialTimeMs={color === 'BLACK' ? blackTime : whiteTime}
+            start
+          />
+        </div>
+        <div className="flex flex-col w-full max-w-[720px] relative">
+          <div className="w-full relative max-w-[720px] h-full">
             {renderSquare()}
           </div>
-
-          <div className="flex w-full justify-between my-2 text-sm font-semibold font-sans">
-            Player {owner}
-            <Timer
-              initialTimeMs={color === 'WHITE' ? whiteTime : blackTime}
-              start
-            />
-          </div>
+          {promoteData.show && (
+            <div className="absolute w-full h-full flex justify-center items-center drop-shadow-xl bg-black bg-opacity-20 z-50 rounded-md">
+              <PromotionCard
+                color="white"
+                promoteData={promoteData}
+                setPromoteData={setPromoteData}
+              />
+            </div>
+          )}
         </div>
-
-        {/* Right Side Menu */}
+        <div className="flex w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
+          Player {owner}
+          <Timer
+            initialTimeMs={color === 'WHITE' ? whiteTime : blackTime}
+            start
+          />
+        </div>
+        {/*
         <RightSideMenu
           checkStatus={checkStatus}
           player={player}
@@ -375,6 +309,7 @@ const CBoard = () => {
           startGame={startGame}
           key={chainId}
         />
+        */}
       </div>
     </div>
   )
