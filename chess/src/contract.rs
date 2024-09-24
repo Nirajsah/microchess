@@ -72,8 +72,8 @@ impl Contract for ChessContract {
                     if player == players[0] {
                         return;
                     }
-                    // let game = Game::new();
-                    let game = Game::with_fen("8/7P/7P/8/8/8/8/7r w - - 0 1");
+                    let game = Game::new();
+                    // let game = Game::with_fen("8/7P/7P/8/8/8/8/7r w - - 0 1");
                     self.state.add_player(player);
                     self.state.board.set(game);
                 } else {
