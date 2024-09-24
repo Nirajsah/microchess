@@ -15,7 +15,7 @@ export default function Modal({ select, unselect, children }: ModalProps) {
         `}
     >
       <div
-        className={`transition-all ${
+        className={`p-2 transition-all ${
           select ? 'scale-100 opacity-100' : 'scale-125 opacity-0'
         }`}
         onClick={(e) => e.stopPropagation()}

@@ -10,8 +10,8 @@ export default function Tile({
   setPossMoves,
   board,
 }: {
-  image: string
-  piece: Piece
+  image: string | undefined
+  piece: Piece | undefined
   square: Square
   setSelectedSquare: React.Dispatch<React.SetStateAction<Square | null>>
   setPossMoves: React.Dispatch<React.SetStateAction<Square[]>>
@@ -33,7 +33,7 @@ export default function Tile({
       const rect = tileRef.current.getBoundingClientRect()
       setPosition({ x: rect.left, y: rect.top })
     }
-    const moves = generatePossibleMoves(piece, square, board)
+    const moves = generatePossibleMoves(piece as Piece, square, board)
     setPossMoves(moves)
   }
 
@@ -56,9 +56,11 @@ export default function Tile({
   return (
     <div
       ref={tileRef}
-      className={`w-14 h-14 flex items-center justify-center hover:scale-110 chess-piece ${piece}`}
+      className={`flex items-center justify-center hover:scale-110 chess-piece ${piece}`}
       // className="chess-piece w-14 h-14 hover:scale-110"
       style={{
+        maxWidth: '50%',
+        maxHeight: '50%',
         // backgroundImage: `url(${image})`,
         // backgroundSize: 'contain', // make sure the image covers the entire div
         // backgroundPosition: 'center', // center the image
@@ -76,7 +78,7 @@ export default function Tile({
         onDragEnd(e)
       }}
     >
-      <img src={image} alt={image} />
+      <img src={image} alt={image} className="object-contain" />
     </div>
   )
 }
