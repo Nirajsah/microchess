@@ -8,7 +8,7 @@ const Settings = () => {
 }
 
 export const LeftSideMenu = () => {
-  const [showSettings, setShowSettings] = React.useState(true)
+  const [showSettings, setShowSettings] = React.useState(false)
   return (
     <div className="border w-full h-full border-black">
       <Modal
@@ -17,7 +17,13 @@ export const LeftSideMenu = () => {
       >
         <Settings />
       </Modal>
-      <div>
+
+      <div
+        onClick={(e) => {
+          e.preventDefault()
+          setShowSettings(true)
+        }}
+      >
         <button>Settings</button>
       </div>
     </div>
