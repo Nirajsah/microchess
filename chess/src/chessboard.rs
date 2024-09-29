@@ -793,11 +793,8 @@ impl ChessBoard {
             return Err(ChessError::InvalidCapture);
         }
 
-        self.move_piece(from, to, piece)
-            .and_then(|_| self.capture_piece(to, c_captured))
-
-        // self.capture_piece(to, c_captured)
-        //     .and_then(|_| self.move_piece(from, to, piece))
+        self.capture_piece(to, c_captured)
+            .and_then(|_| self.move_piece(from, to, piece))
     }
 
     /// Black pawn captures
