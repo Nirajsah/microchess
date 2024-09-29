@@ -11,7 +11,21 @@ export const GET_BOARD = gql`
     board
   }
 `
-
+export const PROMOTE_PIECE = gql`
+  mutation PromotePiece(
+    $from: String!
+    $to: String!
+    $piece: String!
+    $promotedPiece: String!
+  ) {
+    pawnPromotion(
+      from: $from
+      to: $to
+      piece: $piece
+      promotedPiece: $promotedPiece
+    )
+  }
+`
 export const MOVE_PIECE = gql`
   mutation MakeMove($from: String!, $to: String!, $piece: String!) {
     makeMove(from: $from, to: $to, piece: $piece)
@@ -73,7 +87,10 @@ export const OPPONENT = gql`
 `
 
 export const TIME_LEFT = gql`
-  query TimeLeft($player: Color!) {
-    timeLeft(player: $player)
+  query TimeLeft {
+    timeLeft {
+      white
+      black
+    }
   }
 `
