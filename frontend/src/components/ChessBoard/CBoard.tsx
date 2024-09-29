@@ -28,6 +28,7 @@ import {
   Square,
   SquareToPieceMap,
 } from './types'
+import { RightSideMenu } from './RightSideMenu'
 
 const COLUMNS = 'abcdefgh'.split('')
 
@@ -100,8 +101,8 @@ const CBoard = () => {
   const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
   const [opponentId, setOpponentId] = React.useState<string | null>(null)
   const [play] = useMutation(NEW_GAME)
-  const [whiteTime, setWhiteTime] = React.useState(900701910) // 10 minutes
-  const [blackTime, setBlackTime] = React.useState(900701910)
+  const [whiteTime, setWhiteTime] = React.useState(0) // 15 minutes
+  const [blackTime, setBlackTime] = React.useState(0) // 15 minutes
 
   const [timeQuery] = useLazyQuery(TIME_LEFT, {
     variables: {
@@ -109,7 +110,6 @@ const CBoard = () => {
       chainId: chainId,
     },
     onCompleted: (data) => {
-      console.log('time left', data.timeLeft)
       setWhiteTime(data.timeLeft.white)
       setBlackTime(data.timeLeft.black)
     },
@@ -191,7 +191,6 @@ const CBoard = () => {
       player: owner,
     },
     onCompleted: (data) => {
-      console.log('player: ', data)
       setColor(data.player)
     },
     fetchPolicy: 'network-only',
@@ -221,7 +220,17 @@ const CBoard = () => {
     moveQuery()
   }
 
-  const board: any = React.useMemo(() => fenToObj(boardState), [boardState])
+  const [board, setBoard] = React.useState<SquareToPieceMap | any>(() =>
+    fenToObj(boardState)
+  )
+
+  // Use useEffect to update the boards when boardState changes
+  React.useEffect(() => {
+    setBoard(fenToObj(boardState))
+  }, [boardState])
+
+  // const board: any = React.useMemo(() => fenToObj(boardState), [boardState])
+
   const checkStatus = getCheckStatusFromFEN(boardState)
   const [moves, setMoves] = React.useState<
     Array<{ white: string; black: string }>
@@ -233,18 +242,19 @@ const CBoard = () => {
     return (
       <div className="w-full">
         <div className="h-[12.5%] z-50 absolute">
-          <Ranks color={color} />
+          <Ranks color={color as Color} />
         </div>
         <Board
           board={board}
           isBlack={isBlack}
-          color={color}
+          color={color as Color}
           player={player as Color}
           isKingInCheck={checkStatus}
+          setBoard={setBoard}
           setPromoteData={setPromoteData}
         />
         <div className="flex">
-          <Files color={color} />
+          <Files color={color as Color} />
         </div>
       </div>
     )
@@ -254,60 +264,85 @@ const CBoard = () => {
   const [promoteData, setPromoteData] = React.useState<PromoteData>({
     from: '',
     to: '',
+    piece: '',
     show: false,
   })
 
+  const appBackgrounds = {
+    classicWood: '#f5f5dc', // Beige
+    modernMinimalist: '#e0e0e0', // Light Silver
+    forest: '#2e7d3217', // Dark Forest Green
+    oceanBreeze: '#e0f7fa', // Light Cyan
+    mutedPastel: '#fce4ec', // Soft Pink
+    nightMode: '#121212', // Deep Charcoal
+    desertSand: '#f4a460', // Sandy Brown
+    softViolet: '#f8bbd0', // Light Pink
+    default: '#ffebe84a',
+  }
+
   return (
-    <div className="w-full h-full p-3">
-      <div className="md:flex flex-col justify-center w-full">
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        backgroundColor: appBackgrounds.forest,
+      }}
+      className="w-full h-full p-3 font-fira"
+    >
+      <div className="flex flex-col items-center justify-center">
         <Modal select={open} unselect={() => setOpen(!open)}>
           <Welcome />
         </Modal>
-        <div className="p-2 w-full flex border border-black items-center justify-between">
+        <div className="absolute top-0 w-full p-2 max-w-[1320px] flex items-center justify-between">
           <Link to="/" className="text-2xl tracking-wide font-semibold">
             Stella
           </Link>
-          <LeftSideMenu />
-        </div>
-        <div className="flex w-full justify-between my-2 text-sm font-semibold font-sans">
-          Opponent {opponentId}
-          <Timer
-            initialTimeMs={color === 'BLACK' ? blackTime : whiteTime}
-            start
-          />
-        </div>
-        <div className="flex flex-col w-full max-w-[720px] relative">
-          <div className="w-full relative max-w-[720px] h-full">
-            {renderSquare()}
+          <div>
+            <LeftSideMenu />
           </div>
-          {promoteData.show && (
-            <div className="absolute w-full h-full flex justify-center items-center drop-shadow-xl bg-black bg-opacity-20 z-50 rounded-md">
-              <PromotionCard
-                color="white"
-                promoteData={promoteData}
-                setPromoteData={setPromoteData}
+        </div>
+        <div className="flex flex-col lg:flex-row mt-6 gap-4 w-full max-w-[1080px]">
+          <div className="flex flex-col w-full max-w-[720px] relative">
+            <div className="flex w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
+              Opponent {opponentId}
+              <Timer
+                initialTimeMs={color === 'BLACK' ? blackTime : whiteTime}
+                start
               />
             </div>
-          )}
+            <div className="w-full relative max-w-[720px] h-full bg-white rounded-md">
+              {renderSquare()}
+            </div>
+            {promoteData.show && (
+              <div className="absolute w-full h-full flex justify-center items-center drop-shadow-2xl z-50 rounded-md">
+                <PromotionCard
+                  color="white"
+                  promoteData={promoteData}
+                  setPromoteData={setPromoteData}
+                />
+              </div>
+            )}
+            <div className="flex w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
+              Player {owner}
+              <Timer
+                initialTimeMs={color === 'WHITE' ? whiteTime : blackTime}
+                start
+              />
+            </div>
+          </div>
+
+          <div className="w-full mt-4 md:mt-8">
+            <RightSideMenu
+              checkStatus={checkStatus}
+              player={player}
+              opponentId={opponentId}
+              capturedPieces={capturedPieces}
+              moves={moves}
+              startGame={startGame}
+              key={chainId}
+            />
+          </div>
         </div>
-        <div className="flex w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
-          Player {owner}
-          <Timer
-            initialTimeMs={color === 'WHITE' ? whiteTime : blackTime}
-            start
-          />
-        </div>
-        {/*
-        <RightSideMenu
-          checkStatus={checkStatus}
-          player={player}
-          opponentId={opponentId}
-          capturedPieces={capturedPieces}
-          moves={moves}
-          startGame={startGame}
-          key={chainId}
-        />
-        */}
       </div>
     </div>
   )

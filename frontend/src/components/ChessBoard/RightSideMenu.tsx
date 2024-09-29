@@ -20,7 +20,7 @@ export const RightSideMenu: React.FC<Props> = ({
   startGame,
 }) => {
   return (
-    <div className="w-full items-center max-w-[400px] font-sans mx-5 my-3 flex flex-col gap-4 rounded-lg">
+    <div className="w-full items-center font-sans flex flex-col gap-4 rounded-lg">
       <div className="bg-white py-5 px-2 font-bold rounded-lg w-full border border-black card relative">
         {player} Plays
       </div>
@@ -54,7 +54,7 @@ export const RightSideMenu: React.FC<Props> = ({
         </div>
       </div>
       {!opponentId && (
-        <div className="w-[300px] h-[70px] card relative">
+        <div className="w-full h-[70px] card relative">
           <PlayButton startGame={startGame} />
         </div>
       )}

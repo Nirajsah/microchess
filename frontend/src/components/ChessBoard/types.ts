@@ -2,6 +2,7 @@
 export type PromoteData = {
   from: string
   to: string
+  piece: string
   show: boolean
 }
 

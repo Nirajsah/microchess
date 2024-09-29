@@ -17,23 +17,23 @@ export default function Tile({
   setPossMoves: React.Dispatch<React.SetStateAction<Square[]>>
   board: SquareToPieceMap
 }) {
-  const [isGrabbing, setIsGrabbing] = React.useState(false)
+  const tileRef = React.useRef<HTMLDivElement>(null)
+
   const dragNdrop = parseInt(sessionStorage.getItem('dragNdrop') ?? '0', 10)
   const isDraggable = Boolean(dragNdrop)
 
-  const [position, setPosition] = React.useState({ x: 0, y: 0 })
-  const tileRef = React.useRef<HTMLDivElement>(null)
+  const [isDragging, setIsDragging] = React.useState(false)
 
   const onDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    setIsDragging(true)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', `${piece}`)
     setSelectedSquare(square)
     setTimeout(() => {
-      ;(e.target as HTMLElement).style.display = 'none'
+      ;(e.target as HTMLElement).style.opacity = '0'
     }, 0.0)
     if (tileRef.current) {
-      const rect = tileRef.current.getBoundingClientRect()
-      setPosition({ x: rect.left, y: rect.top })
+      tileRef.current.getBoundingClientRect()
     }
     const moves = generatePossibleMoves(piece as Piece, square, board)
     setPossMoves(moves)
@@ -44,34 +44,28 @@ export default function Tile({
       tileRef.current.style.opacity = '1'
     }
     setTimeout(() => {
-      ;(e.target as HTMLElement).style.display = 'block'
+      ;(e.target as HTMLElement).style.opacity = '1'
     }, 10)
+    setIsDragging(false)
   }
-  // React.useEffect(() => {
-  //   if (tileRef.current) {
-  //     const tile = tileRef.current
-  //     tile.style.transition = 'transform 0.5s ease'
-  //     tile.style.transform = `translate(0, 0)`
-  //   }
-  // }, [square])
+
+  const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
+    if (tileRef.current && isDragging) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }
 
   return (
     <div
       ref={tileRef}
-      className={`flex items-center justify-center hover:scale-110 chess-piece ${piece}`}
-      // className="chess-piece w-14 h-14 hover:scale-110"
+      className={`flex items-center justify-center hover:scale-110 chess-piece transition-all duration-200 ${piece}`}
       style={{
         maxWidth: '50%',
         maxHeight: '50%',
-        // backgroundImage: `url(${image})`,
-        // backgroundSize: 'contain', // make sure the image covers the entire div
-        // backgroundPosition: 'center', // center the image
-        // backgroundRepeat: 'no-repeat', // prevent the image from repeating
-        cursor: isGrabbing ? 'grabbing' : 'grab', // change the cursor to a grabbing hand
+        cursor: isDragging ? 'grabbing' : 'grab', // change the cursor to a grabbing hand
+        opacity: 1,
       }}
-      onMouseDown={() => setIsGrabbing(true)}
-      onMouseUp={() => setIsGrabbing(false)}
-      onMouseLeave={() => setIsGrabbing(false)}
       draggable={isDraggable}
       onDragStart={(e) => {
         onDragStart(e)
@@ -79,13 +73,23 @@ export default function Tile({
       onDragEnd={(e) => {
         onDragEnd(e)
       }}
+      onDrag={handleDrag}
     >
-      <img
-        src={image}
-        alt={image}
-        className="object-contain"
-        draggable={isDraggable}
-      />
+      {image && (
+        <div className="w-full" draggable={isDraggable}>
+          <img
+            style={{
+              maxWidth: '100%', // Keep the image size consistent
+              maxHeight: '100%',
+              objectFit: 'contain',
+              opacity: 1,
+            }}
+            src={image}
+            alt={image}
+            draggable="false"
+          />
+        </div>
+      )}
     </div>
   )
 }

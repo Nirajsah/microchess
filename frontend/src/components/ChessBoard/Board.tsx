@@ -17,8 +17,6 @@ import { CAPTURE_PIECE, MOVE_PIECE } from '../../GraphQL/queries'
 import generatePossibleMoves from './GeneratePossibleMoves'
 import { Color, Piece, Square, SquareToPieceMap } from './types'
 import { useChess } from '../../context/ChessProvider'
-// import generatePossibleMoves from './GeneratePossibleMoves'
-// import Ranks from './Ranks'
 
 const pieceImages: any = {
   wP: whitePawn,
@@ -44,6 +42,7 @@ export default function Board({
   color,
   player,
   isKingInCheck,
+  setBoard,
   setPromoteData,
 }: {
   board: SquareToPieceMap
@@ -51,14 +50,17 @@ export default function Board({
   color: Color
   player: Color
   isKingInCheck?: string | null
+  setBoard: React.Dispatch<React.SetStateAction<any>>
   setPromoteData: React.Dispatch<
     React.SetStateAction<{
       from: string
       to: string
+      piece: string
       show: boolean
     }>
   >
 }) {
+  const [hoveredSquare, setHoverSquare] = React.useState<Square | null>(null)
   const [possMoves, setPossMoves] = React.useState<Square[]>([])
   const [selectedPiece, setSelectedPiece] = React.useState<Piece | null>(null)
   const [selectedSquare, setSelectedSquare] = React.useState<Square | null>(
@@ -85,11 +87,69 @@ export default function Board({
     return parseInt(square.charAt(1))
   }
 
-  const handleSquareClick = (
+  const capturePiece = async (
+    from: string,
+    to: string,
+    piece: string,
+    capturedPiece: string
+  ): Promise<boolean> => {
+    return new Promise((resolve, reject) => {
+      captureMutation({
+        variables: {
+          piece,
+          from: from,
+          to: to,
+          endpoint: 'chess',
+          capturedPiece: capturedPiece,
+        },
+        onError: (error) => {
+          console.error('Message:', error.message)
+          reject(false) // On error, reject the promise with false
+        },
+        onCompleted: () => {
+          resolve(true) // On successful completion, resolve the promise with true
+        },
+      })
+    })
+  }
+
+  const movePiece = async (
+    from: string,
+    to: string,
+    piece: string
+  ): Promise<boolean> => {
+    return new Promise((resolve, reject) => {
+      moveMutation({
+        variables: {
+          piece: piece,
+          from: from,
+          to: to,
+          endpoint: 'chess',
+        },
+        onError: (error) => {
+          console.error('Message:', error.message)
+          reject(false) // On error, reject with false
+        },
+        onCompleted: () => {
+          resolve(true) // On success, resolve with true
+        },
+      })
+    })
+  }
+
+  const handleSquareClick = async (
     to_square: Square,
     piece: Piece,
     capturedPiece: Piece | null
   ) => {
+    console.log('handleSquareClick', to_square, piece, capturedPiece)
+    if (color === 'WHITE' && piece?.charAt(0) === 'b') {
+      return
+    }
+    if (color === 'BLACK' && piece?.charAt(0) === 'w') {
+      return
+    }
+
     if (
       (piece && selectedSquare && chessSettings.dragNdrop) ||
       (selectedPiece && selectedSquare)
@@ -100,8 +160,10 @@ export default function Board({
           setPromoteData({
             from: selectedSquare,
             to: to_square,
+            piece,
             show: true,
           })
+          return
         }
 
         if (piece === 'bP' && getRank(to_square) === 1) {
@@ -109,14 +171,82 @@ export default function Board({
           setPromoteData({
             from: selectedSquare,
             to: to_square,
+            piece,
             show: true,
           })
+          return
         }
 
         if (capturedPiece) {
-          capturePiece(selectedSquare, to_square, piece, capturedPiece) // from, to, piece, capturedPiece
+          if (chessSettings.dragNdrop) {
+            setBoard(() => ({
+              ...board,
+              [selectedSquare]: null,
+              [to_square]: null,
+              [to_square]: piece,
+            }))
+            const success = await capturePiece(
+              selectedSquare,
+              to_square,
+              piece,
+              capturedPiece
+            ) // from, to, piece, capturedPiece
+
+            if (!success) {
+              setBoard(() => ({
+                ...board,
+                [selectedSquare]: piece,
+                [to_square]: capturedPiece,
+              }))
+            }
+          } else {
+            const success = await capturePiece(
+              selectedSquare,
+              to_square,
+              piece as Piece,
+              capturedPiece as Piece
+            ) // from, to, piece, capturedPiece
+
+            if (!success) {
+              setBoard(() => ({
+                ...board,
+                [selectedSquare]: selectedPiece,
+                [to_square]: capturedPiece,
+              }))
+            }
+          }
         } else {
-          movePiece(selectedSquare, to_square, piece) // from, to, piece
+          if (chessSettings.dragNdrop) {
+            setBoard(() => ({
+              ...board,
+              [selectedSquare]: null,
+              [to_square]: piece,
+            }))
+            const success = await movePiece(selectedSquare, to_square, piece) // from, to, piece
+
+            if (!success) {
+              setBoard({
+                ...board,
+                [selectedSquare]: piece,
+                [to_square]: null,
+              })
+            }
+          } else {
+            const success = await movePiece(
+              selectedSquare,
+              to_square,
+              selectedPiece as Piece
+            ) // from, to, piece
+
+            console.log('success', success)
+            if (!success) {
+              setBoard(() => ({
+                ...board,
+                [selectedSquare]: selectedPiece,
+                [to_square]: null,
+              }))
+            }
+          }
         }
         setSelectedPiece(null)
         setSelectedSquare(null)
@@ -134,44 +264,87 @@ export default function Board({
     }
   }
 
-  const capturePiece = async (
-    from: string,
-    to: string,
-    piece: string,
-    capturedPiece: string
-  ) => {
-    await captureMutation({
-      variables: {
-        piece,
-        from: from,
-        to: to,
-        endpoint: 'chess',
-        capturedPiece: capturedPiece,
-      },
-      onError: (error) => {
-        console.error('Message:', error.message)
-      },
-    })
-  }
+  // const capturePiece = async (
+  //   from: string,
+  //   to: string,
+  //   piece: string,
+  //   capturedPiece: string
+  // ) => {
+  //   await captureMutation({
+  //     variables: {
+  //       piece,
+  //       from: from,
+  //       to: to,
+  //       endpoint: 'chess',
+  //       capturedPiece: capturedPiece,
+  //     },
+  //     onError: (error) => {
+  //       console.error('Message:', error.message)
+  //     },
+  //     onCompleted: () => {
+  //       return true
+  //     },
+  //   })
+  // }
 
-  const movePiece = async (from: string, to: string, piece: string) => {
-    await moveMutation({
-      variables: {
-        piece: piece,
-        from: from,
-        to: to,
-        endpoint: 'chess',
-      },
-      onError: (error) => {
-        console.error('Message:', error.message)
-      },
-    })
-  }
+  // const movePiece = async (from: string, to: string, piece: string) => {
+  //   console.log('data received', from, to, piece)
+  //   await moveMutation({
+  //     variables: {
+  //       piece: piece,
+  //       from: from,
+  //       to: to,
+  //       endpoint: 'chess',
+  //     },
+  //     onError: (error) => {
+  //       console.error('Message:', error.message)
+  //     },
+  //   })
+  // }
 
   const boardRef = React.useRef<HTMLDivElement>(null)
 
+  const themes = {
+    classicWood: {
+      light: '#d2b48c', // Tan
+      dark: '#8b5a2b', // Saddle Brown
+    },
+    modernMinimalist: {
+      light: '#f0f0f0', // Light Gray
+      dark: '#4d4d4d', // Charcoal
+    },
+    forest: {
+      light: '#c8e6c9', // Light Green
+      dark: '#388e3c', // Forest Green
+    },
+    oceanBreeze: {
+      light: '#b3e5fc', // Light Blue
+      dark: '#0277bd', // Deep Blue
+    },
+    mutedPastel: {
+      light: '#e0f7fa', // Pastel Cyan
+      dark: '#b39ddb', // Pastel Purple
+    },
+    nightMode: {
+      light: '#8c8c8c', // Soft Gray
+      dark: '#333333', // Dark Charcoal
+    },
+    desertSand: {
+      light: '#f7e9d7', // Sandy Beige
+      dark: '#bc8f8f', // Rosy Brown
+    },
+    softViolet: {
+      light: '#f3e5f5', // Light Violet
+      dark: '#9575cd', // Deep Violet
+    },
+    default: {
+      light: '#ff685324',
+      dark: '#ff2a00bf',
+    },
+  }
+
   return (
-    <div ref={boardRef} className="w-full h-full">
+    <div ref={boardRef} className="w-full h-full chess-board relative">
       {ranks.map((rank, rankIndex) => (
         <div key={rank} className="flex w-full h-full">
           {files.map((file, fileIndex) => {
@@ -187,14 +360,16 @@ export default function Board({
 
             const KingInCheck = getKingPosition(board)
 
+            const selectedTheme = themes.forest
+
             const backgroundColor =
               square === KingInCheck
                 ? 'purple'
                 : selectedSquare === square
                   ? 'green'
                   : number % 2 === 0
-                    ? '#ff685321'
-                    : '#ff2a00bf'
+                    ? selectedTheme.light
+                    : selectedTheme.dark
 
             const onDrop = (
               e: React.DragEvent<HTMLDivElement>,
@@ -207,10 +382,23 @@ export default function Board({
               setSelectedSquare(null)
               setPossMoves([])
               handleSquareClick(to, piece as Piece, capturedPiece)
+              setHoverSquare(null)
             }
 
             const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
               e.preventDefault()
+              setHoverSquare(square as Square)
+            }
+
+            const borderRadius = {
+              borderTopLeftRadius: square === 'a8' ? '6px' : '0px',
+              borderTopRightRadius: square === 'h8' ? '6px' : '0px',
+              borderBottomLeftRadius: square === 'a1' ? '6px' : '0px',
+              borderBottomRightRadius: square === 'h1' ? '6px' : '0px',
+            }
+
+            const highlight = {
+              border: hoveredSquare === square ? '3px solid #fafafa' : 'none',
             }
 
             return (
@@ -224,13 +412,22 @@ export default function Board({
                 key={file}
                 style={{
                   backgroundColor,
-                  borderRadius: '4px',
+                  ...borderRadius,
+                  ...highlight,
                 }}
                 className="md:h-[90px] w-[12vw] h-[12vw] md:w-[90px] flex justify-center items-center relative pieces"
                 onClick={(e) => {
                   e.preventDefault()
                   if (color === player && !chessSettings.dragNdrop) {
-                    handleSquareClick(square as Square, piece as Piece, null)
+                    if (selectedPiece) {
+                      handleSquareClick(
+                        square as Square,
+                        selectedPiece,
+                        piece as Piece
+                      )
+                    } else {
+                      handleSquareClick(square as Square, piece as Piece, null)
+                    }
                   }
                 }}
                 onDrag={(e) => {
@@ -252,10 +449,11 @@ export default function Board({
                   <div
                     style={{
                       position: 'absolute',
-                      width: '10px',
-                      height: '10px',
-                      backgroundColor: 'red', // Adjust color if needed
-                      borderRadius: '50%',
+                      width: '30px',
+                      height: '30px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.5)', // Background with 50% opacity
+                      border: '1px solid white', // Fully opaque white border
+                      borderRadius: '50%', // This makes it a circle
                       zIndex: 1,
                     }}
                   ></div>
