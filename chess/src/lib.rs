@@ -14,12 +14,13 @@ pub mod chessboard;
 pub mod piece;
 pub mod square;
 use square::Square;
+use thiserror::Error;
 pub mod magic;
 pub mod prng;
 
 impl ContractAbi for ChessAbi {
     type Operation = Operation;
-    type Response = ();
+    type Response = ChessResponse;
 }
 
 impl ServiceAbi for ChessAbi {
@@ -40,6 +41,12 @@ pub struct InstantiationArgument {
     /// This should be long enough to confirm a block, but short enough for the block timestamp
     /// to accurately reflect the current time.
     pub block_delay: TimeDelta,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ChessResponse {
+    Ok,
+    Err(ChessError),
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, GraphQLMutationRoot)]
@@ -85,17 +92,32 @@ pub struct PlayerTime {
     pub black: TimeDelta,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Eq, Clone, Error)]
 pub enum ChessError {
+    #[error("Piece not found")]
     PieceNotFound,
+    #[error("Invalid piece")]
     InvalidPiece,
+    #[error("Invalid move")]
     InvalidMove,
+    #[error("Invalid capture")]
     InvalidCapture,
+    #[error("Invalid promotion")]
     InvalidPromotion,
+    #[error("Invalid castle")]
     InvalidCastle,
+    #[error("Invalid en passant")]
     InvalidEnPassant,
+    #[error("Invalid request")]
+    InvalidRequest,
+    #[error("Castle rights not available")]
     CastleRights,
+    #[error("King in check")]
     KingInCheck,
+    #[error("Checkmate")]
+    Checkmate,
+    #[error("Stalemate")]
+    Stalemate,
 }
 
 pub type Result<T> = std::result::Result<T, ChessError>;
@@ -283,19 +305,20 @@ impl Game {
         match m {
             MoveType::Move => match self.move_piece(from, to, piece) {
                 Ok(_) => {
+                    log::info!("Move in OK block: {:?}", m);
                     if self.board.in_check(color) {
                         self.board.update_castling_rights(color);
                     }
                     Ok(())
                 }
-                Err(_) => Err(ChessError::InvalidMove),
+                Err(e) => return Err(e),
             },
             MoveType::Capture(Piece) => match self.capture_piece(from, to, piece, Piece) {
                 Ok(_) => {
                     self.insert_captured_pieces(&Piece);
                     Ok(())
                 }
-                Err(_) => Err(ChessError::InvalidCapture),
+                Err(e) => return Err(e),
             },
             MoveType::Castle(CastleType::KingSide) => self.castle(&piece, CastleType::KingSide),
             MoveType::Castle(CastleType::QueenSide) => self.castle(&piece, CastleType::QueenSide),
@@ -307,7 +330,8 @@ impl Game {
                     self.insert_captured_pieces(&piece.opp_piece()); // In case of en passant, only pawns can be captured
                     Ok(())
                 }
-                Err(_) => Err(ChessError::InvalidEnPassant),
+
+                Err(e) => return Err(e),
             },
             MoveType::Promotion(Piece) => {
                 if let Some(captured_piece) = self.board.get_piece_at(to) {
@@ -423,7 +447,6 @@ impl Game {
                         let mut temp_board = self.clone();
                         match temp_board.make_move(mv.from, mv.to, mv.piece, mv.move_type) {
                             Ok(_) => {
-                                log::info!("move made: {:?}", mv);
                                 if !temp_board.board.in_check(color) {
                                     return false;
                                 }
