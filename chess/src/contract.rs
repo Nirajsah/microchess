@@ -5,11 +5,13 @@ mod state;
 
 use std::str::FromStr;
 
+use self::state::Chess;
 use chess::{
     chessboard::ChessBoard,
     piece::{Color, Piece},
     square::Square,
-    CastleType, ChessError, Clock, Game, GameState, InstantiationArgument, MoveType, Operation,
+    CastleType, ChessError, ChessResponse, Clock, Game, GameState, InstantiationArgument, MoveType,
+    Operation,
 };
 use linera_sdk::{
     base::{Owner, TimeDelta, WithContractAbi},
@@ -18,8 +20,6 @@ use linera_sdk::{
     Contract, ContractRuntime,
 };
 use log;
-
-use self::state::Chess;
 
 #[allow(dead_code)]
 pub struct ChessContract {
@@ -61,24 +61,26 @@ impl Contract for ChessContract {
         }
     }
 
-    async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {
+    async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
         match operation {
             Operation::NewGame { player } => {
                 let players = self.state.get_players();
                 if players.len() == 2 {
-                    return;
+                    return ChessResponse::Err(ChessError::InvalidRequest);
                 }
                 if players.len() == 1 {
                     if player == players[0] {
-                        return;
+                        return ChessResponse::Err(ChessError::InvalidRequest);
                     }
                     let game = Game::new();
                     // let game = Game::with_fen("8/7P/7P/8/8/8/8/7r w - - 0 1");
                     self.state.add_player(player);
                     self.state.board.set(game);
+                    return ChessResponse::Ok;
                 } else {
                     log::info!("No players found: Adding new Player: {:?}", player);
                     self.state.add_player(player);
+                    return ChessResponse::Ok;
                 }
             }
 
@@ -89,17 +91,7 @@ impl Contract for ChessContract {
                 captured_piece,
             } => {
                 // check if the game is still ongoing
-                match self.state.board.get().state {
-                    GameState::Checkmate => {
-                        log::info!("Game is over: Checkmate");
-                        return;
-                    }
-                    GameState::Stalemate => {
-                        log::info!("Game is over: Stalemate");
-                        return;
-                    }
-                    _ => {}
-                }
+                self.is_game_over();
 
                 let block_time = self.runtime.system_time();
                 let clock = self.state.clock.get_mut();
@@ -112,7 +104,6 @@ impl Contract for ChessContract {
                     .await
                     .expect("Failed to get active player")
                     .expect("Active player not found");
-
                 assert_eq!(
                     active_player, active,
                     "Only the active player can make a move."
@@ -122,13 +113,13 @@ impl Contract for ChessContract {
                     && active_player != Color::White
                     && captured_piece.starts_with("w")
                 {
-                    return;
+                    return ChessResponse::Err(ChessError::InvalidCapture);
                 }
                 if piece.starts_with("b")
                     && active_player != Color::Black
                     && captured_piece.starts_with("b")
                 {
-                    return;
+                    return ChessResponse::Err(ChessError::InvalidCapture);
                 }
 
                 let piece = ChessBoard::get_piece(&piece).expect("Invalid piece");
@@ -154,26 +145,15 @@ impl Contract for ChessContract {
                         clock.make_move(block_time, active_player);
 
                         self.state.board.get_mut().is_checkmate(); // check if the current player is checkmate, i.e if white makes a move after switch turn black is active player and we check if active player is in checkmate
+                        ChessResponse::Ok
                     }
-                    Err(e) => {
-                        log::info!("Invalid move: {:?}", e);
-                    }
+                    Err(e) => return ChessResponse::Err(e),
                 }
             }
 
             Operation::MakeMove { from, to, piece } => {
                 // check if the game is still ongoing
-                match self.state.board.get().state {
-                    GameState::Checkmate => {
-                        log::info!("Game is over: Checkmate");
-                        return;
-                    }
-                    GameState::Stalemate => {
-                        log::info!("Game is over: Stalemate");
-                        return;
-                    }
-                    _ => {}
-                }
+                self.is_game_over();
 
                 let owner = self.runtime.authenticated_signer().unwrap();
                 let active_player = self.state.board.get().active;
@@ -184,7 +164,6 @@ impl Contract for ChessContract {
                     .await
                     .expect("Failed to get active player")
                     .expect("Active player not found");
-
                 assert_eq!(
                     active_player, active,
                     "Only the active player can make a move."
@@ -192,12 +171,12 @@ impl Contract for ChessContract {
 
                 // Early return if the piece is not owned by the active player
                 if piece.starts_with("w") && active_player != Color::White {
-                    return;
+                    return ChessResponse::Err(ChessError::InvalidMove);
                 }
 
                 // Early return if the piece is not owned by the active player
                 if piece.starts_with("b") && active_player != Color::Black {
-                    return;
+                    return ChessResponse::Err(ChessError::InvalidMove);
                 }
 
                 let p = ChessBoard::get_piece(&piece).expect("Invalid piece");
@@ -236,6 +215,7 @@ impl Contract for ChessContract {
 
                 match success {
                     Ok(_) => {
+                        log::info!("Move successful");
                         self.state.board.get_mut().switch_player_turn();
                         self.state.board.get_mut().create_move_string(active, to);
 
@@ -244,9 +224,11 @@ impl Contract for ChessContract {
                             .assert_before(block_time.saturating_add(clock.block_delay));
 
                         self.state.board.get_mut().is_checkmate();
+                        ChessResponse::Ok
                     }
                     Err(e) => {
-                        log::info!("Invalid move: {:?}", e);
+                        log::info!("Move failed: {:?}", e);
+                        return ChessResponse::Err(ChessError::InvalidMove);
                     }
                 }
             }
@@ -257,38 +239,27 @@ impl Contract for ChessContract {
                 promoted_piece,
             } => {
                 // check if the game is still ongoing
-                match self.state.board.get().state {
-                    GameState::Checkmate => {
-                        log::info!("Game is over: Checkmate");
-                        return;
-                    }
-                    GameState::Stalemate => {
-                        log::info!("Game is over: Stalemate");
-                        return;
-                    }
-                    _ => {}
-                }
+                self.is_game_over();
 
                 let from_sq = Square::from_str(&from).expect("Invalid square");
                 let piece = Piece::from_str(&piece).expect("Invalid piece");
 
                 if piece != Piece::WhitePawn && piece != Piece::BlackPawn {
-                    return;
+                    return ChessResponse::Err(ChessError::InvalidPromotion);
                 }
 
                 if piece == Piece::WhitePawn {
                     if from_sq.rank() != 7 {
-                        log::info!("Invalid move: White pawn can only promote on rank 7 current rank: {:?}", from_sq.rank());
-                        return;
+                        return ChessResponse::Err(ChessError::InvalidPromotion);
                     }
                 } else if piece == Piece::BlackPawn {
                     if from_sq.rank() != 2 {
-                        log::info!("Invalid move: Black pawn can only promote on rank 2");
-                        return;
+                        return ChessResponse::Err(ChessError::InvalidPromotion);
                     }
                 }
 
                 let block_time = self.runtime.system_time();
+
                 let clock = self.state.clock.get_mut();
                 let owner = self.runtime.authenticated_signer().unwrap();
                 let active_player = self.state.board.get().active;
@@ -299,7 +270,6 @@ impl Contract for ChessContract {
                     .await
                     .expect("Failed to get active player")
                     .expect("Active player not found");
-
                 assert_eq!(
                     active_player, active,
                     "Only the active player can make a move."
@@ -307,8 +277,6 @@ impl Contract for ChessContract {
 
                 let to_sq = Square::from_str(&to).expect("Invalid square");
                 let promoting_to = Piece::from_str(&promoted_piece).expect("Invalid piece");
-
-                log::info!("Promoting {:?} to {:?}", piece, promoting_to);
 
                 let success = self.state.board.get_mut().make_move(
                     from_sq,
@@ -330,10 +298,9 @@ impl Contract for ChessContract {
                         clock.make_move(block_time, active_player);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
+                        ChessResponse::Ok
                     }
-                    Err(e) => {
-                        log::info!("Invalid move: {:?}", e);
-                    }
+                    Err(e) => return ChessResponse::Err(e),
                 }
             }
         }
@@ -343,5 +310,21 @@ impl Contract for ChessContract {
 
     async fn store(mut self) {
         self.state.save().await.expect("Failed to save state");
+    }
+}
+
+impl ChessContract {
+    pub fn is_game_over(&self) -> ChessResponse {
+        match self.state.board.get().state {
+            GameState::Checkmate => {
+                return ChessResponse::Err(ChessError::InvalidRequest);
+            }
+            GameState::Stalemate => {
+                return ChessResponse::Err(ChessError::InvalidRequest);
+            }
+            GameState::InPlay => {
+                return ChessResponse::Ok;
+            }
+        }
     }
 }
