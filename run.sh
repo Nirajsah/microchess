@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# File: run_linera_hex_game.sh
+# File: run_microchess.sh
 
 # Function to kill all background processes
 kill_processes() {
