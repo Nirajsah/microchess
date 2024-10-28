@@ -20,14 +20,7 @@ import Modal from '../Modal'
 import { Welcome } from '../popup/Welcome'
 import { LeftSideMenu } from './LeftSideMenu'
 import { PromotionCard } from './PromotionCard'
-import {
-  Color,
-  Fen,
-  Piece,
-  PromoteData,
-  Square,
-  SquareToPieceMap,
-} from './types'
+import { Color, Fen, PromoteData, SquareToPieceMap } from './types'
 import { RightSideMenu } from './RightSideMenu'
 
 const COLUMNS = 'abcdefgh'.split('')
@@ -294,8 +287,11 @@ const CBoard = () => {
           <Welcome />
         </Modal>
         <div className="absolute top-0 w-full p-2 max-w-[1320px] flex items-center justify-between">
-          <Link to="/" className="text-2xl tracking-wide font-semibold">
-            Stella
+          <Link
+            to="/"
+            className="text-2xl text-white tracking-wide font-semibold"
+          >
+            MicroChess
           </Link>
           <div>
             <LeftSideMenu />
@@ -303,14 +299,14 @@ const CBoard = () => {
         </div>
         <div className="flex flex-col lg:flex-row mt-6 gap-4 w-full max-w-[1080px]">
           <div className="flex flex-col w-full max-w-[720px] relative">
-            <div className="flex w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
+            <div className="flex text-white w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
               Opponent {opponentId}
               <Timer
                 initialTimeMs={color === 'BLACK' ? blackTime : whiteTime}
                 start
               />
             </div>
-            <div className="w-full relative max-w-[720px] h-full bg-white rounded-md">
+            <div className="w-full relative max-w-[720px] h-full bg-white rounded-md ">
               {renderSquare()}
             </div>
             {promoteData.show && (
@@ -322,7 +318,7 @@ const CBoard = () => {
                 />
               </div>
             )}
-            <div className="flex w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
+            <div className="flex w-full text-white max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
               Player {owner}
               <Timer
                 initialTimeMs={color === 'WHITE' ? whiteTime : blackTime}
