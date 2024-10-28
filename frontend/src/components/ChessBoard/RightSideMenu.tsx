@@ -20,12 +20,12 @@ export const RightSideMenu: React.FC<Props> = ({
   startGame,
 }) => {
   return (
-    <div className="w-full items-center font-sans flex flex-col gap-4 rounded-lg">
-      <div className="bg-white py-5 px-2 font-bold rounded-lg w-full border border-black card relative">
+    <div className="w-full text-white items-center font-sans flex flex-col gap-4 rounded-lg">
+      <div className="bg-gradient-to-r from-[#121624] to-[#121b1a] py-5 px-2 font-bold rounded-lg w-full border border-black card relative">
         {player} Plays
       </div>
 
-      <div className="w-full border border-black rounded-lg card relative bg-white">
+      <div className="w-full border rounded-lg relative bg-gradient-to-r from-[#121624] to-[#121b1a]">
         <div className="w-full">
           <table className="w-full">
             <thead className="">
@@ -70,8 +70,7 @@ export const RightSideMenu: React.FC<Props> = ({
           <span className="text-sm">Black King In Check</span>
         </div>
       )}
-
-      <div className="card relative bg-white border border-black rounded-lg w-full">
+      <div className="card relative bg-gradient-to-r from-[#121624] to-[#121b1a] border border-black rounded-lg w-full">
         <div className="flex flex-wrap gap-2 p-2 bg-secondary/10 rounded-md">
           <CapturedPieces pieces={capturedPieces} />
         </div>
