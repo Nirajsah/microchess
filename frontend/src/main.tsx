@@ -11,7 +11,7 @@ const client = createApolloClient()
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <ChessProvider>
     <ApolloProvider client={client}>
-      <div className="font-montserrat w-full h-full">
+      <div className="font-fira min-h-full w-full">
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<App />} />

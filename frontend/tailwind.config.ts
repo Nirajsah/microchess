@@ -6,6 +6,7 @@ export default {
       fontFamily: {
         montserrat: ['Montserrat'],
         fira: ['Fira Sans'],
+        silkscreen: ['Silkscreen'],
       },
     },
   },
