@@ -10,7 +10,10 @@ function isValidSquare(square: string): square is Square {
 export function generatePossibleMoves(
   piece: Piece,
   square: Square,
-  board: SquareToPieceMap
+  board: SquareToPieceMap,
+  whiteCastle: boolean,
+  blackCastle: boolean,
+  en_passant: Square
 ): Square[] {
   const [file, rank] = square.split('')
   const fileIndex = files.indexOf(file)
@@ -41,6 +44,23 @@ export function generatePossibleMoves(
     }
   }
 
+  // Helper function to check if a square is under attack
+  function isSquareUnderAttack(square: Square, isWhite: boolean): boolean {
+    for (const [sq, pc] of Object.entries(board)) {
+      if (!pc || pc.charAt(0) === (isWhite ? 'w' : 'b')) continue
+      const attackingMoves = generatePossibleMoves(
+        pc,
+        sq as Square,
+        board,
+        false, // Prevent infinite recursion
+        false,
+        'a1' as Square // Dummy value
+      )
+      if (attackingMoves.includes(square)) return true
+    }
+    return false
+  }
+
   const pieceType = piece.charAt(1)
 
   switch (pieceType) {
@@ -55,10 +75,20 @@ export function generatePossibleMoves(
       ;[-1, 1].forEach((dx) => {
         const captureSquare =
           `${files[fileIndex + dx]}${ranks[rankIndex + direction]}` as Square
+        // Normal capture
         if (
           isValidSquare(captureSquare) &&
           board[captureSquare] &&
           board[captureSquare]?.charAt(0) !== piece.charAt(0)
+        ) {
+          possibleMoves.push(captureSquare)
+        }
+
+        // En passant capture
+        if (
+          isValidSquare(captureSquare) &&
+          captureSquare === en_passant &&
+          ((isWhitePiece && rank === '5') || (!isWhitePiece && rank === '4'))
         ) {
           possibleMoves.push(captureSquare)
         }
@@ -120,6 +150,48 @@ export function generatePossibleMoves(
         [-1, 1],
         [-1, -1],
       ].forEach(([dx, dy]) => addMovesInDirection(dx, dy, 1))
+
+      // Castling
+      if ((isWhitePiece && whiteCastle) || (!isWhitePiece && blackCastle)) {
+        const baseRank = isWhitePiece ? '1' : '8'
+        const kingStartSquare = `e${baseRank}` as Square
+
+        // Only check castling if king is in starting position
+        if (square === kingStartSquare) {
+          // Kingside castling
+          if (
+            !board[`f${baseRank}` as Square] &&
+            !board[`g${baseRank}` as Square] &&
+            board[`h${baseRank}` as Square]?.charAt(1) === 'R'
+          ) {
+            // Check if king's path is not under attack
+            if (
+              !isSquareUnderAttack(kingStartSquare, isWhitePiece) &&
+              !isSquareUnderAttack(`f${baseRank}` as Square, isWhitePiece) &&
+              !isSquareUnderAttack(`g${baseRank}` as Square, isWhitePiece)
+            ) {
+              possibleMoves.push(`g${baseRank}` as Square)
+            }
+          }
+
+          // Queenside castling
+          if (
+            !board[`d${baseRank}` as Square] &&
+            !board[`c${baseRank}` as Square] &&
+            !board[`b${baseRank}` as Square] &&
+            board[`a${baseRank}` as Square]?.charAt(1) === 'R'
+          ) {
+            // Check if king's path is not under attack
+            if (
+              !isSquareUnderAttack(kingStartSquare, isWhitePiece) &&
+              !isSquareUnderAttack(`d${baseRank}` as Square, isWhitePiece) &&
+              !isSquareUnderAttack(`c${baseRank}` as Square, isWhitePiece)
+            ) {
+              possibleMoves.push(`c${baseRank}` as Square)
+            }
+          }
+        }
+      }
       break
   }
 

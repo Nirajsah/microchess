@@ -280,7 +280,7 @@ const CBoard = () => {
         height: '100%',
         backgroundColor: appBackgrounds.forest,
       }}
-      className="w-full h-full p-3 font-fira"
+      className="w-full min-h-screen p-3 font-fira"
     >
       <div className="flex flex-col items-center justify-center">
         <Modal select={open} unselect={() => setOpen(!open)}>
@@ -306,7 +306,7 @@ const CBoard = () => {
                 start
               />
             </div>
-            <div className="w-full relative max-w-[720px] h-full bg-white rounded-md ">
+            <div className="w-full relative max-w-[720px] h-full bg-white rounded-md">
               {renderSquare()}
             </div>
             {promoteData.show && (
