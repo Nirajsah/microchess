@@ -1,7 +1,5 @@
-import { CodegenConfig } from '@graphql-codegen/cli'
-import 'dotenv/config'
-import { APP as app, mainPort as port, mainChainId as chain } from './src/const'
-
+import { CodegenConfig } from "@graphql-codegen/cli";
+import "dotenv/config";
 /** 
   Make sure you set the correct chainId, app, and port in your .env file.
 
@@ -10,17 +8,17 @@ import { APP as app, mainPort as port, mainChainId as chain } from './src/const'
 
 const config: CodegenConfig = {
   schema:
-    'http://127.0.0.1:8080/chains/c06f52a2a3cc991e6981d5628c11b03ad39f7509c4486893623a41d1f7ec49a0/applications/c06f52a2a3cc991e6981d5628c11b03ad39f7509c4486893623a41d1f7ec49a0000000000000000000000000c06f52a2a3cc991e6981d5628c11b03ad39f7509c4486893623a41d1f7ec49a0020000000000000000000000',
-  documents: ['src/**/*.{ts,tsx}'],
+    "http://localhost:8080/chains/fc9384defb0bcd8f6e206ffda32599e24ba715f45ec88d4ac81ec47eb84fa111/applications/5ebdd6b18dc8a74bd647be10f823ee99b2461045509d2d673191f49d11b27730cf429328605e79c453aab199ca296b9872b04d71f31d19cf20488b70c3510efafc9384defb0bcd8f6e206ffda32599e24ba715f45ec88d4ac81ec47eb84fa111010000000000000000000000",
+  documents: ["src/**/*.{ts,tsx}"],
   generates: {
-    './src/__generated__/': {
-      preset: 'client',
-      plugins: [],
+    "./src/GraphQL/": {
+      preset: "client",
       presetConfig: {
-        gqlTagName: 'gql',
+        gqlTagName: "gql",
       },
     },
   },
-}
+  ignoreNoDocuments: true,
+};
 
-export default config
+export default config;

@@ -3,14 +3,10 @@ import Ranks from "./Ranks";
 import Files from "./Files";
 import { useLazyQuery, useMutation, useSubscription } from "@apollo/client";
 import {
-  GET_BOARD,
+  GAME_DATA,
   GET_CAPTURED_PIECES,
-  GET_MOVES,
-  GET_PLAYER,
-  GET_PLAYER_TURN,
   NEW_GAME,
   NOTIFICATIONS,
-  OPPONENT,
   TIME_LEFT,
 } from "../../GraphQL/queries";
 import Board from "./Board";
@@ -35,19 +31,6 @@ function fenToPieceCode(piece: any) {
 
   // white piece
   return "w" + piece.toUpperCase();
-}
-
-function getCheckStatusFromFEN(fen: string): string | null {
-  // Split the FEN string based on the semicolon delimiter
-  const parts = fen.split(";");
-
-  // The last part contains the check status
-  if (parts.length > 1) {
-    const statusPart = parts[1].trim();
-    return statusPart; // 'bK' or any other status
-  }
-
-  return null; // No check status found
 }
 
 // we need to return castling rights as well
@@ -110,6 +93,25 @@ const CBoard = () => {
   const [whiteTime, setWhiteTime] = React.useState(0); // 15 minutes
   const [blackTime, setBlackTime] = React.useState(0); // 15 minutes
 
+  const [gameData, { called: callGameData }] = useLazyQuery(GAME_DATA, {
+    variables: {
+      endpoint: "chess",
+      chainId: chainId,
+      player: owner,
+    },
+    onCompleted: (data) => {
+      setBoardState(data.gameData.board);
+      setPlayer(data.gameData.playerTurn);
+      setColor(data.gameData.player);
+      setMoves(data.gameData.moves);
+      setOpponentId(data.gameData.opponent);
+    },
+    onError: (error) => {
+      console.log("Error: ", error);
+    },
+    fetchPolicy: "network-only",
+  });
+
   const [timeQuery] = useLazyQuery(TIME_LEFT, {
     variables: {
       endpoint: "chess",
@@ -132,82 +134,21 @@ const CBoard = () => {
     },
     fetchPolicy: "network-only",
   });
-  const [opponentIdQuery] = useLazyQuery(OPPONENT, {
-    variables: {
-      endpoint: "chess",
-      chainId: chainId,
-      player: owner,
-    },
-    onCompleted: (data) => {
-      setOpponentId(data.getOpponent);
-    },
-    fetchPolicy: "network-only",
-  });
-
-  const [boardQuery] = useLazyQuery(GET_BOARD, {
-    variables: {
-      endpoint: "chess",
-      chainId: chainId,
-    },
-    onCompleted: (data) => {
-      setBoardState(data.board);
-    },
-    fetchPolicy: "network-only",
-  });
-
-  const [playerTurn, { called }] = useLazyQuery(GET_PLAYER_TURN, {
-    variables: {
-      endpoint: "chess",
-      chainId: chainId,
-    },
-    onCompleted: (data) => {
-      setPlayer(data.playerTurn);
-    },
-    fetchPolicy: "network-only",
-  });
-
-  const [moveQuery] = useLazyQuery(GET_MOVES, {
-    variables: {
-      endpoint: "chess",
-      chainId: chainId,
-    },
-    onCompleted: (data) => {
-      setMoves(data.getMoves);
-    },
-    fetchPolicy: "network-only",
-  });
 
   useSubscription(NOTIFICATIONS, {
     variables: {
       chainId: chainId,
     },
     onData: () => {
-      playerTurn();
-      boardQuery();
-      moveQuery();
+      gameData();
       capturedPiecesQuery();
       timeQuery();
     },
   });
 
-  const [playerColorQuery] = useLazyQuery(GET_PLAYER, {
-    variables: {
-      endpoint: "chess",
-      chainId: chainId,
-      player: owner,
-    },
-    onCompleted: (data) => {
-      setColor(data.player);
-    },
-    fetchPolicy: "network-only",
-  });
-
-  if (!called) {
-    playerTurn();
-    boardQuery();
-    playerColorQuery();
+  if (!callGameData) {
+    gameData();
     capturedPiecesQuery();
-    opponentIdQuery();
     timeQuery();
   }
 
@@ -221,13 +162,8 @@ const CBoard = () => {
     });
   }
 
-  if (!called) {
-    void playerColorQuery();
-    moveQuery();
-  }
-
   const [board, setBoard] = React.useState<BoardType>(() => {
-    let obj = fenToObj(fen);
+    let obj = fenToObj(boardState);
     return {
       position: obj.position,
       KingInCheck: obj.KingInCheck,
@@ -239,7 +175,7 @@ const CBoard = () => {
 
   // Use useEffect to update the boards when boardState changes
   React.useEffect(() => {
-    let obj = fenToObj(fen);
+    let obj = fenToObj(boardState);
     setBoard({
       position: obj.position,
       KingInCheck: obj.KingInCheck,
