@@ -88,4 +88,18 @@ impl Square {
             _ => unreachable!(),
         }
     }
+
+    #[rustfmt::skip]
+    pub const fn usize_to_string(i: usize) -> String {
+        match i {
+            0 => "a1".to_string(), 1 => "b1".to_string(), 2 => "c1".to_string(), 3 => "d1".to_string(), 4 => "e1".to_string(), 5 => "f1".to_string(), 6 => "g1".to_string(), 7 => "h1".to_string(),
+            8 => "a2".to_string(), 9 => "b2".to_string(), 10 => "c2".to_string(), 11 => "d2".to_string(), 12 => "e2".to_string(), 13 => "f2".to_string(), 14 => "g2".to_string(), 15 => "h2".to_string(),
+            16 => "a3".to_string(), 17 => "b3".to_string(), 18 => "c3".to_string(), 19 => "d3".to_string(), 20 => "e3".to_string(), 21 => "f3".to_string(), 22 => "g3".to_string(), 23 => "h3".to_string(),
+            24 => "a4".to_string(), 25 => "b4".to_string(), 26 => "c4".to_string(), 27 => "d4".to_string(), 28 => "e4".to_string(), 29 => "f4".to_string(), 30 => "g4".to_string(), 31 => "h4".to_string(),
+            32 => "a5".to_string(), 33 => "b5".to_string(), 34 => "c5".to_string(), 35 => "d5".to_string(), 36 => "e5".to_string(), 37 => "f5".to_string(), 38 => "g5".to_string(), 39 => "h5".to_string(),
+            40 => "a6".to_string(), 41 => "b6".to_string(), 42 => "c6".to_string(), 43 => "d6".to_string(), 44 => "e6".to_string(), 45 => "f6".to_string(), 46 => "g6".to_string(), 47 => "h6".to_string(),
+            48 => "a7".to_string(), 49 => "b7".to_string(), 50 => "c7".to_string(), 51 => "d7".to_string(), 52 => "e7".to_string(), 53 => "f7".to_string(), 54 => "g7".to_string(), 55 => "h7".to_string(),
+            56 => "a8".to_string(), 57 => "b8".to_string(), 58 => "c8".to_string(), 59 => "d8".to_string(), 60 => "e8".to_string(), 61 => "f8".to_string(), 62 => "g8".to_string(), 63 => "h8".to_string(),
+        }
+    }
 }

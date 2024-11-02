@@ -335,16 +335,6 @@ impl ChessBoard {
         opponent_pieces
     }
 
-    /// Check if a square is empty
-    fn is_square_empty(&self, square: isize) -> bool {
-        self.all_pieces() & (1 << square) == 0
-    }
-
-    /// Get the rank of a square (0 to 7)
-    fn rank_of(&self, square: usize) -> usize {
-        square / 8
-    }
-
     /// Returns the piece at a given square
     pub fn get_piece_at(&self, square: Square) -> Option<Piece> {
         let bit = 1u64 << square as usize;
@@ -487,14 +477,6 @@ impl ChessBoard {
             }
         }
 
-        // if self.castling_rights[0] {
-        //     fen.push_str(" K");
-        // }
-
-        // if self.castling_rights[1] {
-        //     fen.push_str(" Q");
-        // }
-
         // Add placeholder values for the rest of the FEN string
 
         if self.castling_rights[Color::White.index()] {
@@ -509,7 +491,15 @@ impl ChessBoard {
             fen.push_str(" -");
         }
 
-        fen.push_str(" - 0 1");
+        if self.en_passant != 0 {
+            let en_passant_square = self.en_passant.trailing_zeros();
+            let square = Square::usize_to_string(en_passant_square as usize);
+            fen.push_str(&square);
+        } else {
+            fen.push_str(" -");
+        }
+
+        fen.push_str(" 0 1");
 
         if self.in_check(Color::White) {
             fen.push_str(" ;wK");

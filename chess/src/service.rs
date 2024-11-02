@@ -5,10 +5,10 @@ mod state;
 use std::sync::Arc;
 
 use self::state::Chess;
-use async_graphql::{EmptySubscription, Object, Request, Response, Schema};
+use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use chess::{
     piece::{Color, Piece},
-    Clock, GameState, Move, Operation, PlayerTime,
+    Clock, GameState, Move, Operation, PlayerStats, PlayerTime,
 };
 
 use linera_sdk::{
@@ -17,6 +17,7 @@ use linera_sdk::{
     views::{View, ViewStorageContext},
     Service, ServiceRuntime,
 };
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 pub struct ChessService {
@@ -48,20 +49,28 @@ impl Service for ChessService {
     }
 }
 
+#[derive(Deserialize, Serialize, SimpleObject)]
+struct GameData {
+    board: String,         // ChessBoard
+    player_turn: Color,    // player's color to move
+    player: Color,         // players color
+    moves: Vec<Move>,      // moves made till now
+    opponent: Owner,       // opponent player id(Owner)
+    game_state: GameState, // State of the Game, Play, StaleMate or CheckMate
+}
+
 #[Object]
 impl ChessService {
-    async fn board(&self) -> String {
-        self.state.board.get().board.to_fen()
-    }
-    async fn player_turn(&self) -> &Color {
-        &self.state.board.get().active
-    }
-    async fn player(&self, player: Owner) -> Color {
-        let color = self.state.owners.get(&player).await.unwrap();
-        color.unwrap()
-    }
-    async fn get_moves(&self) -> &Vec<Move> {
-        &self.state.board.get().moves
+    async fn game_data(&self, player: Owner) -> GameData {
+        let game_data = GameData {
+            board: self.state.board.get().board.to_fen(),
+            player_turn: self.state.board.get().active,
+            player: self.state.owners.get(&player).await.unwrap().unwrap(),
+            moves: self.state.board.get().moves.clone(),
+            opponent: self.state.opponent(player).unwrap(),
+            game_state: self.state.board.get().state,
+        };
+        game_data
     }
     async fn captured_pieces(&self) -> &Vec<Piece> {
         &self.state.board.get().captured_pieces
@@ -69,13 +78,10 @@ impl ChessService {
     async fn timer(&self) -> &Clock {
         &self.state.clock.get()
     }
-    async fn get_opponent(&self, player: Owner) -> Option<Owner> {
-        self.state.opponent(player)
-    }
-    async fn game_state(&self) -> &GameState {
-        &self.state.board.get().state
-    }
     async fn time_left(&self) -> PlayerTime {
         self.state.clock.get().time_left_for_player()
+    }
+    async fn get_leaderboard(&self) -> Vec<PlayerStats> {
+        self.state.get_leaderboard()
     }
 }

@@ -3,7 +3,9 @@
 use async_graphql::{Enum, Request, Response, SimpleObject};
 use chessboard::ChessBoard;
 use lazy_static::lazy_static;
-use linera_sdk::base::{ContractAbi, Owner, ServiceAbi, TimeDelta, Timestamp};
+use linera_sdk::base::{
+    Amount, ChainId, ContractAbi, MessageId, Owner, PublicKey, ServiceAbi, TimeDelta, Timestamp,
+};
 use piece::{Color, Piece};
 use serde::{Deserialize, Serialize};
 pub struct ChessAbi;
@@ -43,6 +45,16 @@ pub struct InstantiationArgument {
     pub block_delay: TimeDelta,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PlayerStats {
+    pub player_id: Owner,
+    pub games_played: u32,
+    pub wins: u32,
+    pub losses: u32,
+    pub draws: u32,
+    pub win_rate: f32,
+}
+
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChessResponse {
     Ok,
@@ -76,6 +88,30 @@ pub enum Operation {
         piece: String,
         promoted_piece: String,
     },
+    Resign,
+    /// Start the game on a temporary chain
+    StartGame {
+        /// The `Owner` controlling player 1 and 2, respectively.
+        players: [PublicKey; 2],
+        /// A small amount to cover the fees for the game, on the new chain
+        amount: Amount,
+        /// Game's total time (~15 mins)
+        match_time: TimeDelta,
+    },
+}
+//     /// The `Owner` controlling player 1 and 2, respectively.
+//     pub players: [Owner; 2],
+//     /// The initial time each player has to think about their turns.
+//     pub start_time: TimeDelta,
+//
+
+/// The IDs of a temporary chain for a single game.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject)]
+pub struct GameChain {
+    /// The ID of the `OpenChain` message that created the chain.
+    pub message_id: MessageId,
+    /// The ID of the temporary game chain itself.
+    pub chain_id: ChainId,
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Enum)]
@@ -84,6 +120,7 @@ pub enum GameState {
     InPlay,
     Checkmate,
     Stalemate,
+    Resign,
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
@@ -137,7 +174,7 @@ pub struct Clock {
 impl Clock {
     /// Initializes the clock.
     pub fn new(block_time: Timestamp, arg: &InstantiationArgument) -> Self {
-        let total_time = TimeDelta::from_secs(900);
+        let total_time = TimeDelta::from_secs(900); // 15 mins
         Self {
             time_left: [total_time, total_time],
             increment: arg.increment,
@@ -461,7 +498,6 @@ impl Game {
 
             pieces &= pieces - 1;
         }
-        log::info!("No legal moves found. Checkmate.");
         true
     }
 
