@@ -7,7 +7,7 @@ export default function PlayButton({ startGame }: { startGame: () => void }) {
         event.preventDefault()
         startGame()
       }}
-      className="group flex h-full w-full items-center justify-between border-2 border-black bg-white px-8 text-xl font-semibold transition-all duration-300 ease-in-out hover:-translate-y-1 hover:translate-x-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+      className="group flex h-full w-full items-center justify-between border-2 border-black bg-gradient-to-r from-[#121624] to-[#121b1a] px-8 text-xl font-semibold transition-all duration-300 ease-in-out hover:-translate-y-1 hover:translate-x-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
     >
       <span className="relative overflow-hidden flex items-center w-40">
         <span className="inline-block transition-transform duration-300 transform group-hover:-translate-y-full">

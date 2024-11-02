@@ -303,15 +303,18 @@ const CBoard = () => {
         height: "100%",
         backgroundColor: appBackgrounds.forest,
       }}
-      className="w-full h-full p-3 font-fira"
+      className="w-full min-h-screen p-3 font-fira"
     >
       <div className="flex flex-col items-center justify-center">
         <Modal select={open} unselect={() => setOpen(!open)}>
           <Welcome />
         </Modal>
         <div className="absolute top-0 w-full p-2 max-w-[1320px] flex items-center justify-between">
-          <Link to="/" className="text-2xl tracking-wide font-semibold">
-            Stella
+          <Link
+            to="/"
+            className="text-2xl text-white tracking-wide font-semibold"
+          >
+            MicroChess
           </Link>
           <div>
             <LeftSideMenu />
@@ -319,7 +322,7 @@ const CBoard = () => {
         </div>
         <div className="flex flex-col lg:flex-row mt-6 gap-4 w-full max-w-[1080px]">
           <div className="flex flex-col w-full max-w-[720px] relative">
-            <div className="flex w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
+            <div className="flex text-white w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
               Opponent {opponentId}
               <Timer
                 initialTimeMs={color === "BLACK" ? blackTime : whiteTime}
@@ -338,7 +341,7 @@ const CBoard = () => {
                 />
               </div>
             )}
-            <div className="flex w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
+            <div className="flex w-full text-white max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
               Player {owner}
               <Timer
                 initialTimeMs={color === "WHITE" ? whiteTime : blackTime}
@@ -349,7 +352,7 @@ const CBoard = () => {
 
           <div className="w-full mt-4 md:mt-8">
             <RightSideMenu
-              checkStatus={checkStatus}
+              checkStatus={board.KingInCheck}
               player={player}
               opponentId={opponentId}
               capturedPieces={capturedPieces}

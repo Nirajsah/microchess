@@ -15,7 +15,8 @@ use chess::{
 };
 use linera_sdk::{
     base::{
-        Account, Amount, ApplicationId, Destination, Owner, PublicKey, TimeDelta, WithContractAbi,
+        Account, Amount, ApplicationId, ChainId, Destination, Owner, PublicKey, TimeDelta,
+        WithContractAbi,
     },
     util::BlockingWait,
     views::{RootView, View, ViewStorageContext},
@@ -308,6 +309,7 @@ impl Contract for ChessContract {
             }
             Operation::Resign => {
                 self.state.board.get_mut().state = GameState::Resign;
+                return ChessResponse;
             }
             Operation::StartGame {
                 players,

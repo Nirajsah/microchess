@@ -52,7 +52,7 @@ export const LeftSideMenu = () => {
           setShowSettings(true)
         }}
       >
-        <button>Settings</button>
+        <button className="text-white">Settings</button>
       </div>
     </div>
   )

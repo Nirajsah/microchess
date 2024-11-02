@@ -206,7 +206,14 @@ export default function Board({
         reset();
       }
     } else if (piece) {
-      const moves = generatePossibleMoves(piece, to_square, board); // (true, true, "e3") need to pass castleling flag and en_passant flag
+      const moves = generatePossibleMoves(
+        piece,
+        to_square,
+        board,
+        true,
+        true,
+        "d3" as Square,
+      ); // (true, true, "e3") need to pass castleling flag and en_passant flag
       setPossMoves(moves);
       setSelectedPiece(piece);
       setSelectedSquare(to_square);
