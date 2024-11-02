@@ -6,12 +6,13 @@ export default function HomePage() {
   return (
     <div className="min-h-full w-full flex flex-col items-center text-white">
       <Navbar />
-      <div className="w-full max-w-[1280px] py-20 flex h-full justify-center">
-        <div className="text-5xl  font-silkscreen content-center relative text-balance font-medium tracking-normal text-center leading-snug">
-          <p className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFB777] to-[#F16C6A]">
-            Decentralized Chess Platform
+      <div className="w-full max-w-[1320px] gap-3 py-20 flex h-full justify-center">
+        <div className="text-[120px] font-jolly relative text-balance font-medium tracking-normal leading-sung">
+          Micro
+          <p className="text-transparent inline bg-clip-text bg-gradient-to-r from-[#ff3636] to-[#F16C6A]">
+            Chess
           </p>
-          Play Fair, Play Secure, Play On-Chain
+          <p className="block">Play Fair, Play Secure, Play On-Chain</p>
         </div>
       </div>
       <Games />

@@ -303,7 +303,7 @@ const CBoard = () => {
         height: "100%",
         backgroundColor: appBackgrounds.forest,
       }}
-      className="w-full min-h-screen p-3 font-fira"
+      className="w-full min-h-screen p-3 font-fira bg-gradient-to-br from-[#2e7d3217] to-[#ffebe84a]"
     >
       <div className="flex flex-col items-center justify-center">
         <Modal select={open} unselect={() => setOpen(!open)}>

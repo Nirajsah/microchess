@@ -7,6 +7,7 @@ export default {
         montserrat: ['Montserrat'],
         fira: ['Fira Sans'],
         silkscreen: ['Silkscreen'],
+        jolly: ['Jolly Lodger'],
       },
     },
   },
