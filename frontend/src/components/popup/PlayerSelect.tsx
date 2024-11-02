@@ -2,12 +2,13 @@ export default function PlayerSelect() {
   const player1 = {
     port: '8080',
     owner: 'df44403a282330a8b086603516277c014c844a4b418835873aced1132a3adcd5',
-    chainId: 'c06f52a2a3cc991e6981d5628c11b03ad39f7509c4486893623a41d1f7ec49a0',
+    chainId: 'fc9384defb0bcd8f6e206ffda32599e24ba715f45ec88d4ac81ec47eb84fa111',
+    
   }
   const player2 = {
     port: '8081',
     owner: '43c319a4eab3747afcd608d32b73a2472fcaee390ec6bed3e694b4908f55772d',
-    chainId: 'c06f52a2a3cc991e6981d5628c11b03ad39f7509c4486893623a41d1f7ec49a0',
+    chainId: 'fc9384defb0bcd8f6e206ffda32599e24ba715f45ec88d4ac81ec47eb84fa111',
   }
 
   const handlePlayer = (player: number) => {

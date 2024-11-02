@@ -1,7 +1,7 @@
-import React from 'react'
-import Ranks from './Ranks'
-import Files from './Files'
-import { useLazyQuery, useMutation, useSubscription } from '@apollo/client'
+import React from "react";
+import Ranks from "./Ranks";
+import Files from "./Files";
+import { useLazyQuery, useMutation, useSubscription } from "@apollo/client";
 import {
   GET_BOARD,
   GET_CAPTURED_PIECES,
@@ -12,232 +12,249 @@ import {
   NOTIFICATIONS,
   OPPONENT,
   TIME_LEFT,
-} from '../../GraphQL/queries'
-import Board from './Board'
-import { Link } from 'react-router-dom'
-import Timer from './Timer'
-import Modal from '../Modal'
-import { Welcome } from '../popup/Welcome'
-import { LeftSideMenu } from './LeftSideMenu'
-import { PromotionCard } from './PromotionCard'
-import {
-  Color,
-  Fen,
-  Piece,
-  PromoteData,
-  Square,
-  SquareToPieceMap,
-} from './types'
-import { RightSideMenu } from './RightSideMenu'
+} from "../../GraphQL/queries";
+import Board from "./Board";
+import { Link } from "react-router-dom";
+import Timer from "./Timer";
+import Modal from "../Modal";
+import { Welcome } from "../popup/Welcome";
+import { LeftSideMenu } from "./LeftSideMenu";
+import { PromotionCard } from "./PromotionCard";
+import { BoardType, Color, Fen, PromoteData, SquareToPieceMap } from "./types";
+import { RightSideMenu } from "./RightSideMenu";
 
-const COLUMNS = 'abcdefgh'.split('')
+const COLUMNS = "abcdefgh".split("");
 
-const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 function fenToPieceCode(piece: any) {
   // black piece
   if (piece.toLowerCase() === piece) {
-    return 'b' + piece.toUpperCase()
+    return "b" + piece.toUpperCase();
   }
 
   // white piece
-  return 'w' + piece.toUpperCase()
+  return "w" + piece.toUpperCase();
 }
 
 function getCheckStatusFromFEN(fen: string): string | null {
   // Split the FEN string based on the semicolon delimiter
-  const parts = fen.split(';')
+  const parts = fen.split(";");
 
   // The last part contains the check status
   if (parts.length > 1) {
-    const statusPart = parts[1].trim()
-    return statusPart // 'bK' or any other status
+    const statusPart = parts[1].trim();
+    return statusPart; // 'bK' or any other status
   }
 
-  return null // No check status found
+  return null; // No check status found
 }
 
+// we need to return castling rights as well
 function fenToObj(fen: string): {
-  position: SquareToPieceMap
-  KingInCheck: string
+  position: SquareToPieceMap;
+  KingInCheck: string | null;
 } {
   // cut off any move, castling, etc info from the end
   // we're only interested in position information
-  fen = fen.replace(/ .+$/, '')
-  const rows = fen.split('/')
-  const position: any = {}
+  const FEN = fen.replace(/ .+$/, "");
+  const rows = FEN.split("/");
+  const position: any = {};
+  const check = fen.split(";");
+  const castling = fen.split("");
 
-  let currentRow = 8
+  let currentRow = 8;
   for (let i = 0; i < 8; i++) {
-    const row = rows[i].split('')
-    let colIdx = 0
+    const row = rows[i].split("");
+    let colIdx = 0;
 
     // loop through each character in the FEN section
     for (let j = 0; j < row.length; j++) {
       // number / empty squares
       if (row[j].search(/[1-8]/) !== -1) {
-        const numEmptySquares = parseInt(row[j], 10)
-        colIdx = colIdx + numEmptySquares
+        const numEmptySquares = Number.parseInt(row[j], 10);
+        colIdx = colIdx + numEmptySquares;
       } else {
         // piece
-        const square = COLUMNS[colIdx] + currentRow
-        position[square] = fenToPieceCode(row[j])
-        colIdx = colIdx + 1
+        const square = COLUMNS[colIdx] + currentRow;
+        position[square] = fenToPieceCode(row[j]);
+        colIdx = colIdx + 1;
       }
     }
 
-    currentRow = currentRow - 1
+    currentRow = currentRow - 1;
+  }
+  // The last part contains the check status
+  let KingInCheck: string | null = null;
+
+  if (check.length > 1) {
+    KingInCheck = check[1].trim();
+    KingInCheck; // 'bK' or any other status
   }
 
-  return position
+  return {
+    position,
+    KingInCheck,
+  };
 }
 
 const CBoard = () => {
-  const chainId = window.sessionStorage.getItem('chainId') ?? ''
-  const owner = window.sessionStorage.getItem('owner') ?? ''
-  const [player, setPlayer] = React.useState('')
-  const [boardState, setBoardState] = React.useState<Fen>(fen)
-  const [color, setColor] = React.useState<Color>('WHITE')
-  const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
-  const [opponentId, setOpponentId] = React.useState<string | null>(null)
-  const [play] = useMutation(NEW_GAME)
-  const [whiteTime, setWhiteTime] = React.useState(0) // 15 minutes
-  const [blackTime, setBlackTime] = React.useState(0) // 15 minutes
+  const chainId = window.sessionStorage.getItem("chainId") ?? "";
+  const owner = window.sessionStorage.getItem("owner") ?? "";
+  const [player, setPlayer] = React.useState("");
+  const [boardState, setBoardState] = React.useState<Fen>(fen);
+  const [color, setColor] = React.useState<Color>("WHITE");
+  const [capturedPieces, setCapturedPieces] = React.useState<string[]>([]);
+  const [opponentId, setOpponentId] = React.useState<string | null>(null);
+  const [play] = useMutation(NEW_GAME);
+  const [whiteTime, setWhiteTime] = React.useState(0); // 15 minutes
+  const [blackTime, setBlackTime] = React.useState(0); // 15 minutes
 
   const [timeQuery] = useLazyQuery(TIME_LEFT, {
     variables: {
-      endpoint: 'chess',
+      endpoint: "chess",
       chainId: chainId,
     },
     onCompleted: (data) => {
-      setWhiteTime(data.timeLeft.white)
-      setBlackTime(data.timeLeft.black)
+      setWhiteTime(data.timeLeft.white);
+      setBlackTime(data.timeLeft.black);
     },
-    fetchPolicy: 'network-only',
-  })
+    fetchPolicy: "network-only",
+  });
 
   const [capturedPiecesQuery] = useLazyQuery(GET_CAPTURED_PIECES, {
     variables: {
-      endpoint: 'chess',
+      endpoint: "chess",
       chainId: chainId,
     },
     onCompleted: (data) => {
-      setCapturedPieces(data.capturedPieces)
+      setCapturedPieces(data.capturedPieces);
     },
-    fetchPolicy: 'network-only',
-  })
+    fetchPolicy: "network-only",
+  });
   const [opponentIdQuery] = useLazyQuery(OPPONENT, {
     variables: {
-      endpoint: 'chess',
+      endpoint: "chess",
       chainId: chainId,
       player: owner,
     },
     onCompleted: (data) => {
-      setOpponentId(data.getOpponent)
+      setOpponentId(data.getOpponent);
     },
-    fetchPolicy: 'network-only',
-  })
+    fetchPolicy: "network-only",
+  });
 
   const [boardQuery] = useLazyQuery(GET_BOARD, {
     variables: {
-      endpoint: 'chess',
+      endpoint: "chess",
       chainId: chainId,
     },
     onCompleted: (data) => {
-      setBoardState(data.board)
+      setBoardState(data.board);
     },
-    fetchPolicy: 'network-only',
-  })
+    fetchPolicy: "network-only",
+  });
 
   const [playerTurn, { called }] = useLazyQuery(GET_PLAYER_TURN, {
     variables: {
-      endpoint: 'chess',
+      endpoint: "chess",
       chainId: chainId,
     },
     onCompleted: (data) => {
-      setPlayer(data.playerTurn)
+      setPlayer(data.playerTurn);
     },
-    fetchPolicy: 'network-only',
-  })
+    fetchPolicy: "network-only",
+  });
 
   const [moveQuery] = useLazyQuery(GET_MOVES, {
     variables: {
-      endpoint: 'chess',
+      endpoint: "chess",
       chainId: chainId,
     },
     onCompleted: (data) => {
-      setMoves(data.getMoves)
+      setMoves(data.getMoves);
     },
-    fetchPolicy: 'network-only',
-  })
+    fetchPolicy: "network-only",
+  });
 
   useSubscription(NOTIFICATIONS, {
     variables: {
       chainId: chainId,
     },
     onData: () => {
-      playerTurn()
-      boardQuery()
-      moveQuery()
-      capturedPiecesQuery()
-      timeQuery()
+      playerTurn();
+      boardQuery();
+      moveQuery();
+      capturedPiecesQuery();
+      timeQuery();
     },
-  })
+  });
 
   const [playerColorQuery] = useLazyQuery(GET_PLAYER, {
     variables: {
-      endpoint: 'chess',
+      endpoint: "chess",
       chainId: chainId,
       player: owner,
     },
     onCompleted: (data) => {
-      setColor(data.player)
+      setColor(data.player);
     },
-    fetchPolicy: 'network-only',
-  })
+    fetchPolicy: "network-only",
+  });
 
   if (!called) {
-    playerTurn()
-    boardQuery()
-    playerColorQuery()
-    capturedPiecesQuery()
-    opponentIdQuery()
-    timeQuery()
+    playerTurn();
+    boardQuery();
+    playerColorQuery();
+    capturedPiecesQuery();
+    opponentIdQuery();
+    timeQuery();
   }
 
   async function startGame() {
     await play({
       variables: {
         player: owner,
-        endpoint: 'chess',
+        endpoint: "chess",
         chainId: chainId,
       },
-    })
+    });
   }
 
   if (!called) {
-    void playerColorQuery()
-    moveQuery()
+    void playerColorQuery();
+    moveQuery();
   }
 
-  const [board, setBoard] = React.useState<SquareToPieceMap | any>(() =>
-    fenToObj(boardState)
-  )
+  const [board, setBoard] = React.useState<BoardType>(() => {
+    let obj = fenToObj(fen);
+    return {
+      position: obj.position,
+      KingInCheck: obj.KingInCheck,
+      whiteCastle: false,
+      blackCastle: false,
+      en_passant: "e3",
+    };
+  });
 
   // Use useEffect to update the boards when boardState changes
   React.useEffect(() => {
-    setBoard(fenToObj(boardState))
-  }, [boardState])
+    let obj = fenToObj(fen);
+    setBoard({
+      position: obj.position,
+      KingInCheck: obj.KingInCheck,
+      whiteCastle: false,
+      blackCastle: false,
+      en_passant: "e3",
+    });
+  }, [boardState]);
 
-  // const board: any = React.useMemo(() => fenToObj(boardState), [boardState])
-
-  const checkStatus = getCheckStatusFromFEN(boardState)
   const [moves, setMoves] = React.useState<
     Array<{ white: string; black: string }>
-  >([])
+  >([]);
 
   const renderSquare = () => {
-    const isBlack = color.toLowerCase() === 'black'
+    const isBlack = color.toLowerCase() === "black";
 
     return (
       <div className="w-full">
@@ -245,11 +262,10 @@ const CBoard = () => {
           <Ranks color={color as Color} />
         </div>
         <Board
-          board={board}
+          boardData={board}
           isBlack={isBlack}
           color={color as Color}
           player={player as Color}
-          isKingInCheck={checkStatus}
           setBoard={setBoard}
           setPromoteData={setPromoteData}
         />
@@ -257,34 +273,34 @@ const CBoard = () => {
           <Files color={color as Color} />
         </div>
       </div>
-    )
-  }
+    );
+  };
 
-  const [open, setOpen] = React.useState(true)
+  const [open, setOpen] = React.useState(true);
   const [promoteData, setPromoteData] = React.useState<PromoteData>({
-    from: '',
-    to: '',
-    piece: '',
+    from: "",
+    to: "",
+    piece: "",
     show: false,
-  })
+  });
 
   const appBackgrounds = {
-    classicWood: '#f5f5dc', // Beige
-    modernMinimalist: '#e0e0e0', // Light Silver
-    forest: '#2e7d3217', // Dark Forest Green
-    oceanBreeze: '#e0f7fa', // Light Cyan
-    mutedPastel: '#fce4ec', // Soft Pink
-    nightMode: '#121212', // Deep Charcoal
-    desertSand: '#f4a460', // Sandy Brown
-    softViolet: '#f8bbd0', // Light Pink
-    default: '#ffebe84a',
-  }
+    classicWood: "#f5f5dc", // Beige
+    modernMinimalist: "#e0e0e0", // Light Silver
+    forest: "#2e7d3217", // Dark Forest Green
+    oceanBreeze: "#e0f7fa", // Light Cyan
+    mutedPastel: "#fce4ec", // Soft Pink
+    nightMode: "#121212", // Deep Charcoal
+    desertSand: "#f4a460", // Sandy Brown
+    softViolet: "#f8bbd0", // Light Pink
+    default: "#ffebe84a",
+  };
 
   return (
     <div
       style={{
-        width: '100%',
-        height: '100%',
+        width: "100%",
+        height: "100%",
         backgroundColor: appBackgrounds.forest,
       }}
       className="w-full h-full p-3 font-fira"
@@ -306,7 +322,7 @@ const CBoard = () => {
             <div className="flex w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
               Opponent {opponentId}
               <Timer
-                initialTimeMs={color === 'BLACK' ? blackTime : whiteTime}
+                initialTimeMs={color === "BLACK" ? blackTime : whiteTime}
                 start
               />
             </div>
@@ -325,7 +341,7 @@ const CBoard = () => {
             <div className="flex w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
               Player {owner}
               <Timer
-                initialTimeMs={color === 'WHITE' ? whiteTime : blackTime}
+                initialTimeMs={color === "WHITE" ? whiteTime : blackTime}
                 start
               />
             </div>
@@ -345,7 +361,7 @@ const CBoard = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default CBoard
+export default CBoard;
