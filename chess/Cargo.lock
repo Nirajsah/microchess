@@ -2124,6 +2124,7 @@ dependencies = [
  "linera-wasmer",
  "linera-witty",
  "lru",
+ "once_cell",
  "oneshot",
  "prometheus",
  "reqwest",
@@ -2193,6 +2194,7 @@ dependencies = [
  "serde",
  "tempfile",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2227,6 +2229,7 @@ dependencies = [
  "base64 0.22.1",
  "cargo_metadata",
  "glob",
+ "once_cell",
  "quote",
  "semver",
  "serde",
