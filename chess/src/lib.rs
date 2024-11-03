@@ -460,18 +460,36 @@ impl Game {
         }
     }
 
+    /// A function to check stalemate, returns true if stalemate(this checks for a possible legal
+    /// move)
+    pub fn is_stalemate(&mut self, total_pieces: Bitboard) -> bool {
+        let mut pieces = total_pieces;
+        while pieces != 0 {
+            let from: usize = pieces.trailing_zeros() as usize;
+            let square = Square::usize_to_square(from);
+            if let Some(piece) = self.board.get_piece_at(square) {
+                if let Some(_possible_moves) = self.get_possible_moves(square, piece) {
+                    return false;
+                }
+            }
+
+            pieces &= pieces - 1;
+        }
+        true
+    }
+
     /// Check if the current player is in checkmate
     pub fn is_checkmate(&mut self) -> bool {
         let color = self.active;
-
-        if !self.board.in_check(color) {
-            return false;
-        }
 
         let mut pieces = match color {
             Color::White => self.board.white_pieces(),
             Color::Black => self.board.black_pieces(),
         };
+
+        if !self.board.in_check(color) {
+            self.is_stalemate(pieces);
+        }
 
         // Try all possible moves for all pieces of the current player
         while pieces != 0 {
