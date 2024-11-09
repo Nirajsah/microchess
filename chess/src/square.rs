@@ -90,7 +90,7 @@ impl Square {
     }
 
     #[rustfmt::skip]
-    pub const fn usize_to_string(i: usize) -> String {
+    pub fn usize_to_string(i: usize) -> String {
         match i {
             0 => "a1".to_string(), 1 => "b1".to_string(), 2 => "c1".to_string(), 3 => "d1".to_string(), 4 => "e1".to_string(), 5 => "f1".to_string(), 6 => "g1".to_string(), 7 => "h1".to_string(),
             8 => "a2".to_string(), 9 => "b2".to_string(), 10 => "c2".to_string(), 11 => "d2".to_string(), 12 => "e2".to_string(), 13 => "f2".to_string(), 14 => "g2".to_string(), 15 => "h2".to_string(),
@@ -100,6 +100,7 @@ impl Square {
             40 => "a6".to_string(), 41 => "b6".to_string(), 42 => "c6".to_string(), 43 => "d6".to_string(), 44 => "e6".to_string(), 45 => "f6".to_string(), 46 => "g6".to_string(), 47 => "h6".to_string(),
             48 => "a7".to_string(), 49 => "b7".to_string(), 50 => "c7".to_string(), 51 => "d7".to_string(), 52 => "e7".to_string(), 53 => "f7".to_string(), 54 => "g7".to_string(), 55 => "h7".to_string(),
             56 => "a8".to_string(), 57 => "b8".to_string(), 58 => "c8".to_string(), 59 => "d8".to_string(), 60 => "e8".to_string(), 61 => "f8".to_string(), 62 => "g8".to_string(), 63 => "h8".to_string(),
+            _ => unreachable!(),
         }
     }
 }

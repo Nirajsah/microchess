@@ -45,9 +45,9 @@ pub struct InstantiationArgument {
     pub block_delay: TimeDelta,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, SimpleObject)]
 pub struct PlayerStats {
-    pub player_id: Owner,
+    pub player_id: String,
     pub games_played: u32,
     pub wins: u32,
     pub losses: u32,
@@ -487,8 +487,12 @@ impl Game {
             Color::Black => self.board.black_pieces(),
         };
 
+        // if not in check return false
         if !self.board.in_check(color) {
-            self.is_stalemate(pieces);
+            if self.is_stalemate(pieces) {
+                self.state = GameState::Stalemate;
+                return false;
+            }
         }
 
         // Try all possible moves for all pieces of the current player

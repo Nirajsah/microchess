@@ -10,20 +10,19 @@ use chess::{
     chessboard::ChessBoard,
     piece::{Color, Piece},
     square::Square,
-    CastleType, ChessError, ChessResponse, Clock, Game, GameState, InstantiationArgument, MoveType,
-    Operation, PlayerStats,
+    CastleType, ChessError, ChessResponse, Clock, Game, GameChain, GameState,
+    InstantiationArgument, MoveType, Operation, PlayerStats,
 };
 use linera_sdk::{
     base::{
-        Account, Amount, ApplicationId, ChainId, Destination, Owner, PublicKey, TimeDelta,
-        WithContractAbi,
+        Account, Amount, ApplicationId, ApplicationPermissions, ChainId, Destination, Owner,
+        PublicKey, TimeDelta, WithContractAbi,
     },
     util::BlockingWait,
     views::{RootView, View, ViewStorageContext},
     Contract, ContractRuntime,
 };
 use log;
-// use market::MarketAbi;
 
 #[allow(dead_code)]
 pub struct ChessContract {
@@ -93,10 +92,6 @@ impl Contract for ChessContract {
                 piece,
                 captured_piece,
             } => {
-                log::info!(
-                    "Request to make a move time: {}",
-                    self.runtime.system_time()
-                );
                 // check if the game is still ongoing
                 self.is_game_over();
 
@@ -150,7 +145,12 @@ impl Contract for ChessContract {
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
                         clock.make_move(block_time, active_player);
-                        self.state.board.get_mut().is_checkmate(); // check if the current player is checkmate, i.e if white makes a move after switch turn black is active player and we check if active player is in checkmate
+
+                        // check if the current player is checkmate, i.e if white makes a move after switch turn black is active player and we check if active player is in checkmate
+                        if self.state.board.get_mut().is_checkmate() {
+                            // returns false, if not checkmate
+                            self.state.board.get_mut().state = GameState::Checkmate;
+                        };
                         ChessResponse::Ok
                     }
                     Err(_) => panic!("Operation Failed"),
@@ -159,7 +159,6 @@ impl Contract for ChessContract {
 
             Operation::MakeMove { from, to, piece } => {
                 // check if the game is still ongoing
-                log::info!("Requesting to make move: {}", self.runtime.system_time());
                 self.is_game_over();
 
                 let owner = self.runtime.authenticated_signer().unwrap();
@@ -230,7 +229,10 @@ impl Contract for ChessContract {
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
 
-                        self.state.board.get_mut().is_checkmate();
+                        if self.state.board.get_mut().is_checkmate() {
+                            // returns false, if not checkmate
+                            self.state.board.get_mut().state = GameState::Checkmate;
+                        };
                         ChessResponse::Ok
                     }
                     Err(_) => panic!("Operation Failed"),
@@ -302,20 +304,41 @@ impl Contract for ChessContract {
                         clock.make_move(block_time, active_player);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
+                        if self.state.board.get_mut().is_checkmate() {
+                            // returns false, if not checkmate
+                            self.state.board.get_mut().state = GameState::Checkmate;
+                        };
                         ChessResponse::Ok
                     }
                     Err(_) => panic!("Operation Failed"),
                 }
             }
             Operation::Resign => {
+                self.is_game_over();
+                let owner = self.runtime.authenticated_signer().unwrap();
+                let active_player = self.state.board.get().active;
+                let active = self
+                    .state
+                    .owners
+                    .get(&owner)
+                    .await
+                    .expect("Failed to get active player")
+                    .expect("Active player not found");
+                assert_eq!(
+                    active_player, active,
+                    "Only the active player can make a move."
+                );
+
+                self.handle_winner().await;
+
                 self.state.board.get_mut().state = GameState::Resign;
-                return ChessResponse;
+                return ChessResponse::Ok;
             }
             Operation::StartGame {
                 players,
                 amount,
                 match_time,
-            } => self.start_game(players, amount, match_time),
+            } => self.start_game(players, amount, match_time).await,
         }
     }
 
@@ -350,40 +373,35 @@ impl ChessContract {
         amount: Amount,
         match_time: TimeDelta,
     ) -> ChessResponse {
-        assert_eq!(self.runtime.chain_id(), self.main_chain_id());
-        let ownership = ChainOwnership::multiple(
-            [(players[0], 100), (players[1], 100)],
-            100,
-            TimeoutConfig::default(),
-        );
-        let app_id = self.runtime.application_id();
-        let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
-        let (message_id, chain_id) = self.runtime.open_chain(ownership, permissions, fee_budget);
-        for public_key in &players {
-            self.state
-                .game_chains
-                .get_mut_or_default(public_key)
-                .await
-                .unwrap()
-                .insert(GameChain {
-                    message_id,
-                    chain_id,
-                });
-        }
-        self.runtime.send_message(
-            chain_id,
-            Message::Start {
-                players,
-                board_size,
-                timeouts: timeouts.unwrap_or_else(|| self.state.timeouts.get().clone()),
-            },
-        );
+        // assert_eq!(self.runtime.chain_id(), self.main_chain_id());
+        // let ownership = ChainOwnership::multiple(
+        //     [(players[0], 100), (players[1], 100)],
+        //     100,
+        //     TimeoutConfig::default(),
+        // );
+        // let app_id = self.runtime.application_id();
+        // let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
+        // let (message_id, chain_id) = self.runtime.open_chain(ownership, permissions, fee_budget);
+        // for public_key in &players {
+        //     self.state
+        //         .game_chains
+        //         .get_mut_or_default(public_key)
+        //         .await
+        //         .unwrap()
+        //         .insert(GameChain {
+        //             message_id,
+        //             chain_id,
+        //         });
+        // }
+        // self.runtime.send_message(
+        //     chain_id,
+        //     Message::Start {
+        //         players,
+        //         board_size,
+        //         timeouts: timeouts.unwrap_or_else(|| self.state.timeouts.get().clone()),
+        //     },
+        // );
         ChessResponse::Ok
-    }
-
-    /// Returns the ChainId of creator chain
-    fn main_chain_id(&mut self) -> ChainId {
-        self.runtime.application_creator_chain_id()
     }
 
     /// Handles the winner stats, when a match is over, this function is called to update the
@@ -398,25 +416,10 @@ impl ChessContract {
         self.state.add_player_leaderboard(winner);
     }
 
-    pub async fn handle_winner(&mut self, _user_account: Account) {
+    /// Handles the winner of the game, when a match is over
+    pub async fn handle_winner(&mut self) {
         // self.send_reward_nft().await;
         // if players were betting on the game. send the amount to the winner(Todo!)
         // it will require punk records
     }
-
-    // pub async fn send_reward_nft(&mut self) {
-    //     let market_id = self.market_id();
-    //     let call = market::Operation::NewItem {
-    //         name: "NFt".to_string(),
-    //         description: "Valuable NFt".to_string(),
-    //         image: "https://www.google.com/".to_string(),
-    //         item_type: "digital".to_string(),
-    //     };
-    //     log::info!("Sending the user an reward.....");
-    //     self.runtime.call_application(true, market_id, &call);
-    // }
-    //
-    // fn market_id(&mut self) -> ApplicationId<MarketAbi> {
-    //     self.runtime.application_parameters().market_app_id
-    // }
 }

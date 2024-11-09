@@ -536,7 +536,6 @@ dependencies = [
  "lazy_static",
  "linera-sdk",
  "log",
- "market",
  "serde",
  "thiserror",
 ]
@@ -2498,19 +2497,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b955cdeb2a02b9117f121ce63aa52d08ade45de53e48fe6a38b39c10f6f709"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "market"
-version = "0.1.0"
-dependencies = [
- "async-graphql",
- "async-graphql-derive",
- "bcs",
- "linera-sdk",
- "log",
- "serde",
- "thiserror",
 ]
 
 [[package]]
