@@ -1,10 +1,12 @@
 #![allow(unused_imports)]
+
 use crate::{
     bishop_attacks_on_the_fly, computed_king_moves, computed_knight_attacks, computed_pawn_attacks,
     computed_pawn_moves, lazy_static,
     magic::{magic_index, make_table, BISHOP_MAGICS, ROOK_MAGICS},
-    queen_attacks_on_the_fly, rook_attacks_on_the_fly, Bitboard, ChessError, Color, Game, MoveData,
-    MoveType, Piece, NOT_A_FILE, NOT_H_FILE,
+    queen_attacks_on_the_fly, rook_attacks_on_the_fly,
+    zobrist::update_castle_hash,
+    Bitboard, ChessError, Color, Game, MoveData, MoveType, Piece, NOT_A_FILE, NOT_H_FILE,
 };
 use async_graphql::SimpleObject;
 use serde::{Deserialize, Serialize};
@@ -42,7 +44,7 @@ pub struct ChessBoard {
     pub bK: BitBoard,
 
     /// Castling rights
-    pub castling_rights: [bool; 2],
+    pub castling_rights: [bool; 4], // [White, Black](KingSide, QueenSide)
     /// En passant
     pub en_passant: BitBoard,
 }
@@ -64,7 +66,7 @@ impl ChessBoard {
             bQ: 0x0800000000000000,
             bK: 0x1000000000000000,
 
-            castling_rights: [true; 2],
+            castling_rights: [true; 4],
             en_passant: 0x00,
         }
     }
@@ -108,8 +110,10 @@ impl ChessBoard {
         }
 
         // Parse castling rights
-        board.castling_rights[0] = castling_rights.contains('K') || castling_rights.contains('Q');
-        board.castling_rights[1] = castling_rights.contains('k') || castling_rights.contains('q');
+        board.castling_rights[0] = castling_rights.contains('K');
+        board.castling_rights[1] = castling_rights.contains('Q');
+        board.castling_rights[2] = castling_rights.contains('k');
+        board.castling_rights[3] = castling_rights.contains('q');
 
         // Parse en passant
         if *en_passant != "-" {
@@ -379,9 +383,29 @@ impl ChessBoard {
         None // No piece at this square
     }
 
+    /// A function to revoke the castling right, when rook is moved for a player
+    pub fn revoke_castling_rights(&mut self, color: Color, rook_position: Square) {
+        match (color, rook_position) {
+            (Color::White, Square::A1) => self.castling_rights[0] = false,
+            (Color::White, Square::H1) => self.castling_rights[1] = false,
+            (Color::Black, Square::A8) => self.castling_rights[2] = false,
+            (Color::Black, Square::H8) => self.castling_rights[3] = false,
+            _ => {}
+        }
+    }
+
     /// A function to update the castling right of a color
     pub fn update_castling_rights(&mut self, color: Color) {
-        self.castling_rights[color.index()] = false;
+        match color {
+            Color::White => {
+                self.castling_rights[0] = false;
+                self.castling_rights[1] = false;
+            }
+            Color::Black => {
+                self.castling_rights[2] = false;
+                self.castling_rights[3] = false;
+            }
+        }
     }
 
     /// A function to create capture string
@@ -478,18 +502,34 @@ impl ChessBoard {
         }
 
         // Add placeholder values for the rest of the FEN string
+        // castling rights for K(0)Q(1)k(2)q(3)
+        // Castling rights for K (White Kingside), Q (White Queenside),
+        // k (Black Kingside), q (Black Queenside)
+        let mut castling_rights_str = String::new();
 
-        if self.castling_rights[Color::White.index()] {
-            fen.push_str(" KQ");
-        } else {
-            fen.push_str(" -");
+        if self.castling_rights[0] {
+            castling_rights_str.push('K');
+        }
+        if self.castling_rights[1] {
+            castling_rights_str.push('Q');
+        }
+        if self.castling_rights[2] {
+            castling_rights_str.push('k');
+        }
+        if self.castling_rights[3] {
+            castling_rights_str.push('q');
         }
 
-        if self.castling_rights[Color::Black.index()] {
-            fen.push_str("kq");
-        } else {
-            fen.push_str(" -");
+        // If there are no castling rights, add "-" to indicate no castling is allowed
+        if castling_rights_str.is_empty() {
+            castling_rights_str.push('-');
         }
+
+        // If there are no castling rights, add "-" to indicate no castling is allowed
+        //if castling_rights_str.is_empty() {
+        //    castling_rights_str.push('-');
+        //}
+        fen.push_str(&castling_rights_str);
 
         if self.en_passant != 0 {
             let en_passant_square = self.en_passant.trailing_zeros();
@@ -714,7 +754,7 @@ impl ChessBoard {
         if rook_attacks_on_the_fly(from, self.all_pieces()) & (1u64 << to as usize) == 0 {
             return Err(ChessError::InvalidMove);
         }
-        self.update_castling_rights(color);
+        self.revoke_castling_rights(color, from);
         self.move_piece(from, to, piece)
     }
 
