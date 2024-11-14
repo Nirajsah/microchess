@@ -10,7 +10,7 @@ linera-sdk = { path = "../../linera-protocol/linera-sdk", default-features = fal
 serde = { version = "1.0.203", features = ["derive"] }
 log = "0.4.22"
 lazy_static = "1.5.0"
-thiserror = "1.0.64"
+thiserror = "2.0.1"
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
