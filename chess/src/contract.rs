@@ -10,6 +10,7 @@ use chess::{
     chessboard::ChessBoard,
     piece::{Color, Piece},
     square::Square,
+    zobrist::PIECE_KEYS,
     CastleType, ChessError, ChessResponse, Clock, Game, GameChain, GameState,
     InstantiationArgument, MoveType, Operation, PlayerStats,
 };
@@ -62,6 +63,12 @@ impl Contract for ChessContract {
         for (player, color) in players_colors {
             self.state.owners.insert(&player, color).unwrap();
         }
+
+        for (i, row) in PIECE_KEYS.iter().enumerate() {
+            for (j, key) in row.iter().enumerate() {
+                log::info!("PIECE_KEYS[{}][{}] = {:x}", i, j, key);
+            }
+        }
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
@@ -75,8 +82,8 @@ impl Contract for ChessContract {
                     if player == players[0] {
                         return ChessResponse::Err(ChessError::InvalidRequest);
                     }
-                    let game = Game::new();
-                    // let game = Game::with_fen("8/7P/7P/8/8/8/8/7r w - - 0 1");
+                    let game = self.state.board.get().new();
+                    // let game = self.state.board.get().with_fen("8/7P/7P/8/8/8/8/7r w - - 0 1");
                     self.state.add_player(player);
                     self.state.board.set(game);
                     return ChessResponse::Ok;
@@ -146,11 +153,19 @@ impl Contract for ChessContract {
                             .assert_before(block_time.saturating_add(clock.block_delay));
                         clock.make_move(block_time, active_player);
 
+                        // check for threefold repetition and 50 Move rule, update the game state
+                        if self.state.board.get_mut().check_threefold_repetition()
+                            || self.state.board.get().check_50_move_rule()
+                        {
+                            self.state.board.get_mut().state = GameState::Draw;
+                        }
+
                         // check if the current player is checkmate, i.e if white makes a move after switch turn black is active player and we check if active player is in checkmate
                         if self.state.board.get_mut().is_checkmate() {
                             // returns false, if not checkmate
                             self.state.board.get_mut().state = GameState::Checkmate;
                         };
+
                         ChessResponse::Ok
                     }
                     Err(_) => panic!("Operation Failed"),
@@ -198,6 +213,11 @@ impl Contract for ChessContract {
 
                 match p {
                     Piece::WhiteKing => {
+                        // if the player is in check, return
+                        if self.state.board.get().board.in_check(active_player) {
+                            return ChessResponse::Err(ChessError::InvalidMove);
+                        }
+
                         if from_sq == Square::E1 && to_sq == Square::G1 {
                             m = MoveType::Castle(CastleType::KingSide);
                         } else if from_sq == Square::E1 && to_sq == Square::C1 {
@@ -205,6 +225,11 @@ impl Contract for ChessContract {
                         }
                     }
                     Piece::BlackKing => {
+                        // if the player is in check, return
+                        if self.state.board.get().board.in_check(active_player) {
+                            return ChessResponse::Err(ChessError::InvalidMove);
+                        }
+
                         if from_sq == Square::E8 && to_sq == Square::G8 {
                             m = MoveType::Castle(CastleType::KingSide);
                         } else if from_sq == Square::E8 && to_sq == Square::C8 {
@@ -229,10 +254,18 @@ impl Contract for ChessContract {
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
 
+                        // check for threefold repetition and 50 Move rule, update the game state
+                        if self.state.board.get_mut().check_threefold_repetition()
+                            || self.state.board.get().check_50_move_rule()
+                        {
+                            self.state.board.get_mut().state = GameState::Draw;
+                        }
+
                         if self.state.board.get_mut().is_checkmate() {
                             // returns false, if not checkmate
                             self.state.board.get_mut().state = GameState::Checkmate;
                         };
+
                         ChessResponse::Ok
                     }
                     Err(_) => panic!("Operation Failed"),
@@ -304,10 +337,19 @@ impl Contract for ChessContract {
                         clock.make_move(block_time, active_player);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
+
+                        // check for threefold repetition and 50 Move rule, update the game state
+                        if self.state.board.get_mut().check_threefold_repetition()
+                            || self.state.board.get().check_50_move_rule()
+                        {
+                            self.state.board.get_mut().state = GameState::Draw;
+                        }
+
                         if self.state.board.get_mut().is_checkmate() {
                             // returns false, if not checkmate
                             self.state.board.get_mut().state = GameState::Checkmate;
                         };
+
                         ChessResponse::Ok
                     }
                     Err(_) => panic!("Operation Failed"),
@@ -356,6 +398,9 @@ impl ChessContract {
                 return ChessResponse::Err(ChessError::InvalidRequest);
             }
             GameState::Stalemate => {
+                return ChessResponse::Err(ChessError::InvalidRequest);
+            }
+            GameState::Draw => {
                 return ChessResponse::Err(ChessError::InvalidRequest);
             }
             GameState::InPlay => {

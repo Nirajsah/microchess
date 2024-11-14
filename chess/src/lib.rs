@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+use std::collections::HashMap;
+
 use async_graphql::{Enum, Request, Response, SimpleObject};
 use chessboard::ChessBoard;
 use lazy_static::lazy_static;
@@ -17,8 +19,13 @@ pub mod piece;
 pub mod square;
 use square::Square;
 use thiserror::Error;
+use zobrist::{
+    update_castle_hash, update_ep_hash, update_piece_hash, update_side_hash, BLACK_TO_MOVE,
+    CASTLE_KEYS, EP_KEYS, PIECE_KEYS,
+};
 pub mod magic;
 pub mod prng;
+pub mod zobrist;
 
 impl ContractAbi for ChessAbi {
     type Operation = Operation;
@@ -115,11 +122,13 @@ pub struct GameChain {
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Enum)]
+#[serde(rename_all = "PascalCase")]
 pub enum GameState {
     #[default]
     InPlay,
     Checkmate,
     Stalemate,
+    Draw,
     Resign,
 }
 
@@ -265,30 +274,86 @@ pub struct Game {
     pub captured_pieces: Vec<Piece>,
     /// Game State
     pub state: GameState,
+    /// current zobrist hashing
+    pub current_hash: u64,
+    /// position_count
+    pub position_count: HashMap<u64, u32>,
+    /// 50-Move Rule Counter
+    pub halfmove_clock: u32,
 }
 
 impl Game {
-    /// A function to create a new game
-    pub fn new() -> Self {
+    /// A function to create a new game using defaults
+    pub fn new(&self) -> Self {
         Game {
             board: ChessBoard::new(),
             active: Color::White,
             moves: vec![],
             captured_pieces: vec![],
             state: GameState::InPlay,
+            current_hash: self.compute_zobrist_hash(),
+            position_count: HashMap::new(),
+            halfmove_clock: 0,
         }
     }
 
-    pub fn with_fen(fen: &str) -> Self {
+    /// A function to create a new game using FEN
+    pub fn with_fen(&self, fen: &str) -> Self {
         Game {
             board: ChessBoard::with_fen(fen),
             active: Color::White,
             moves: vec![],
             captured_pieces: vec![],
             state: GameState::InPlay,
+            current_hash: self.compute_zobrist_hash(),
+            position_count: HashMap::new(),
+            halfmove_clock: 0,
         }
     }
 
+    /// A function to compute zobrist hashing
+    pub fn compute_zobrist_hash(&self) -> u64 {
+        let mut hash = 0;
+
+        // XOR piece positions
+        for square in 0..64 {
+            if let Some(piece) = self
+                .board
+                .get_piece_at(Square::usize_to_square(square as usize))
+            {
+                hash ^= PIECE_KEYS[square][piece.index()];
+            }
+        }
+
+        // XOR en passant key if an en passant square is present
+        if self.board.en_passant != 0 {
+            let en_passant_square = self.board.en_passant.trailing_zeros() as usize;
+            hash ^= EP_KEYS[en_passant_square];
+        }
+
+        // XOR castling rights
+        for i in 0..4 {
+            if self.board.castling_rights[i] {
+                hash ^= CASTLE_KEYS[i];
+            }
+        }
+
+        // XOR turn key if it's Black's turn
+        if self.active == Color::Black {
+            hash ^= *BLACK_TO_MOVE;
+        }
+
+        hash
+    }
+
+    /// Check for threefold_repetition
+    pub fn check_threefold_repetition(&mut self) -> bool {
+        let count = self.position_count.entry(self.current_hash).or_insert(0);
+        *count += 1;
+        *count == 3
+    }
+
+    /// A function to insert the captured_pieces into a vec
     pub fn insert_captured_pieces(&mut self, piece: &Piece) {
         self.captured_pieces.push(*piece);
     }
@@ -333,7 +398,23 @@ impl Game {
 
     /// A function to switch player turn
     pub fn switch_player_turn(&mut self) {
-        self.active = self.active.opposite()
+        self.active = self.active.opposite();
+        update_side_hash(self.active, &mut self.current_hash);
+    }
+
+    /// A function to reset the halfmove_clock to 0,on pawn move or a piece capture
+    pub fn reset_halfmove_clock(&mut self) {
+        self.halfmove_clock = 0
+    }
+
+    /// A function to update the halfmove_clock by 1
+    pub fn update_halfmove_clock(&mut self) {
+        self.halfmove_clock += 1
+    }
+
+    /// Check if halfmove_clock is greater or equals to 100, [Draw]
+    pub fn check_50_move_rule(&self) -> bool {
+        self.halfmove_clock >= 100
     }
 
     /// A function to make move
@@ -342,44 +423,92 @@ impl Game {
         match m {
             MoveType::Move => match self.move_piece(from, to, piece) {
                 Ok(_) => {
-                    log::info!("Move in OK block: {:?}", m);
-                    if self.board.in_check(color) {
-                        self.board.update_castling_rights(color);
+                    // Revoke castling rights for a ColorSide permanently
+                    if piece == Piece::WhiteRook || piece == Piece::BlackRook {
+                        self.board.revoke_castling_rights(color, from);
+                        update_castle_hash(self.board.castling_rights, &mut self.current_hash);
                     }
+
+                    // update halfmove_clock based on piece
+                    if piece == Piece::WhitePawn || piece == Piece::BlackPawn {
+                        self.reset_halfmove_clock();
+                    } else {
+                        self.update_halfmove_clock();
+                    }
+
+                    update_piece_hash(from, piece, &mut self.current_hash);
+                    update_piece_hash(to, piece, &mut self.current_hash);
+
                     Ok(())
                 }
                 Err(e) => return Err(e),
             },
             MoveType::Capture(Piece) => match self.capture_piece(from, to, piece, Piece) {
                 Ok(_) => {
+                    // Revoke castling rights for a ColorSide permanently(K,Q,k,q), when a rook is caputred at the starting position
+                    if Piece == Piece::WhiteRook || Piece == Piece::BlackRook {
+                        self.board.revoke_castling_rights(color, to);
+                        update_castle_hash(self.board.castling_rights, &mut self.current_hash);
+                    }
+
+                    update_piece_hash(from, piece, &mut self.current_hash); // XOR out from the starting square
+                    update_piece_hash(to, Piece, &mut self.current_hash); // XOR out captured piece
+                    update_piece_hash(to, piece, &mut self.current_hash); // XOR in moving piece to new square
+
                     self.insert_captured_pieces(&Piece);
+                    self.reset_halfmove_clock();
                     Ok(())
                 }
                 Err(e) => return Err(e),
             },
-            MoveType::Castle(CastleType::KingSide) => self.castle(&piece, CastleType::KingSide),
-            MoveType::Castle(CastleType::QueenSide) => self.castle(&piece, CastleType::QueenSide),
+            MoveType::Castle(CastleType::KingSide) => {
+                match self.castle(&piece, CastleType::KingSide) {
+                    Ok(_) => {
+                        self.board.update_castling_rights(color); // revoke castling rights after castling
+                        update_castle_hash(self.board.castling_rights, &mut self.current_hash);
+                        self.update_halfmove_clock();
+                        Ok(())
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+            MoveType::Castle(CastleType::QueenSide) => {
+                match self.castle(&piece, CastleType::QueenSide) {
+                    Ok(_) => {
+                        self.board.update_castling_rights(color); // revoke castling rights after castling
+                        update_castle_hash(self.board.castling_rights, &mut self.current_hash);
+                        self.update_halfmove_clock();
+                        Ok(())
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
             MoveType::EnPassant => match self.board.en_passant_capture(from, to, &piece) {
                 Ok(_) => {
-                    if self.board.in_check(color) {
-                        self.board.update_castling_rights(color);
-                    }
                     self.insert_captured_pieces(&piece.opp_piece()); // In case of en passant, only pawns can be captured
+                    update_ep_hash(to, &mut self.current_hash);
+                    self.reset_halfmove_clock();
                     Ok(())
                 }
 
                 Err(e) => return Err(e),
             },
             MoveType::Promotion(Piece) => {
+                update_piece_hash(from, piece, &mut self.current_hash);
+
                 if let Some(captured_piece) = self.board.get_piece_at(to) {
-                    log::info!("Promotion: {:?}", captured_piece);
-                    self.capture_piece(from, to, piece, captured_piece)
-                        .and_then(|_| self.board.add_piece(to, piece, Piece))
+                    log::info!("Promotion and Capture: {:?}", captured_piece);
+                    update_piece_hash(to, captured_piece, &mut self.current_hash); // Remove captured piece
+                    self.capture_piece(from, to, piece, captured_piece)?;
                 } else {
-                    log::info!("Promotion: {:?}", Piece);
-                    self.move_piece(from, to, piece)
-                        .and_then(|_| self.board.add_piece(to, piece, Piece))
+                    log::info!("Promotion without Capture");
+                    self.move_piece(from, to, piece)?; // Move without capture
                 }
+
+                update_piece_hash(to, Piece, &mut self.current_hash);
+                self.update_halfmove_clock();
+
+                self.board.add_piece(to, piece, Piece)
             }
         }
     }
