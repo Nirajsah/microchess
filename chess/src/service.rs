@@ -34,7 +34,7 @@ impl Service for ChessService {
     type Parameters = ();
 
     async fn new(runtime: ServiceRuntime<Self>) -> Self {
-        let state = Chess::load(ViewStorageContext::from(runtime.key_value_store()))
+        let state = Chess::load(runtime.root_view_storage_context())
             .await
             .expect("Failed to load state");
         ChessService {

@@ -20,7 +20,7 @@ use linera_sdk::{
         PublicKey, TimeDelta, WithContractAbi,
     },
     util::BlockingWait,
-    views::{RootView, View, ViewStorageContext},
+    views::{RootView, View},
     Contract, ContractRuntime,
 };
 use log;
@@ -43,7 +43,7 @@ impl Contract for ChessContract {
     type InstantiationArgument = InstantiationArgument;
 
     async fn load(runtime: ContractRuntime<Self>) -> Self {
-        let state = Chess::load(ViewStorageContext::from(runtime.key_value_store()))
+        let state = Chess::load(runtime.root_view_storage_context())
             .await
             .expect("Failed to load state");
         ChessContract { state, runtime }
@@ -63,17 +63,12 @@ impl Contract for ChessContract {
         for (player, color) in players_colors {
             self.state.owners.insert(&player, color).unwrap();
         }
-
-        for (i, row) in PIECE_KEYS.iter().enumerate() {
-            for (j, key) in row.iter().enumerate() {
-                log::info!("PIECE_KEYS[{}][{}] = {:x}", i, j, key);
-            }
-        }
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
         match operation {
             Operation::NewGame { player } => {
+                log::info!("{player} has arrived");
                 let players = self.state.get_players();
                 if players.len() == 2 {
                     return ChessResponse::Err(ChessError::InvalidRequest);
@@ -268,7 +263,8 @@ impl Contract for ChessContract {
 
                         ChessResponse::Ok
                     }
-                    Err(_) => panic!("Operation Failed"),
+                    Err(e) => ChessResponse::Err(e),
+                    //Err(_) => panic!("Operation Failed"),
                 }
             }
             Operation::PawnPromotion {
@@ -466,5 +462,261 @@ impl ChessContract {
         // self.send_reward_nft().await;
         // if players were betting on the game. send the amount to the winner(Todo!)
         // it will require punk records
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(unused_imports)]
+    use std::str::FromStr;
+
+    use chess::{piece::Color, ChessError, ChessResponse, InstantiationArgument, Operation};
+    use env_logger;
+    use futures::FutureExt as _;
+
+    use linera_sdk::{
+        base::Owner,
+        contract::MockContractRuntime,
+        util::BlockingWait,
+        views::{View, ViewStorageContext},
+        Contract, ContractRuntime,
+    };
+    use log::LevelFilter;
+
+    use super::{Chess, ChessContract};
+
+    #[test]
+    fn new_game() {
+        env_logger::builder().filter_level(LevelFilter::Info).init();
+
+        let owner1 =
+            Owner::from_str("df44403a282330a8b086603516277c014c844a4b418835873aced1132a3adcd5")
+                .unwrap();
+        let owner2 =
+            Owner::from_str("43c319a4eab3747afcd608d32b73a2472fcaee390ec6bed3e694b4908f55772d")
+                .unwrap();
+
+        // Setting Players through InstantiationArgument
+        let initial_value = InstantiationArgument {
+            players: [owner1, owner2],
+            start_time: 600000000.into(),
+            increment: 600000000.into(),
+            block_delay: 100000000.into(),
+        };
+        let mut app = create_and_instantiate_app(initial_value.clone(), owner1);
+
+        let players = initial_value.players;
+
+        let mut response = ChessResponse::Ok;
+
+        for player in players {
+            response = app
+                .execute_operation(Operation::NewGame { player })
+                .now_or_never()
+                .expect("Execution of application operation should not await anything");
+        }
+
+        assert_eq!(
+            app.state.get_players().len(),
+            2,
+            "Players are set, and a new game has started"
+        );
+
+        assert_eq!(response, ChessResponse::Ok, "Error in Response");
+
+        assert_eq!(app.state.board.get().active, Color::White);
+
+        // Test alternating moves:
+
+        // White makes a valid pawn move from a2 to a3
+        let from = "a2".to_string();
+        let to = "a3".to_string();
+        let piece = "wP".to_string();
+        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        assert_eq!(response, ChessResponse::Ok, "Pawn move should be valid");
+        assert_eq!(
+            app.state.board.get().active,
+            Color::Black,
+            "Active player is now Black"
+        );
+
+        //// Black makes a valid pawn move from b7 to b6
+        //let from = "b7".to_string();
+        //let to = "b6".to_string();
+        //let piece = "bP".to_string();
+        //response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        //assert_eq!(response, ChessResponse::Ok, "Pawn move should be valid");
+        //assert_eq!(
+        //    app.state.board.get().active,
+        //    Color::White,
+        //    "Active player is now White"
+        //);
+        //
+        //// White attempts an illegal knight move from g1 to g5 (invalid)
+        //let from = "g1".to_string();
+        //let to = "g5".to_string();
+        //let piece = "wN".to_string();
+        //response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        //assert_eq!(
+        //    response,
+        //    ChessResponse::Err(ChessError::InvalidMove),
+        //    "Knight move should be invalid"
+        //);
+        //assert_eq!(
+        //    app.state.board.get().active,
+        //    Color::White,
+        //    "Active player is still White"
+        //);
+        //
+        //// White makes a valid knight move from g1 to f3
+        //let from = "g1".to_string();
+        //let to = "f3".to_string();
+        //let piece = "wN".to_string();
+        //response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        //assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
+        //assert_eq!(
+        //    app.state.board.get().active,
+        //    Color::Black,
+        //    "Active player is now Black"
+        //);
+
+        //// Black makes a valid bishop move from f8 to c5
+        //let from = "f8".to_string();
+        //let to = "c5".to_string();
+        //let piece = "bB".to_string();
+        //response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        //assert_eq!(response, ChessResponse::Ok, "Bishop move should be valid");
+        //assert_eq!(
+        //    app.state.board.get().active,
+        //    Color::White,
+        //    "Active player is now White"
+        //);
+        //
+        //// White attempts an illegal pawn move from a3 to a5 (invalid)
+        //let from = "a3".to_string();
+        //let to = "a5".to_string();
+        //let piece = "wP".to_string();
+        //response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        //assert_eq!(
+        //    response,
+        //    ChessResponse::Err(ChessError::InvalidMove),
+        //    "Pawn move should be invalid"
+        //);
+        //assert_eq!(
+        //    app.state.board.get().active,
+        //    Color::White,
+        //    "Active player is still White"
+        //);
+        //
+        //// White makes a valid bishop move from c1 to f4
+        //let from = "c1".to_string();
+        //let to = "f4".to_string();
+        //let piece = "wB".to_string();
+        //response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        //assert_eq!(response, ChessResponse::Ok, "Bishop move should be valid");
+        //assert_eq!(
+        //    app.state.board.get().active,
+        //    Color::Black,
+        //    "Active player is now Black"
+        //);
+        //
+        //// Black attempts an illegal bishop move from f4 to h3 (invalid)
+        //let from = "f4".to_string();
+        //let to = "h3".to_string();
+        //let piece = "bB".to_string();
+        //response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        //assert_eq!(
+        //    response,
+        //    ChessResponse::Err(ChessError::InvalidMove),
+        //    "Bishop move should be invalid"
+        //);
+        //assert_eq!(
+        //    app.state.board.get().active,
+        //    Color::Black,
+        //    "Active player is still Black"
+        //);
+        //
+        //// Black makes a valid queen move from d8 to d4
+        //let from = "d8".to_string();
+        //let to = "d4".to_string();
+        //let piece = "bQ".to_string();
+        //response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        //assert_eq!(response, ChessResponse::Ok, "Queen move should be valid");
+        //assert_eq!(
+        //    app.state.board.get().active,
+        //    Color::White,
+        //    "Active player is now White"
+        //);
+        //
+        //// White makes a king move from e1 to e2 (no check yet)
+        //let from = "e1".to_string();
+        //let to = "e2".to_string();
+        //let piece = "wK".to_string();
+        //response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        //assert_eq!(response, ChessResponse::Ok, "King move should be valid");
+        //assert_eq!(
+        //    app.state.board.get().active,
+        //    Color::Black,
+        //    "Active player is now Black"
+        //);
+        //
+        //// Black attempts to move the queen but is now in check (this would fail the check)
+        //let from = "d4".to_string();
+        //let to = "d5".to_string();
+        //let piece = "bQ".to_string();
+        //response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        //assert_eq!(
+        //    response,
+        //    ChessResponse::Err(ChessError::KingInCheck),
+        //    "Move should not be allowed as the king is in check"
+        //);
+        //
+        //// Black resolves the check and makes a valid queen move from d4 to d3
+        //let from = "d4".to_string();
+        //let to = "d3".to_string();
+        //let piece = "bQ".to_string();
+        //response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        //assert_eq!(response, ChessResponse::Ok, "Queen move should be valid");
+        //assert_eq!(
+        //    app.state.board.get().active,
+        //    Color::White,
+        //    "Active player is now White"
+        //);
+    }
+
+    fn make_move(
+        app: &mut ChessContract,
+        from: String,
+        to: String,
+        piece: String,
+    ) -> ChessResponse {
+        let response = app
+            .execute_operation(Operation::MakeMove { from, to, piece })
+            .now_or_never()
+            .expect("Execution of application operation should not await anything");
+
+        response
+    }
+
+    fn create_and_instantiate_app(
+        initial_value: InstantiationArgument,
+        authentic_signer: Owner,
+    ) -> ChessContract {
+        let mut runtime = ContractRuntime::new().with_application_parameters(());
+        runtime.set_system_time(100000000.into());
+        runtime.set_authenticated_signer(authentic_signer);
+        let mut contract = ChessContract {
+            state: Chess::load(runtime.root_view_storage_context())
+                .blocking_wait()
+                .expect("Failed to read from mock key value store"),
+            runtime,
+        };
+
+        contract
+            .instantiate(initial_value)
+            .now_or_never()
+            .expect("Initialization of application state should not await anything");
+
+        contract
     }
 }
