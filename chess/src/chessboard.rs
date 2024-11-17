@@ -6,7 +6,8 @@ use crate::{
     magic::{magic_index, make_table, BISHOP_MAGICS, ROOK_MAGICS},
     queen_attacks_on_the_fly, rook_attacks_on_the_fly,
     zobrist::update_castle_hash,
-    Bitboard, ChessError, Color, Game, MoveData, MoveType, Piece, NOT_A_FILE, NOT_H_FILE,
+    Bitboard, ChessError, ChessResponse, Color, Game, MoveData, MoveType, Piece, NOT_A_FILE,
+    NOT_H_FILE,
 };
 use async_graphql::SimpleObject;
 use serde::{Deserialize, Serialize};
@@ -69,6 +70,11 @@ impl ChessBoard {
             castling_rights: [true; 4],
             en_passant: 0x00,
         }
+    }
+
+    /// A function used to reset en_passant square
+    pub fn reset_enpassant(&mut self) {
+        self.en_passant = 0x00;
     }
 
     /// Generates a ChessBoard from a FEN string
@@ -458,7 +464,7 @@ impl ChessBoard {
     }
 
     ///A function to generate FEN string using bitboard
-    pub fn to_fen(&self) -> String {
+    pub fn to_fen(&self, active_player: &Color) -> String {
         let bitboards = [
             self.wP, self.wN, self.wB, self.wR, self.wQ, self.wK, self.bP, self.bN, self.bB,
             self.bR, self.bQ, self.bK,
@@ -501,23 +507,39 @@ impl ChessBoard {
             }
         }
 
+        fen.push_str(" "); // just to have a whitespace
+
+        fen.push_str(
+            &active_player
+                .to_string()
+                .chars()
+                .next()
+                .unwrap_or_default()
+                .to_string(),
+        );
+
         // Add placeholder values for the rest of the FEN string
         // castling rights for K(0)Q(1)k(2)q(3)
         // Castling rights for K (White Kingside), Q (White Queenside),
         // k (Black Kingside), q (Black Queenside)
-        let mut castling_rights_str = String::new();
+        let mut castling_rights_str = String::from(" ");
 
-        if self.castling_rights[0] {
-            castling_rights_str.push('K');
+        if !self.in_check(Color::White) {
+            if self.castling_rights[0] {
+                castling_rights_str.push('K');
+            }
+            if self.castling_rights[1] {
+                castling_rights_str.push('Q');
+            }
         }
-        if self.castling_rights[1] {
-            castling_rights_str.push('Q');
-        }
-        if self.castling_rights[2] {
-            castling_rights_str.push('k');
-        }
-        if self.castling_rights[3] {
-            castling_rights_str.push('q');
+
+        if !self.in_check(Color::Black) {
+            if self.castling_rights[2] {
+                castling_rights_str.push('k');
+            }
+            if self.castling_rights[3] {
+                castling_rights_str.push('q');
+            }
         }
 
         // If there are no castling rights, add "-" to indicate no castling is allowed
@@ -525,15 +547,12 @@ impl ChessBoard {
             castling_rights_str.push('-');
         }
 
-        // If there are no castling rights, add "-" to indicate no castling is allowed
-        //if castling_rights_str.is_empty() {
-        //    castling_rights_str.push('-');
-        //}
         fen.push_str(&castling_rights_str);
 
         if self.en_passant != 0 {
             let en_passant_square = self.en_passant.trailing_zeros();
             let square = Square::usize_to_string(en_passant_square as usize);
+            fen.push_str(" "); // just to have a whitespace
             fen.push_str(&square);
         } else {
             fen.push_str(" -");
@@ -542,11 +561,11 @@ impl ChessBoard {
         fen.push_str(" 0 1");
 
         if self.in_check(Color::White) {
-            fen.push_str(" ;wK");
+            fen.push_str(";wK");
         }
 
         if self.in_check(Color::Black) {
-            fen.push_str(" ;bK");
+            fen.push_str(";bK");
         }
 
         fen
@@ -692,6 +711,12 @@ impl ChessBoard {
             Self::set(to, self.get_mut_board(&piece));
         }
 
+        // reset the enpassant square at the end of a move. if the move was not an en_passant
+        // capture, reset. if it was an en_passant capture then `self.en_passant == 0`
+        if self.en_passant != 0 {
+            self.reset_enpassant();
+        }
+
         Ok(())
     }
 
@@ -808,7 +833,10 @@ impl ChessBoard {
         };
 
         self.capture_piece(Square::usize_to_square(captured_square), &en_piece)
-            .and_then(|_| self.move_piece(from, to, piece))
+            .and_then(|_| {
+                self.move_piece(from, to, piece)
+                    .and_then(|_| Ok(self.reset_enpassant()))
+            })
     }
 
     /// White pawn captures

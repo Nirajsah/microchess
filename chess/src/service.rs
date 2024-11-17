@@ -14,7 +14,7 @@ use chess::{
 use linera_sdk::{
     base::{Owner, WithServiceAbi},
     graphql::GraphQLMutationRoot,
-    views::{View, ViewStorageContext},
+    views::View,
     Service, ServiceRuntime,
 };
 use serde::{Deserialize, Serialize};
@@ -62,13 +62,14 @@ struct GameData {
 #[Object]
 impl ChessService {
     async fn game_data(&self, player: Owner) -> GameData {
+        let game = self.state.board.get();
         let game_data = GameData {
-            board: self.state.board.get().board.to_fen(),
-            player_turn: self.state.board.get().active,
+            board: game.board.to_fen(&game.active_player()),
+            player_turn: game.active, // (todo!, to be removed)
             player: self.state.owners.get(&player).await.unwrap().unwrap(),
-            moves: self.state.board.get().moves.clone(),
+            moves: game.moves.clone(),
             opponent: self.state.opponent(player).unwrap(),
-            game_state: self.state.board.get().state,
+            game_state: game.state,
         };
         game_data
     }

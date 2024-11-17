@@ -87,6 +87,13 @@ impl Color {
             Color::Black => 1,
         }
     }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            Color::White => "white".to_string(),
+            Color::Black => "black".to_string(),
+        }
+    }
 }
 
 impl FromStr for Piece {

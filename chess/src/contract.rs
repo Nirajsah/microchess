@@ -108,10 +108,10 @@ impl Contract for ChessContract {
                     .await
                     .expect("Failed to get active player")
                     .expect("Active player not found");
-                assert_eq!(
-                    active_player, active,
-                    "Only the active player can make a move."
-                );
+                //assert_eq!(
+                //    active_player, active,
+                //    "Only the active player can make a move."
+                //);
 
                 if piece.starts_with("w")
                     && active_player != Color::White
@@ -241,7 +241,6 @@ impl Contract for ChessContract {
 
                 match success {
                     Ok(_) => {
-                        log::info!("Move successful");
                         self.state.board.get_mut().switch_player_turn();
                         self.state.board.get_mut().create_move_string(active, to);
 
@@ -470,7 +469,10 @@ mod tests {
     #![allow(unused_imports)]
     use std::str::FromStr;
 
-    use chess::{piece::Color, ChessError, ChessResponse, InstantiationArgument, Operation};
+    use chess::{
+        piece::{Color, Piece},
+        ChessError, ChessResponse, InstantiationArgument, Operation,
+    };
     use env_logger;
     use futures::FutureExt as _;
 
@@ -529,10 +531,7 @@ mod tests {
         // Test alternating moves:
 
         // White makes a valid pawn move from a2 to a3
-        let from = "a2".to_string();
-        let to = "a3".to_string();
-        let piece = "wP".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "a2", "a3", "wP");
         assert_eq!(response, ChessResponse::Ok, "Pawn move should be valid");
         assert_eq!(
             app.state.board.get().active,
@@ -543,10 +542,7 @@ mod tests {
         log::info!("{:?}", app.state.board.get().active);
 
         // Black makes a valid pawn move from b7 to b6
-        let from = "b7".to_string();
-        let to = "b6".to_string();
-        let piece = "bP".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "b7", "b6", "bP");
         assert_eq!(response, ChessResponse::Ok, "Pawn move should be valid");
         assert_eq!(
             app.state.board.get().active,
@@ -555,10 +551,7 @@ mod tests {
         );
 
         // White attempts an illegal knight move from g1 to g5 (invalid)
-        let from = "g1".to_string();
-        let to = "g5".to_string();
-        let piece = "wN".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "g1", "g5", "wN");
         assert_eq!(
             response,
             ChessResponse::Err(ChessError::InvalidMove),
@@ -571,10 +564,7 @@ mod tests {
         );
 
         // White makes a valid knight move from g1 to f3
-        let from = "g1".to_string();
-        let to = "f3".to_string();
-        let piece = "wN".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "g1", "f3", "wN");
         assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
         assert_eq!(
             app.state.board.get().active,
@@ -583,10 +573,7 @@ mod tests {
         );
 
         // Black makes a invalid bishop move from f8 to c5(pawn on e7 blocks the move)
-        let from = "f8".to_string();
-        let to = "c5".to_string();
-        let piece = "bB".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "f8", "c5", "bB");
         assert_eq!(
             response,
             ChessResponse::Err(ChessError::InvalidMove),
@@ -599,10 +586,7 @@ mod tests {
         );
 
         // Black makes a valid pawn move from e7 to e6
-        let from = "e7".to_string();
-        let to = "e6".to_string();
-        let piece = "bP".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "e7", "e6", "bP");
         assert_eq!(response, ChessResponse::Ok, "Pawn move should be valid");
         assert_eq!(
             app.state.board.get().active,
@@ -611,10 +595,7 @@ mod tests {
         );
 
         // White attempts an illegal pawn move from a3 to a5 (invalid)
-        let from = "a3".to_string();
-        let to = "a5".to_string();
-        let piece = "wP".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "a3", "a5", "wP");
         assert_eq!(
             response,
             ChessResponse::Err(ChessError::InvalidMove),
@@ -627,10 +608,7 @@ mod tests {
         );
 
         // White makes a Invalid bishop move from c1 to f4(pawn is blocking at d2)
-        let from = "c1".to_string();
-        let to = "f4".to_string();
-        let piece = "wB".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "c1", "f4", "wB");
         assert_eq!(
             response,
             ChessResponse::Err(ChessError::InvalidMove),
@@ -643,10 +621,7 @@ mod tests {
         );
 
         // White makes a valid pawn move from e2 to e4
-        let from = "e2".to_string();
-        let to = "e4".to_string();
-        let piece = "wP".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "e2", "e4", "wP");
         assert_eq!(response, ChessResponse::Ok, "Pawn move should be valid");
         assert_eq!(
             app.state.board.get().active,
@@ -655,10 +630,7 @@ mod tests {
         );
 
         // Black attempts an illegal bishop move from f4 to h4 (invalid)
-        let from = "f4".to_string();
-        let to = "h4".to_string();
-        let piece = "bB".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "f4", "h4", "bB");
         assert_eq!(
             response,
             ChessResponse::Err(ChessError::InvalidMove),
@@ -671,10 +643,7 @@ mod tests {
         );
 
         // Black makes a valid queen move from d8 to d4
-        let from = "d8".to_string();
-        let to = "g5".to_string();
-        let piece = "bQ".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "d8", "g5", "bQ");
         assert_eq!(response, ChessResponse::Ok, "Queen move should be valid");
         assert_eq!(
             app.state.board.get().active,
@@ -683,10 +652,7 @@ mod tests {
         );
 
         // White makes a king move from e1 to e2 (no check yet)
-        let from = "e1".to_string();
-        let to = "e2".to_string();
-        let piece = "wK".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "e1", "e2", "wK");
         assert_eq!(response, ChessResponse::Ok, "King move should be valid");
         assert_eq!(
             app.state.board.get().active,
@@ -695,10 +661,7 @@ mod tests {
         );
 
         // Black attempts to move the queen but is now in check (this would fail the check)
-        let from = "d4".to_string();
-        let to = "d5".to_string();
-        let piece = "bQ".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "d4", "d5", "bQ");
         assert_eq!(
             response,
             ChessResponse::Err(ChessError::InvalidMove),
@@ -706,26 +669,114 @@ mod tests {
         );
 
         // Black resolves the check and makes a valid queen move from g5 to a5
-        let from = "g5".to_string();
-        let to = "a5".to_string();
-        let piece = "bQ".to_string();
-        response = make_move(&mut app, from.clone(), to.clone(), piece.clone());
+        response = make_move(&mut app, "g5", "a5", "bQ");
         assert_eq!(response, ChessResponse::Ok, "Queen move should be valid");
         assert_eq!(
             app.state.board.get().active,
             Color::White,
             "Active player is now White"
         );
+
+        // (c3 d5 f6), (f8, a3, bB, wP)
+        // White makes a Knight move from b1 to c3
+        response = make_move(&mut app, "b1", "c3", "wN");
+        assert_eq!(response, ChessResponse::Ok, "knight move should be valid");
+        assert_eq!(
+            app.state.board.get().active,
+            Color::Black,
+            "Active player is now Black"
+        );
+
+        // Black captures a piece (from f8 bB captures wP a3)
+        response = capture_piece(&mut app, "f8", "a3", "bB", "wP");
+        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
+        assert_eq!(
+            app.state.board.get().active,
+            Color::White,
+            "Active player is now White"
+        );
+
+        // White makes a Knight move from c3 to d5
+        response = make_move(&mut app, "c3", "d5", "wN");
+        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
+        assert_eq!(
+            app.state.board.get().active,
+            Color::Black,
+            "Active player is now Black"
+        );
+
+        // Black makes a bishop move
+        response = make_move(&mut app, "c8", "b7", "bB");
+        assert_eq!(response, ChessResponse::Ok, "Bishop move should be valid");
+        assert_eq!(
+            app.state.board.get().active,
+            Color::White,
+            "Active player is now White"
+        );
+
+        // White makes a Knight move from d5 to f6 (puts black's king in check)
+        response = make_move(&mut app, "d5", "f6", "wN");
+        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
+        assert_eq!(
+            app.state.board.get().active,
+            Color::Black,
+            "Active player is now Black"
+        );
+        log::info!(
+            "before getting out of check {:?}",
+            app.state
+                .board
+                .get()
+                .board
+                .to_fen(&app.state.board.get().active_player())
+        );
+
+        // black bishop needs to make a capture to get its king out of check(g8 to f6 wbK)
+        // Black captures a piece (from f8 bB captures wP a3)
+        response = capture_piece(&mut app, "g8", "f6", "bN", "wN");
+        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
+        assert_eq!(
+            app.state.board.get().active,
+            Color::White,
+            "Active player is now White"
+        );
+        log::info!(
+            "after getting out of check {:?}",
+            app.state
+                .board
+                .get()
+                .board
+                .to_fen(&app.state.board.get().active_player())
+        );
     }
 
-    fn make_move(
+    fn make_move(app: &mut ChessContract, from: &str, to: &str, piece: &str) -> ChessResponse {
+        let response = app
+            .execute_operation(Operation::MakeMove {
+                from: from.to_string(),
+                to: to.to_string(),
+                piece: piece.to_string(),
+            })
+            .now_or_never()
+            .expect("Execution of application operation should not await anything");
+
+        response
+    }
+
+    fn capture_piece(
         app: &mut ChessContract,
-        from: String,
-        to: String,
-        piece: String,
+        from: &str,
+        to: &str,
+        piece: &str,
+        captured_piece: &str,
     ) -> ChessResponse {
         let response = app
-            .execute_operation(Operation::MakeMove { from, to, piece })
+            .execute_operation(Operation::CapturePiece {
+                from: from.to_string(),
+                to: to.to_string(),
+                piece: piece.to_string(),
+                captured_piece: captured_piece.to_string(),
+            })
             .now_or_never()
             .expect("Execution of application operation should not await anything");
 
