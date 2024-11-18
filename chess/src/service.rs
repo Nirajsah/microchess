@@ -64,7 +64,11 @@ impl ChessService {
     async fn game_data(&self, player: Owner) -> GameData {
         let game = self.state.board.get();
         let game_data = GameData {
-            board: game.board.to_fen(&game.active_player()),
+            board: game.board.to_fen(
+                &game.active_player(),
+                &game.halfmove_clock,
+                &game.fullmove_count,
+            ),
             player_turn: game.active, // (todo!, to be removed)
             player: self.state.owners.get(&player).await.unwrap().unwrap(),
             moves: game.moves.clone(),

@@ -112,6 +112,15 @@ pub enum Operation {
 //     pub start_time: TimeDelta,
 //
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub enum Message {
+    Start {
+        players: [PublicKey; 2],
+        /// Represents the total amount of time for each player
+        timer: TimeDelta,
+    },
+}
+
 /// The IDs of a temporary chain for a single game.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject)]
 pub struct GameChain {
@@ -175,7 +184,6 @@ pub type Bitboard = u64;
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
 pub struct Clock {
     pub time_left: [TimeDelta; 2],
-    pub increment: TimeDelta,
     pub current_turn_start: Timestamp,
     pub block_delay: TimeDelta,
 }
@@ -186,7 +194,7 @@ impl Clock {
         let total_time = TimeDelta::from_secs(900); // 15 mins
         Self {
             time_left: [total_time, total_time],
-            increment: arg.increment,
+            // increment: arg.increment, // todo!(increment is not required at the moment)
             current_turn_start: block_time,
             block_delay: arg.block_delay,
         }
@@ -280,6 +288,8 @@ pub struct Game {
     pub position_count: HashMap<u64, u32>,
     /// 50-Move Rule Counter
     pub halfmove_clock: u32,
+    // represents full moves(increments when black makes a move)
+    pub fullmove_count: u32,
 }
 
 impl Game {
@@ -294,6 +304,7 @@ impl Game {
             current_hash: self.compute_zobrist_hash(),
             position_count: HashMap::new(),
             halfmove_clock: 0,
+            fullmove_count: 1,
         }
     }
 
@@ -308,6 +319,7 @@ impl Game {
             current_hash: self.compute_zobrist_hash(),
             position_count: HashMap::new(),
             halfmove_clock: 0,
+            fullmove_count: 1,
         }
     }
 
@@ -399,6 +411,11 @@ impl Game {
     /// A function to switch player turn
     pub fn switch_player_turn(&mut self) {
         self.active = self.active.opposite();
+
+        if self.active == Color::Black {
+            self.fullmove_count += 1
+        }
+
         update_side_hash(self.active, &mut self.current_hash);
     }
 
@@ -429,7 +446,7 @@ impl Game {
                         update_castle_hash(self.board.castling_rights, &mut self.current_hash);
                     }
 
-                    // update halfmove_clock based on piece
+                    // update halfmove_clock based on piece(halfmove_clock's reset is done whenever pawn moves or a piece is captured)
                     if piece == Piece::WhitePawn || piece == Piece::BlackPawn {
                         self.reset_halfmove_clock();
                     } else {

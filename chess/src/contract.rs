@@ -12,12 +12,12 @@ use chess::{
     square::Square,
     zobrist::PIECE_KEYS,
     CastleType, ChessError, ChessResponse, Clock, Game, GameChain, GameState,
-    InstantiationArgument, MoveType, Operation, PlayerStats,
+    InstantiationArgument, Message, MoveType, Operation, PlayerStats,
 };
 use linera_sdk::{
     base::{
-        Account, Amount, ApplicationId, ApplicationPermissions, ChainId, Destination, Owner,
-        PublicKey, TimeDelta, WithContractAbi,
+        Account, Amount, ApplicationId, ApplicationPermissions, ChainId, ChainOwnership,
+        Destination, Owner, PublicKey, TimeDelta, TimeoutConfig, WithContractAbi,
     },
     util::BlockingWait,
     views::{RootView, View},
@@ -38,7 +38,7 @@ impl WithContractAbi for ChessContract {
 }
 
 impl Contract for ChessContract {
-    type Message = ();
+    type Message = Message;
     type Parameters = ();
     type InstantiationArgument = InstantiationArgument;
 
@@ -108,10 +108,13 @@ impl Contract for ChessContract {
                     .await
                     .expect("Failed to get active player")
                     .expect("Active player not found");
-                //assert_eq!(
-                //    active_player, active,
-                //    "Only the active player can make a move."
-                //);
+
+                if !cfg!(test) {
+                    assert_eq!(
+                        active_player, active,
+                        "Only the active player can make a move."
+                    );
+                }
 
                 if piece.starts_with("w")
                     && active_player != Color::White
@@ -180,10 +183,13 @@ impl Contract for ChessContract {
                     .await
                     .expect("Failed to get active player")
                     .expect("Active player not found");
-                //assert_eq!(
-                //    active_player, active,
-                //    "Only the active player can make a move."
-                //);
+
+                if !cfg!(test) {
+                    assert_eq!(
+                        active_player, active,
+                        "Only the active player can make a move."
+                    );
+                }
 
                 // Early return if the piece is not owned by the active player
                 if piece.starts_with("w") && active_player != Color::White {
@@ -361,10 +367,13 @@ impl Contract for ChessContract {
                     .await
                     .expect("Failed to get active player")
                     .expect("Active player not found");
-                assert_eq!(
-                    active_player, active,
-                    "Only the active player can make a move."
-                );
+
+                if !cfg!(test) {
+                    assert_eq!(
+                        active_player, active,
+                        "Only the active player can make a move."
+                    );
+                }
 
                 self.handle_winner().await;
 
@@ -408,40 +417,44 @@ impl ChessContract {
     /// Start a new game on new chain, requires two players and the amount to cover the chain fees
     /// (Todo!) Add the ability to bet on the game, requires optional betting amount
     pub async fn start_game(
-        &self,
+        &mut self,
         players: [PublicKey; 2],
         amount: Amount,
         match_time: TimeDelta,
     ) -> ChessResponse {
-        // assert_eq!(self.runtime.chain_id(), self.main_chain_id());
-        // let ownership = ChainOwnership::multiple(
-        //     [(players[0], 100), (players[1], 100)],
-        //     100,
-        //     TimeoutConfig::default(),
-        // );
-        // let app_id = self.runtime.application_id();
-        // let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
-        // let (message_id, chain_id) = self.runtime.open_chain(ownership, permissions, fee_budget);
-        // for public_key in &players {
-        //     self.state
-        //         .game_chains
-        //         .get_mut_or_default(public_key)
-        //         .await
-        //         .unwrap()
-        //         .insert(GameChain {
-        //             message_id,
-        //             chain_id,
-        //         });
-        // }
-        // self.runtime.send_message(
-        //     chain_id,
-        //     Message::Start {
-        //         players,
-        //         board_size,
-        //         timeouts: timeouts.unwrap_or_else(|| self.state.timeouts.get().clone()),
-        //     },
-        // );
+        assert_eq!(self.runtime.chain_id(), self.main_chain_id());
+        let ownership = ChainOwnership::multiple(
+            [(players[0], 100), (players[1], 100)],
+            100,
+            TimeoutConfig::default(),
+        );
+        let app_id = self.runtime.application_id();
+        let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
+        let (message_id, chain_id) = self.runtime.open_chain(ownership, permissions, amount);
+        for public_key in &players {
+            self.state
+                .game_chains
+                .get_mut_or_default(public_key)
+                .await
+                .unwrap()
+                .insert(GameChain {
+                    message_id,
+                    chain_id,
+                });
+        }
+        self.runtime.send_message(
+            chain_id,
+            Message::Start {
+                players,
+                timer: match_time,
+            },
+        );
         ChessResponse::Ok
+    }
+
+    /// Returns creator chain_id
+    pub fn main_chain_id(&mut self) -> ChainId {
+        self.runtime.application_creator_chain_id()
     }
 
     /// Handles the winner stats, when a match is over, this function is called to update the
@@ -722,13 +735,16 @@ mod tests {
             Color::Black,
             "Active player is now Black"
         );
+
+        let game_data = app.state.board.get();
+
         log::info!(
             "before getting out of check {:?}",
-            app.state
-                .board
-                .get()
-                .board
-                .to_fen(&app.state.board.get().active_player())
+            app.state.board.get().board.to_fen(
+                &game_data.active_player(),
+                &game_data.halfmove_clock,
+                &game_data.fullmove_count
+            )
         );
 
         // black bishop needs to make a capture to get its king out of check(g8 to f6 wbK)
@@ -740,13 +756,16 @@ mod tests {
             Color::White,
             "Active player is now White"
         );
+
+        let game_data = app.state.board.get();
+
         log::info!(
             "after getting out of check {:?}",
-            app.state
-                .board
-                .get()
-                .board
-                .to_fen(&app.state.board.get().active_player())
+            app.state.board.get().board.to_fen(
+                &game_data.active_player(),
+                &game_data.halfmove_clock,
+                &game_data.fullmove_count
+            )
         );
     }
 

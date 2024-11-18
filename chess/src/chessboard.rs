@@ -464,14 +464,19 @@ impl ChessBoard {
     }
 
     ///A function to generate FEN string using bitboard
-    pub fn to_fen(&self, active_player: &Color) -> String {
+    pub fn to_fen(
+        &self,
+        active_player: &Color,
+        halfmove_count: &u32,
+        fullmove_count: &u32,
+    ) -> String {
         let bitboards = [
             self.wP, self.wN, self.wB, self.wR, self.wQ, self.wK, self.bP, self.bN, self.bB,
             self.bR, self.bQ, self.bK,
         ];
         let pieces = ['P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'];
 
-        let mut fen = String::new();
+        let mut fen = String::with_capacity(100);
 
         for rank in (0..8).rev() {
             // Iterate over ranks 7 to 0
@@ -558,7 +563,13 @@ impl ChessBoard {
             fen.push_str(" -");
         }
 
-        fen.push_str(" 0 1");
+        fen.push_str(" "); // just to have a whitespace
+
+        fen.push_str(&halfmove_count.to_string());
+
+        fen.push_str(" "); // just to have a whitespace
+
+        fen.push_str(&fullmove_count.to_string());
 
         if self.in_check(Color::White) {
             fen.push_str(";wK");
