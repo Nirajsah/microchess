@@ -5,7 +5,7 @@ on:
     branches:
       - main
   pull_request:
-  workflow_dispatch: 
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,14 +18,28 @@ jobs:
       matrix:
         toolchain:
           - stable
+
     steps:
-      - uses: actions/checkout@v3
-      - run: rustup target add wasm32-unknown-unknown
-      - run: rustup toolchain install nightly --allow-downgrade -c rustfmt
-      - run: rustup component add rustfmt
-      - run: rustup component add rustfmt --toolchain nightly
-      - run: git clone https://github.com/linera-io/linera-protocol.git ../linera-protocol
-      - run: cd ../linera-protocol; git checkout -t origin/testnet_archimedes
-      - run: cargo install --locked --path linera-storage-service
-      - run: cargo install --locked --path linera-service --features storage-service
-      - run: cargo fmt --all -- --check
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Rust toolchain and components
+        run: |
+          rustup target add wasm32-unknown-unknown
+          rustup toolchain install nightly --allow-downgrade -c rustfmt
+          rustup component add rustfmt
+          rustup component add rustfmt --toolchain nightly
+
+      - name: Install Linera dependencies
+        run: |
+          git clone https://github.com/linera-io/linera-protocol.git ../linera-protocol
+          cd ../linera-protocol
+          git checkout -t origin/testnet_archimedes
+          cargo install --locked --path linera-storage-service
+          cargo install --locked --path linera-service --features storage-service
+
+      - name: Run MicroChess tests
+        run: |
+          cd chess
+          cargo test --verbose
+
