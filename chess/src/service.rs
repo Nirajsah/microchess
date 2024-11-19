@@ -63,7 +63,7 @@ struct GameData {
 impl ChessService {
     async fn game_data(&self, player: Owner) -> GameData {
         let game = self.state.board.get();
-        let game_data = GameData {
+        GameData {
             board: game.board.to_fen(
                 &game.active_player(),
                 &game.halfmove_clock,
@@ -74,8 +74,7 @@ impl ChessService {
             moves: game.moves.clone(),
             opponent: self.state.opponent(player).unwrap(),
             game_state: game.state,
-        };
-        game_data
+        }
     }
     async fn captured_pieces(&self) -> &Vec<Piece> {
         &self.state.board.get().captured_pieces

@@ -23,7 +23,6 @@ use linera_sdk::{
     views::{RootView, View},
     Contract, ContractRuntime,
 };
-use log;
 
 #[allow(dead_code)]
 pub struct ChessContract {
@@ -81,10 +80,10 @@ impl Contract for ChessContract {
                     // let game = self.state.board.get().with_fen("8/7P/7P/8/8/8/8/7r w - - 0 1");
                     self.state.add_player(player);
                     self.state.board.set(game);
-                    return ChessResponse::Ok;
+                    ChessResponse::Ok
                 } else {
                     self.state.add_player(player);
-                    return ChessResponse::Ok;
+                    ChessResponse::Ok
                 }
             }
 
@@ -292,10 +291,8 @@ impl Contract for ChessContract {
                     if from_sq.rank() != 7 {
                         return ChessResponse::Err(ChessError::InvalidPromotion);
                     }
-                } else if piece == Piece::BlackPawn {
-                    if from_sq.rank() != 2 {
-                        return ChessResponse::Err(ChessError::InvalidPromotion);
-                    }
+                } else if piece == Piece::BlackPawn && from_sq.rank() != 2 {
+                    return ChessResponse::Err(ChessError::InvalidPromotion);
                 }
 
                 let block_time = self.runtime.system_time();
@@ -378,7 +375,7 @@ impl Contract for ChessContract {
                 self.handle_winner().await;
 
                 self.state.board.get_mut().state = GameState::Resign;
-                return ChessResponse::Ok;
+                ChessResponse::Ok
             }
             Operation::StartGame {
                 players,
@@ -398,19 +395,11 @@ impl Contract for ChessContract {
 impl ChessContract {
     pub fn is_game_over(&self) -> ChessResponse {
         match self.state.board.get().state {
-            GameState::Checkmate => {
-                return ChessResponse::Err(ChessError::InvalidRequest);
-            }
-            GameState::Stalemate => {
-                return ChessResponse::Err(ChessError::InvalidRequest);
-            }
-            GameState::Draw => {
-                return ChessResponse::Err(ChessError::InvalidRequest);
-            }
-            GameState::InPlay => {
-                return ChessResponse::Ok;
-            }
-            GameState::Resign => return ChessResponse::Err(ChessError::InvalidRequest),
+            GameState::Checkmate => ChessResponse::Err(ChessError::InvalidRequest),
+            GameState::Stalemate => ChessResponse::Err(ChessError::InvalidRequest),
+            GameState::Draw => ChessResponse::Err(ChessError::InvalidRequest),
+            GameState::InPlay => ChessResponse::Ok,
+            GameState::Resign => ChessResponse::Err(ChessError::InvalidRequest),
         }
     }
 

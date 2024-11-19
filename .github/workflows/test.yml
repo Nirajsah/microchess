@@ -38,3 +38,15 @@ jobs:
     - name: Run chess tests
       working-directory: ./chess
       run: cargo test --verbose
+      
+    - name: Check formatting
+      working-directory: ./chess
+      run: |
+        rustup component add rustfmt
+        cargo fmt -- --check       
+
+    - name: Run clippy
+      working-directory: ./chess
+      run: |
+        rustup component add clippy
+        cargo clippy -- -D warnings

@@ -88,7 +88,7 @@ impl Color {
         }
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn convert_to_string(&self) -> String {
         match self {
             Color::White => "white".to_string(),
             Color::Black => "black".to_string(),

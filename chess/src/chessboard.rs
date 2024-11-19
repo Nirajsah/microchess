@@ -124,12 +124,9 @@ impl ChessBoard {
         // Parse en passant
         if *en_passant != "-" {
             let en_passant_square = match en_passant.chars().nth(0) {
-                Some(file) => match en_passant.chars().nth(1) {
-                    Some(rank) => Some(
-                        (rank.to_digit(10).unwrap() as u64 - 1) * 8 + (file as u64 - 'a' as u64),
-                    ),
-                    None => None,
-                },
+                Some(file) => en_passant.chars().nth(1).map(|rank| {
+                    (rank.to_digit(10).unwrap() as u64 - 1) * 8 + (file as u64 - 'a' as u64)
+                }),
                 None => None,
             };
             if let Some(square) = en_passant_square {
@@ -512,15 +509,23 @@ impl ChessBoard {
             }
         }
 
-        fen.push_str(" "); // just to have a whitespace
+        fen.push(' '); // just to have a whitespace
 
-        fen.push_str(
-            &active_player
-                .to_string()
+        //fen.push_str(
+        //    &active_player
+        //        .to_string()
+        //        .chars()
+        //        .next()
+        //        .unwrap_or_default()
+        //        .to_string(),
+        //);
+
+        fen.push(
+            active_player
+                .convert_to_string()
                 .chars()
                 .next()
-                .unwrap_or_default()
-                .to_string(),
+                .unwrap_or_default(),
         );
 
         // Add placeholder values for the rest of the FEN string
@@ -557,17 +562,17 @@ impl ChessBoard {
         if self.en_passant != 0 {
             let en_passant_square = self.en_passant.trailing_zeros();
             let square = Square::usize_to_string(en_passant_square as usize);
-            fen.push_str(" "); // just to have a whitespace
+            fen.push(' '); // just to have a whitespace
             fen.push_str(&square);
         } else {
             fen.push_str(" -");
         }
 
-        fen.push_str(" "); // just to have a whitespace
+        fen.push(' '); // just to have a whitespace
 
         fen.push_str(&halfmove_count.to_string());
 
-        fen.push_str(" "); // just to have a whitespace
+        fen.push(' '); // just to have a whitespace
 
         fen.push_str(&fullmove_count.to_string());
 
@@ -650,7 +655,7 @@ impl ChessBoard {
 
     /// Caputures a piece on the board
     pub fn capture_piece(&mut self, to: Square, piece: &Piece) -> Result<()> {
-        let c_board = self.get_mut_board(&piece);
+        let c_board = self.get_mut_board(piece);
         if *c_board & (1u64 << to as usize) == 0 {
             return Err(ChessError::InvalidPiece);
         }
@@ -694,7 +699,7 @@ impl ChessBoard {
     /// Moves a piece on the board, while checking if the king is in check
     pub fn move_piece(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
         let color = piece.color();
-        let board = self.get_board(&piece);
+        let board = self.get_board(piece);
 
         // Check if the piece is at the 'from' square
         if *board & (1u64 << from as usize) == 0 {
@@ -703,23 +708,23 @@ impl ChessBoard {
 
         // if the player is already in_check, does making the move get king out of check?, if not don't move.
         if self.in_check(color) {
-            Self::clear(from, self.get_mut_board(&piece));
-            Self::set(to, self.get_mut_board(&piece));
+            Self::clear(from, self.get_mut_board(piece));
+            Self::set(to, self.get_mut_board(piece));
             if self.in_check(color) {
-                Self::clear(to, self.get_mut_board(&piece));
-                Self::set(from, self.get_mut_board(&piece));
+                Self::clear(to, self.get_mut_board(piece));
+                Self::set(from, self.get_mut_board(piece));
                 return Err(ChessError::InvalidMove);
             }
         }
 
         // if the player is not in_check, remove the piece and check if the player is in_check, if not set the piece at new square.
         if !self.in_check(color) {
-            Self::clear(from, self.get_mut_board(&piece));
+            Self::clear(from, self.get_mut_board(piece));
             if self.in_check(color) {
-                Self::set(from, self.get_mut_board(&piece));
+                Self::set(from, self.get_mut_board(piece));
                 return Err(ChessError::InvalidMove);
             }
-            Self::set(to, self.get_mut_board(&piece));
+            Self::set(to, self.get_mut_board(piece));
         }
 
         // reset the enpassant square at the end of a move. if the move was not an en_passant
@@ -735,7 +740,7 @@ impl ChessBoard {
 
     /// Moves a white pawn
     pub fn wP_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
-        let sq = from as usize + 8 as usize;
+        let sq = from as usize + 8_usize;
         if to as usize == from as usize + 16 {
             // Ensure the square directly in front is unoccupied
             if self.all_pieces() & (1u64 << sq) != 0 {
@@ -751,7 +756,7 @@ impl ChessBoard {
 
     /// Moves a black pawn
     pub fn bP_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
-        let sq = from as usize - 8 as usize;
+        let sq = from as usize - 8_usize;
         if to as usize == from as usize - 16 {
             // Ensure the square directly in front is unoccupied
             if self.all_pieces() & (1u64 << sq) != 0 {
@@ -838,15 +843,15 @@ impl ChessBoard {
 
         // Calculate the captured pawn's square (it is behind the en passant target square)
         let captured_square = if color == Color::White {
-            to as usize - 8 as usize // White pawns move "up" the board, so capture square is "down"
+            to as usize - 8_usize // White pawns move "up" the board, so capture square is "down"
         } else {
-            to as usize + 8 as usize // Black pawns move "down" the board, so capture square is "up"
+            to as usize + 8_usize // Black pawns move "down" the board, so capture square is "up"
         };
 
         self.capture_piece(Square::usize_to_square(captured_square), &en_piece)
             .and_then(|_| {
                 self.move_piece(from, to, piece)
-                    .and_then(|_| Ok(self.reset_enpassant()))
+                    .map(|_| self.reset_enpassant())
             })
     }
 
@@ -967,13 +972,13 @@ impl ChessBoard {
                 if self.white_attack_mask() & (1u64 << sq as usize) == 0 {
                     return false;
                 }
-                return true;
+                true
             }
             Color::Black => {
                 if self.black_attack_mask() & (1u64 << sq as usize) == 0 {
                     return false;
                 }
-                return true;
+                true
             }
         }
     }
@@ -997,7 +1002,7 @@ impl ChessBoard {
                     self.move_piece(Square::H1, Square::F1, &Piece::WhiteRook)
                 })
         } else {
-            return Err(ChessError::InvalidCastle);
+            Err(ChessError::InvalidCastle)
         }
     }
 
@@ -1020,7 +1025,7 @@ impl ChessBoard {
                     self.move_piece(Square::A1, Square::D1, &Piece::WhiteRook)
                 })
         } else {
-            return Err(ChessError::InvalidCastle);
+            Err(ChessError::InvalidCastle)
         }
     }
 
@@ -1089,7 +1094,7 @@ impl ChessBoard {
         let mut knights = self.wN;
         while knights != 0 {
             let knight_pos = knights.trailing_zeros() as usize;
-            attacks |= KNIGHT_MOVES[knight_pos as usize];
+            attacks |= KNIGHT_MOVES[knight_pos];
             knights &= knights - 1; // Remove the LSB
         }
 
@@ -1097,7 +1102,7 @@ impl ChessBoard {
         let mut kings = self.wK;
         while kings != 0 {
             let king_pos = kings.trailing_zeros() as usize;
-            attacks |= KING_MOVES[king_pos as usize];
+            attacks |= KING_MOVES[king_pos];
             kings &= kings - 1; // Remove the LSB
         }
 
@@ -1143,7 +1148,7 @@ impl ChessBoard {
         let mut knights = self.bN;
         while knights != 0 {
             let knight_pos = knights.trailing_zeros() as usize;
-            attacks |= KNIGHT_MOVES[knight_pos as usize];
+            attacks |= KNIGHT_MOVES[knight_pos];
             knights &= knights - 1; // Remove the LSB
         }
 
@@ -1151,7 +1156,7 @@ impl ChessBoard {
         let mut kings = self.bK;
         while kings != 0 {
             let king_pos = kings.trailing_zeros() as usize;
-            attacks |= KING_MOVES[king_pos as usize];
+            attacks |= KING_MOVES[king_pos];
             kings &= kings - 1; // Remove the LSB
         }
 

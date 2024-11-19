@@ -329,10 +329,7 @@ impl Game {
 
         // XOR piece positions
         for square in 0..64 {
-            if let Some(piece) = self
-                .board
-                .get_piece_at(Square::usize_to_square(square as usize))
-            {
+            if let Some(piece) = self.board.get_piece_at(Square::usize_to_square(square)) {
                 hash ^= PIECE_KEYS[square][piece.index()];
             }
         }
@@ -458,7 +455,7 @@ impl Game {
 
                     Ok(())
                 }
-                Err(e) => return Err(e),
+                Err(e) => Err(e),
             },
             MoveType::Capture(Piece) => match self.capture_piece(from, to, piece, Piece) {
                 Ok(_) => {
@@ -476,7 +473,7 @@ impl Game {
                     self.reset_halfmove_clock();
                     Ok(())
                 }
-                Err(e) => return Err(e),
+                Err(e) => Err(e),
             },
             MoveType::Castle(CastleType::KingSide) => {
                 match self.castle(&piece, CastleType::KingSide) {
@@ -486,7 +483,7 @@ impl Game {
                         self.update_halfmove_clock();
                         Ok(())
                     }
-                    Err(e) => return Err(e),
+                    Err(e) => Err(e),
                 }
             }
             MoveType::Castle(CastleType::QueenSide) => {
@@ -497,7 +494,7 @@ impl Game {
                         self.update_halfmove_clock();
                         Ok(())
                     }
-                    Err(e) => return Err(e),
+                    Err(e) => Err(e),
                 }
             }
             MoveType::EnPassant => match self.board.en_passant_capture(from, to, &piece) {
@@ -508,7 +505,7 @@ impl Game {
                     Ok(())
                 }
 
-                Err(e) => return Err(e),
+                Err(e) => Err(e),
             },
             MoveType::Promotion(Piece) => {
                 update_piece_hash(from, piece, &mut self.current_hash);
@@ -634,11 +631,9 @@ impl Game {
         };
 
         // if not in check return false
-        if !self.board.in_check(color) {
-            if self.is_stalemate(pieces) {
-                self.state = GameState::Stalemate;
-                return false;
-            }
+        if !self.board.in_check(color) && self.is_stalemate(pieces) {
+            self.state = GameState::Stalemate;
+            return false;
         }
 
         // Try all possible moves for all pieces of the current player

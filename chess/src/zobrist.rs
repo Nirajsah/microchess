@@ -8,26 +8,24 @@ use lazy_static::lazy_static;
 lazy_static! {
     pub static ref PIECE_KEYS: [[u64; 12]; 64] = {
         let mut t = [[0; 12]; 64];
-        for i in 0..64 {
-            let mut p = 0;
-            while p < 12 {
-                t[i][p] = get_random_u64();
-                p += 1;
+        for row in t.iter_mut() {
+            for p in row.iter_mut() {
+                *p = get_random_u64();
             }
         }
         t
     };
     pub static ref EP_KEYS: [u64; 64] = {
         let mut t = [0; 64];
-        for i in 0..64 {
-            t[i] = get_random_u64();
+        for i in t.iter_mut() {
+            *i = get_random_u64();
         }
         t
     };
     pub static ref CASTLE_KEYS: [u64; 4] = {
         let mut t = [0; 4];
-        for i in 0..4 {
-            t[i] = get_random_u64();
+        for i in t.iter_mut() {
+            *i = get_random_u64();
         }
         t
     };

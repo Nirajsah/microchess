@@ -1,10 +1,8 @@
-# Stella
+# MicroChess
 
-**Decentralized Games: Play Fair, Play Secure, Play On-Chain.**
+[![Tests](https://github.com/Nirajsah/microchess/actions/workflows/test.yml/badge.svg)](https://github.com/Nirajsah/microchess/actions)
 
-Welcome to the Decentralized Games Platform, a cutting-edge project that merges classic board games with the innovation of blockchain technology. Built on Linera’s Layer 1 architecture, our platform provides a secure, transparent, and engaging environment for game enthusiasts to enjoy on-chain gameplay.
-
-Currently, you can enjoy:
+Welcome to the MicroChess, a cutting-edge project that merges classic chess game with the innovation of blockchain technology. Built on Linera’s Layer 1 architecture, our platform provides a secure, transparent, and engaging environment for chess enthusiasts to enjoy on-chain gameplay.
 
 - **MicroChess:** Play classic chess in a decentralized and secure environment.
 
