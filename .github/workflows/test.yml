@@ -1,45 +1,40 @@
-name: MicroChess Test
+name: chess contract test
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
-  workflow_dispatch:
+    branches: [ "main" ]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build_and_test:
-    name: MicroChess
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        toolchain:
-          - stable
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain and components
-        run: |
-          rustup target add wasm32-unknown-unknown
-          rustup toolchain install nightly --allow-downgrade -c rustfmt
-          rustup component add rustfmt
-          rustup component add rustfmt --toolchain nightly
+    - name: Install Protocol Buffers Compiler
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y protobuf-compiler
+    
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
 
-      - name: Install Linera dependencies
-        run: |
-          git clone https://github.com/linera-io/linera-protocol.git ../linera-protocol
-          cd ../linera-protocol
-          git checkout -t origin/testnet_archimedes
-          cargo install --locked --path linera-storage-service
-          cargo install --locked --path linera-service --features storage-service
+    - name: Add WebAssembly target
+      run: rustup target add wasm32-unknown-unknown   
 
-      - name: Run MicroChess tests
-        run: |
-          cd chess
-          cargo test --verbose
-
+    - name: Build chess project
+      working-directory: ./chess
+      run: cargo build --release --target wasm32-unknown-unknown
+      
+    - name: Run chess tests
+      working-directory: ./chess
+      run: cargo test --verbose

@@ -739,7 +739,7 @@ mod tests {
         let game_data = app.state.board.get();
 
         log::info!(
-            "before getting out of check {:?}",
+            "black king before check {:?}",
             app.state.board.get().board.to_fen(
                 &game_data.active_player(),
                 &game_data.halfmove_clock,
@@ -760,7 +760,7 @@ mod tests {
         let game_data = app.state.board.get();
 
         log::info!(
-            "after getting out of check {:?}",
+            "black moved and king is out of check now {:?}",
             app.state.board.get().board.to_fen(
                 &game_data.active_player(),
                 &game_data.halfmove_clock,

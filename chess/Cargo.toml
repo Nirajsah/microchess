@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 async-graphql = { version = "=7.0.2", default-features = false }
 async-graphql-derive = { version = "=7.0.2", default-features = false }
-linera-sdk = { path = "../../linera-protocol/linera-sdk/", default-features = false }
+linera-sdk = { version = "0.13.1", default-features = false }
 serde = { version = "1.0.203", features = ["derive"] }
 log = "0.4.22"
 lazy_static = "1.5.0"
@@ -17,10 +17,10 @@ rust-analyzer = "0.0.1"
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-linera-sdk = { path = "../../linera-protocol/linera-sdk/", default-features = false, features = ["test"]}
+linera-sdk = { version = "0.13.1", default-features = false, features = ["test"]}
 
 [dev-dependencies]
-linera-sdk = { path = "../../linera-protocol/linera-sdk/", default-features = false, features = ["test"]}
+linera-sdk = { version = "0.13.1", default-features = false, features = ["test"]}
 env_logger = "0.11.5"
 
 [[bin]]

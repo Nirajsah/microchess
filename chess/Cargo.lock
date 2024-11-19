@@ -1954,6 +1954,8 @@ checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
 [[package]]
 name = "linera-base"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbb971ad3098f29bb37530e59165b87a13dc74bfa79e16f0e2ff3da026e651d4"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1991,6 +1993,8 @@ dependencies = [
 [[package]]
 name = "linera-chain"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33b816f0b9edf7f15f0735f7548100efe332d3cc4f095557ad9051be0039e11e"
 dependencies = [
  "async-graphql",
  "async-trait",
@@ -2012,6 +2016,8 @@ dependencies = [
 [[package]]
 name = "linera-core"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7a0917a728fa26f75cfce26b6492e03f579759026744269b1d5268dbed59898"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2047,6 +2053,8 @@ dependencies = [
 [[package]]
 name = "linera-execution"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a02451128cf23957e9b254d0b4f4429c31b3603ad80f8e143cd35ca7feff6eb4"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2085,6 +2093,8 @@ dependencies = [
 [[package]]
 name = "linera-sdk"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c62dd73c25116884f4b541a09c1405b66f0e511957f9484349e187a3ccb221a0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2114,6 +2124,8 @@ dependencies = [
 [[package]]
 name = "linera-sdk-derive"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce3d1ad7f819f04ff7f34b7db40584687fccd802ac1c97f6860473fbe434f5df"
 dependencies = [
  "convert_case",
  "proc-macro2",
@@ -2123,6 +2135,8 @@ dependencies = [
 [[package]]
 name = "linera-storage"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "887b2198a912c26d93ff289e43b585b6c03560b2a6bbaf86c262a1fe90a61727"
 dependencies = [
  "async-trait",
  "bcs",
@@ -2140,6 +2154,8 @@ dependencies = [
 [[package]]
 name = "linera-storage-service"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c042b525bde9dedf7bf62332f12859c4bb96e0862e1cc8d5bfe706dfb14dedd2"
 dependencies = [
  "anyhow",
  "async-lock",
@@ -2162,6 +2178,8 @@ dependencies = [
 [[package]]
 name = "linera-version"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8ad4676aab8a52f6fecc469a1776cc1e9b16a2a94f1d8438b93ae1ddefddcff"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2182,6 +2200,8 @@ dependencies = [
 [[package]]
 name = "linera-views"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5aaafee07481aed9686fa832155956fd1b81260e2ed9bfb133eab814226b4f2c"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2213,6 +2233,8 @@ dependencies = [
 [[package]]
 name = "linera-views-derive"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56b1a72a87909f04dca6b18c1a95f14b1bb803d9b7052298de74db2982581c92"
 dependencies = [
  "cfg_aliases",
  "proc-macro2",
@@ -2348,6 +2370,8 @@ dependencies = [
 [[package]]
 name = "linera-witty"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cc51610b5670720d192d8bfd56ec0d743ef3d3ca76ca8f058679f8ec7a6026d"
 dependencies = [
  "anyhow",
  "cfg_aliases",
@@ -2363,6 +2387,8 @@ dependencies = [
 [[package]]
 name = "linera-witty-macros"
 version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8fa0b8205ad55ba1a9132534bd479ea3a77e22ab5bd6dbbf8b70d7de566625c"
 dependencies = [
  "cfg_aliases",
  "heck 0.4.1",
