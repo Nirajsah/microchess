@@ -24,6 +24,7 @@ use zobrist::{
     CASTLE_KEYS, EP_KEYS, PIECE_KEYS,
 };
 pub mod magic;
+pub mod playerprofile;
 pub mod prng;
 pub mod zobrist;
 

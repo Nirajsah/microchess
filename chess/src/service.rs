@@ -2,17 +2,17 @@
 
 mod state;
 
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use self::state::Chess;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use chess::{
     piece::{Color, Piece},
-    Clock, GameState, Move, Operation, PlayerStats, PlayerTime,
+    Clock, GameChain, GameState, Move, Operation, PlayerStats, PlayerTime,
 };
 
 use linera_sdk::{
-    base::{Owner, WithServiceAbi},
+    base::{Owner, PublicKey, WithServiceAbi},
     graphql::GraphQLMutationRoot,
     views::View,
     Service, ServiceRuntime,
@@ -87,5 +87,13 @@ impl ChessService {
     }
     async fn get_leaderboard(&self) -> Vec<PlayerStats> {
         self.state.get_leaderboard()
+    }
+    async fn get_game_chain(&self, pub_key: PublicKey) -> BTreeSet<GameChain> {
+        self.state
+            .game_chains
+            .get(&pub_key)
+            .await
+            .expect("pub_key is not present")
+            .expect("error getting the game_chains")
     }
 }

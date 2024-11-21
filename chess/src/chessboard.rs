@@ -511,15 +511,6 @@ impl ChessBoard {
 
         fen.push(' '); // just to have a whitespace
 
-        //fen.push_str(
-        //    &active_player
-        //        .to_string()
-        //        .chars()
-        //        .next()
-        //        .unwrap_or_default()
-        //        .to_string(),
-        //);
-
         fen.push(
             active_player
                 .convert_to_string()

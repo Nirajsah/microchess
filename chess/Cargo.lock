@@ -505,13 +505,11 @@ version = "0.1.0"
 dependencies = [
  "async-graphql",
  "async-graphql-derive",
- "component",
  "env_logger",
  "futures",
  "lazy_static",
  "linera-sdk",
  "log",
- "rust-analyzer",
  "serde",
  "thiserror 2.0.1",
 ]
@@ -576,15 +574,6 @@ name = "colorchoice"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
-
-[[package]]
-name = "component"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d77c427b730ea6e0b7ff8f7fb93894a320c06256b3d553be7432788eaee6963"
-dependencies = [
- "anyhow",
-]
 
 [[package]]
 name = "concurrent-queue"
@@ -3272,12 +3261,6 @@ dependencies = [
  "quote",
  "syn 1.0.109",
 ]
-
-[[package]]
-name = "rust-analyzer"
-version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11707871ffa56ce568d4f15dd34c2f891a2aa5e4b3435b99b8f99938492525c3"
 
 [[package]]
 name = "rustc-demangle"
