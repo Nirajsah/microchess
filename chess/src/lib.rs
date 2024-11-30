@@ -2,13 +2,17 @@
 
 use std::collections::HashMap;
 
-use async_graphql::{Enum, Request, Response, SimpleObject};
+use async_graphql::{Enum, InputObject, Request, Response, SimpleObject};
 use chessboard::ChessBoard;
 use lazy_static::lazy_static;
-use linera_sdk::base::{
-    Amount, ChainId, ContractAbi, MessageId, Owner, PublicKey, ServiceAbi, TimeDelta, Timestamp,
+use linera_sdk::{
+    base::{
+        Amount, ChainId, ContractAbi, MessageId, Owner, PublicKey, ServiceAbi, TimeDelta, Timestamp,
+    },
+    ToBcsBytes,
 };
 use piece::{Color, Piece};
+use playerprofile::Rank;
 use serde::{Deserialize, Serialize};
 pub struct ChessAbi;
 use linera_sdk::graphql::GraphQLMutationRoot;
@@ -53,14 +57,39 @@ pub struct InstantiationArgument {
     pub block_delay: TimeDelta,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, SimpleObject)]
-pub struct PlayerStats {
-    pub player_id: String,
-    pub games_played: u32,
-    pub wins: u32,
-    pub losses: u32,
-    pub draws: u32,
-    pub win_rate: f32,
+//#[derive(Clone, Debug, Default, Deserialize, Serialize, SimpleObject)]
+//pub struct PlayerStats {
+//    pub player_id: String,
+//    pub games_played: u32,
+//    pub wins: u32,
+//    pub losses: u32,
+//    pub draws: u32,
+//    pub win_rate: f32,
+//}
+
+#[derive(
+    Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Ord, PartialOrd, SimpleObject, InputObject,
+)]
+#[graphql(input_name = "FriendIdInput")]
+pub struct FriendId {
+    pub id: String,
+}
+
+impl FriendId {
+    pub fn create_token_id(player_key: &String, points: &u32) -> Result<FriendId> {
+        use base64::engine::{general_purpose::STANDARD_NO_PAD, Engine as _};
+        use sha3::Digest as _;
+
+        let mut hasher = sha3::Sha3_256::new();
+        hasher.update(player_key.to_bcs_bytes().unwrap());
+        hasher.update(points.to_bcs_bytes().unwrap());
+
+        let id = hasher.finalize().to_vec();
+
+        let token_id = STANDARD_NO_PAD.encode(id);
+
+        Ok(FriendId { id: token_id })
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,6 +135,19 @@ pub enum Operation {
         /// Game's total time (~15 mins)
         match_time: TimeDelta,
     },
+    RequestGame {
+        player: PublicKey,
+        timer: TimeDelta,
+        rank: Rank,
+    },
+    FriendlyGame {
+        player: PublicKey,
+        timer: TimeDelta,
+    },
+    StartFriendlyGame {
+        player: PublicKey,
+        hash: FriendId,
+    },
 }
 //     /// The `Owner` controlling player 1 and 2, respectively.
 //     pub players: [Owner; 2],
@@ -117,9 +159,26 @@ pub enum Operation {
 pub enum Message {
     Start {
         players: [PublicKey; 2],
-        /// Represents the total amount of time for each player
         timer: TimeDelta,
     },
+    StartGame {
+        player: PublicKey,
+        timer: TimeDelta,
+        rank: Rank,
+    },
+    FriendlyGame {
+        hash: FriendId,
+        player: PlayerRequest,
+    },
+}
+
+#[derive(
+    Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject, InputObject,
+)]
+pub struct PlayerRequest {
+    pub player: PublicKey,
+    pub timer: TimeDelta,
+    pub rank: Rank,
 }
 
 /// The IDs of a temporary chain for a single game.
@@ -191,13 +250,12 @@ pub struct Clock {
 
 impl Clock {
     /// Initializes the clock.
-    pub fn new(block_time: Timestamp, arg: &InstantiationArgument) -> Self {
-        let total_time = TimeDelta::from_secs(900); // 15 mins
+    pub fn new(block_time: Timestamp, timer: TimeDelta) -> Self {
         Self {
-            time_left: [total_time, total_time],
+            time_left: [timer, timer],
             // increment: arg.increment, // todo!(increment is not required at the moment)
             current_turn_start: block_time,
-            block_delay: arg.block_delay,
+            block_delay: TimeDelta::from_micros(100000000),
         }
     }
 
@@ -296,6 +354,7 @@ pub struct Game {
 impl Game {
     /// A function to create a new game using defaults
     pub fn new(&self) -> Self {
+        log::info!("Game is starting....");
         Game {
             board: ChessBoard::new(),
             active: Color::White,

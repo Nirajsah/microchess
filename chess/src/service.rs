@@ -8,7 +8,7 @@ use self::state::Chess;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use chess::{
     piece::{Color, Piece},
-    Clock, GameChain, GameState, Move, Operation, PlayerStats, PlayerTime,
+    Clock, GameChain, GameState, Move, Operation, PlayerTime,
 };
 
 use linera_sdk::{
@@ -76,6 +76,9 @@ impl ChessService {
             game_state: game.state,
         }
     }
+    async fn owners(&self) -> Vec<Owner> {
+        self.state.players.get().to_vec()
+    }
     async fn captured_pieces(&self) -> &Vec<Piece> {
         &self.state.board.get().captured_pieces
     }
@@ -85,9 +88,9 @@ impl ChessService {
     async fn time_left(&self) -> PlayerTime {
         self.state.clock.get().time_left_for_player()
     }
-    async fn get_leaderboard(&self) -> Vec<PlayerStats> {
-        self.state.get_leaderboard()
-    }
+    //async fn get_leaderboard(&self) -> Vec<PlayerStats> {
+    //    self.state.get_leaderboard()
+    //}
     async fn get_game_chain(&self, pub_key: PublicKey) -> BTreeSet<GameChain> {
         self.state
             .game_chains

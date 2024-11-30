@@ -720,9 +720,10 @@ impl ChessBoard {
 
         // reset the enpassant square at the end of a move. if the move was not an en_passant
         // capture, reset. if it was an en_passant capture then `self.en_passant == 0`
-        if self.en_passant != 0 {
-            self.reset_enpassant();
-        }
+        //if self.en_passant != 0 {
+        //    self.reset_enpassant();
+        //}
+        // if enpassant square is present i don't want to remove it.
 
         Ok(())
     }
@@ -731,35 +732,53 @@ impl ChessBoard {
 
     /// Moves a white pawn
     pub fn wP_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        if WHITE_PMOVES[from as usize] & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidMove);
+        }
+
         let sq = from as usize + 8_usize;
         if to as usize == from as usize + 16 {
             // Ensure the square directly in front is unoccupied
             if self.all_pieces() & (1u64 << sq) != 0 {
                 return Err(ChessError::InvalidMove);
             }
-            self.en_passant = 1u64 << sq;
+
+            // Attempt to move the piece
+            if self.move_piece(from, to, piece).is_ok() {
+                // Set en passant square if the move was successful
+                self.en_passant = 1u64 << sq;
+                Ok(())
+            } else {
+                Err(ChessError::InvalidMove) // Handle failure in move_piece
+            }
+        } else {
+            self.move_piece(from, to, piece)
         }
-        if WHITE_PMOVES[from as usize] & (1u64 << to as usize) == 0 {
-            return Err(ChessError::InvalidMove);
-        }
-        self.move_piece(from, to, piece)
     }
 
     /// Moves a black pawn
     pub fn bP_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        if BLACK_PMOVES[from as usize] & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidMove);
+        }
+
         let sq = from as usize - 8_usize;
         if to as usize == from as usize - 16 {
             // Ensure the square directly in front is unoccupied
             if self.all_pieces() & (1u64 << sq) != 0 {
                 return Err(ChessError::InvalidMove);
             }
-
-            self.en_passant = 1u64 << sq;
+            // Attempt to move the piece
+            if self.move_piece(from, to, piece).is_ok() {
+                // Set en passant square if the move was successful
+                self.en_passant = 1u64 << sq;
+                Ok(())
+            } else {
+                Err(ChessError::InvalidMove) // Handle failure in move_piece
+            }
+        } else {
+            self.move_piece(from, to, piece)
         }
-        if BLACK_PMOVES[from as usize] & (1u64 << to as usize) == 0 {
-            return Err(ChessError::InvalidMove);
-        }
-        self.move_piece(from, to, piece)
     }
 
     /// Moves a knight

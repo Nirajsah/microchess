@@ -1,6 +1,10 @@
+/**
+ * Todo!(When a match is over the points update will be based on game type, i.e., Standard, Bullet, Blitz...)
+*/
+use async_graphql::{scalar, SimpleObject};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerProfile {
     pub points: u32,       // Total points the player has accumulated
@@ -12,7 +16,9 @@ pub struct PlayerProfile {
     pub rank: Rank,        // Player Rank (Default: Bronze)
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+scalar!(Rank);
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Ord, PartialOrd, Serialize)]
 pub enum Rank {
     #[default]
     Bronze, // 0–999 points
@@ -21,6 +27,8 @@ pub enum Rank {
     Platinum, // 3000–3999 points
     Diamond,  // 4000+ points
 }
+
+scalar!(GameResult);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum GameResult {
@@ -38,6 +46,23 @@ impl Rank {
             3000..=3999 => Rank::Platinum,
             _ => Rank::Diamond,
         }
+    }
+
+    // A helper function to get the lower bound of the rank range
+    pub fn points(&self) -> u32 {
+        match self {
+            Rank::Bronze => 0,
+            Rank::Silver => 1000,
+            Rank::Gold => 2000,
+            Rank::Platinum => 3000,
+            Rank::Diamond => 4000,
+        }
+    }
+}
+
+impl From<Rank> for u32 {
+    fn from(val: Rank) -> Self {
+        val.points()
     }
 }
 

@@ -505,12 +505,15 @@ version = "0.1.0"
 dependencies = [
  "async-graphql",
  "async-graphql-derive",
+ "base64 0.22.1",
+ "bcs",
  "env_logger",
  "futures",
  "lazy_static",
  "linera-sdk",
  "log",
  "serde",
+ "sha3",
  "thiserror 2.0.1",
 ]
 
