@@ -8,6 +8,7 @@ export default {
         fira: ['Fira Sans'],
         silkscreen: ['Silkscreen'],
         jolly: ['Jolly Lodger'],
+        homenaje: ['Homenaje'],
       },
     },
   },
