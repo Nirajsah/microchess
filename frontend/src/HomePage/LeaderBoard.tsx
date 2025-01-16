@@ -8,13 +8,25 @@ interface PlayerDataInterface {
 
 const PlayerStats = ({ playerData }: { playerData: PlayerDataInterface }) => {
   return (
-    <div className="flex rounded-md px-2 py-2">
-      <span className="w-[150px]">{playerData.rank}</span>
-      <div className="flex justify-between w-full">
-        <span className="w-[260px]">{playerData.name}</span>
-        <span className="w-[100px] text-center">{playerData.wins}</span>
-        <span className="w-[100px] text-center">{playerData.losses}</span>
-        <span className="w-[100px] text-end">{playerData.winRate}</span>
+    <div
+      style={{
+        transform: 'skew(-20deg)',
+      }}
+      className={`flex py-2 px-3 rounded-lg border-2 ${
+        (playerData.rank === 1 && 'border-orange-400') ||
+        (playerData.rank === 2 && 'border-red-400') ||
+        (playerData.rank === 3 && 'border-purple-400')
+      }  `}
+    >
+      <span className="w-[158px]">{playerData.rank}</span>
+      <div className="flex w-full justify-between">
+        <span className="">{playerData.name}</span>
+        <div className="w-full max-w-[700px] grid grid-cols-4">
+          <span className="place-self-end">{playerData.wins}</span>
+          <span className="place-self-end">{playerData.losses}</span>
+          <span className="place-self-end">{playerData.wins}</span>
+          <span className="place-self-end">{playerData.winRate}</span>
+        </div>
       </div>
     </div>
   )
@@ -35,21 +47,31 @@ const PlayerData = [
     losses: 10,
     winRate: '33.3%',
   },
+  {
+    rank: 3,
+    name: 'Player 2',
+    wins: 5,
+    losses: 10,
+    winRate: '33.3%',
+  },
 ]
 
 export default function LeaderBoard() {
   return (
-    <div className="font-fira text-sm p-2 space-y-3 card-border rounded-xl w-full h-full">
-      <div className="w-full flex justify-between">
-        <span className="w-[170px]">Rank</span>
+    <div className="max-w-[1280px] text-sm rounded-xl w-full h-full">
+      <div className="w-full flex justify-between px-2 hero-background-circle">
+        <span className="w-[165px]">Rank</span>
         <div className="flex justify-between w-full">
           <span className="w-[260px]">Player</span>
-          <span className="w-[60px] text-center">Wins</span>
-          <span className="w-[100px] text-center">Losses</span>
-          <span className="w-[100px] text-end">Win Rate</span>
+          <div className="w-full max-w-[700px] grid grid-cols-4">
+            <span className="place-self-end">Wins</span>
+            <span className="place-self-end">Losses</span>
+            <span className="place-self-end">Draws</span>
+            <span className="place-self-end">Win Rate</span>
+          </div>
         </div>
       </div>
-      <div className="gap-1 flex relative flex-col rounded-lg p-1 card-box h-[300px]">
+      <div className="flex gap-2 text-2xl mt-1 relative flex-col rounded-lg h-[300px]">
         {PlayerData.map((player) => (
           <PlayerStats key={player.rank} playerData={player} />
         ))}
