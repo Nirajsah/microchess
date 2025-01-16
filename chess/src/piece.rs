@@ -52,6 +52,23 @@ impl Piece {
             Piece::BlackKing => Piece::WhiteKing,
         }
     }
+
+    pub fn index(&self) -> usize {
+        match self {
+            Piece::WhitePawn => 0,
+            Piece::WhiteKnight => 1,
+            Piece::WhiteBishop => 2,
+            Piece::WhiteRook => 3,
+            Piece::WhiteQueen => 4,
+            Piece::WhiteKing => 5,
+            Piece::BlackPawn => 6,
+            Piece::BlackKnight => 7,
+            Piece::BlackBishop => 8,
+            Piece::BlackRook => 9,
+            Piece::BlackQueen => 10,
+            Piece::BlackKing => 11,
+        }
+    }
 }
 
 impl Color {
@@ -68,6 +85,13 @@ impl Color {
         match self {
             Color::White => 0,
             Color::Black => 1,
+        }
+    }
+
+    pub fn convert_to_string(&self) -> String {
+        match self {
+            Color::White => "white".to_string(),
+            Color::Black => "black".to_string(),
         }
     }
 }

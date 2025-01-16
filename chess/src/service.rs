@@ -2,19 +2,19 @@
 
 mod state;
 
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use self::state::Chess;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use chess::{
     piece::{Color, Piece},
-    Clock, GameState, Move, Operation, PlayerStats, PlayerTime,
+    Clock, GameChain, GameState, Move, Operation, PlayerTime,
 };
 
 use linera_sdk::{
-    base::{Owner, WithServiceAbi},
+    base::{Owner, PublicKey, WithServiceAbi},
     graphql::GraphQLMutationRoot,
-    views::{View, ViewStorageContext},
+    views::View,
     Service, ServiceRuntime,
 };
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ impl Service for ChessService {
     type Parameters = ();
 
     async fn new(runtime: ServiceRuntime<Self>) -> Self {
-        let state = Chess::load(ViewStorageContext::from(runtime.key_value_store()))
+        let state = Chess::load(runtime.root_view_storage_context())
             .await
             .expect("Failed to load state");
         ChessService {
@@ -62,15 +62,22 @@ struct GameData {
 #[Object]
 impl ChessService {
     async fn game_data(&self, player: Owner) -> GameData {
-        let game_data = GameData {
-            board: self.state.board.get().board.to_fen(),
-            player_turn: self.state.board.get().active,
+        let game = self.state.board.get();
+        GameData {
+            board: game.board.to_fen(
+                &game.active_player(),
+                &game.halfmove_clock,
+                &game.fullmove_count,
+            ),
+            player_turn: game.active, // (todo!, to be removed)
             player: self.state.owners.get(&player).await.unwrap().unwrap(),
-            moves: self.state.board.get().moves.clone(),
+            moves: game.moves.clone(),
             opponent: self.state.opponent(player).unwrap(),
-            game_state: self.state.board.get().state,
-        };
-        game_data
+            game_state: game.state,
+        }
+    }
+    async fn owners(&self) -> Vec<Owner> {
+        self.state.players.get().to_vec()
     }
     async fn captured_pieces(&self) -> &Vec<Piece> {
         &self.state.board.get().captured_pieces
@@ -81,7 +88,15 @@ impl ChessService {
     async fn time_left(&self) -> PlayerTime {
         self.state.clock.get().time_left_for_player()
     }
-    async fn get_leaderboard(&self) -> Vec<PlayerStats> {
-        self.state.get_leaderboard()
+    //async fn get_leaderboard(&self) -> Vec<PlayerStats> {
+    //    self.state.get_leaderboard()
+    //}
+    async fn get_game_chain(&self, pub_key: PublicKey) -> BTreeSet<GameChain> {
+        self.state
+            .game_chains
+            .get(&pub_key)
+            .await
+            .expect("pub_key is not present")
+            .expect("error getting the game_chains")
     }
 }

@@ -9,7 +9,7 @@ pub const NOT_AB_FILE: Bitboard = 0xFCFCFCFCFCFCFCFC;
 pub fn computed_pawn_moves(color: &Color) -> Vec<Bitboard> {
     let mut pawn_moves = Vec::new();
     for i in 0..64 {
-        let boards = check_pawn_moves(i, &color);
+        let boards = check_pawn_moves(i, color);
         pawn_moves.push(boards);
     }
     pawn_moves
@@ -19,7 +19,7 @@ pub fn computed_pawn_moves(color: &Color) -> Vec<Bitboard> {
 pub fn computed_pawn_attacks(color: &Color) -> Vec<Bitboard> {
     let mut pawn_moves = Vec::new();
     for i in 0..64 {
-        let boards = mask_pawn_attacks(i, &color);
+        let boards = mask_pawn_attacks(i, color);
         pawn_moves.push(boards);
     }
     pawn_moves

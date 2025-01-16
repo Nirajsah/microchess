@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 thread_local! {
-    static STATE: RefCell<u32> = RefCell::new(1804289383);
+    static STATE: RefCell<u32> = const { RefCell::new(1804289383) };
 }
 
 pub fn get_random() -> u32 {
@@ -14,7 +14,7 @@ pub fn get_random() -> u32 {
     })
 }
 
-fn get_random_u64() -> u64 {
+pub fn get_random_u64() -> u64 {
     let n1 = get_random() as u64 & 0xFFFF;
     let n2 = get_random() as u64 & 0xFFFF;
     let n3 = get_random() as u64 & 0xFFFF;
@@ -24,5 +24,5 @@ fn get_random_u64() -> u64 {
 }
 
 pub fn generate_magic_number() -> u64 {
-    return get_random_u64() & get_random_u64() & get_random_u64();
+    get_random_u64() & get_random_u64() & get_random_u64()
 }
