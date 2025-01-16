@@ -17,7 +17,7 @@ export PATH="$PWD/target/debug:$PATH"
 source /dev/stdin <<<"$(linera net helper 2>/dev/null)"
 
 echo "Setting up Linera network..."
-linera_spawn_and_read_wallet_variables linera net up --testing-prng-seed 37 --extra-wallets 1
+linera_spawn_and_read_wallet_variables linera net up --testing-prng-seed 37 --extra-wallets 3
 
 echo "Setting up owner and chain variables..."
 OWNER_1=df44403a282330a8b086603516277c014c844a4b418835873aced1132a3adcd5

@@ -1,6 +1,10 @@
 use std::collections::BTreeSet;
 
-use chess::{piece::Color, Clock, Game, GameChain, PlayerStats};
+use chess::{
+    piece::Color,
+    playerprofile::{PlayerProfile, Rank},
+    Clock, FriendId, Game, GameChain, PlayerRequest,
+};
 use linera_sdk::{
     base::{Amount, Owner, PublicKey},
     views::{linera_views, MapView, RegisterView, RootView, ViewStorageContext},
@@ -18,10 +22,14 @@ pub struct Chess {
     pub clock: RegisterView<Clock>,
     /// The current game players
     pub players: RegisterView<Vec<Owner>>,
+    /// Player Request, requesting a game
+    pub lobby: MapView<Rank, PlayerRequest>,
+    /// Player Requesting to play with a Friend(need a hash)
+    pub friend_lobby: MapView<FriendId, PlayerRequest>,
     /// LeaderBoard (max 10)
-    pub leaderboard: RegisterView<Vec<PlayerStats>>,
+    pub leaderboard: RegisterView<Vec<PlayerProfile>>,
     /// Player Stats
-    pub stats: RegisterView<PlayerStats>,
+    pub stats: RegisterView<PlayerProfile>,
     /// Temporary chains for individual games, by player.
     pub game_chains: MapView<PublicKey, BTreeSet<GameChain>>,
     /// store the betting amount on temp chain.
@@ -49,31 +57,31 @@ impl Chess {
 
         players.iter().find(|&p| *p != player).cloned()
     }
-    /// A function to create and update player stats
-    pub fn player_stats(&mut self, player_stats: PlayerStats) {
-        self.stats.set(player_stats);
-    }
-
-    /// A function to get the leaderboard
-    pub fn get_leaderboard(&self) -> Vec<PlayerStats> {
-        // need to have a logic to update the leaderboard status with players winning most games
-        self.leaderboard.get().to_vec()
-    }
-
-    /// A function to get the stats of the last player in leaderboard
-    pub fn bottom_player_stats(&self) -> PlayerStats {
-        self.get_leaderboard()
-            .last()
-            .expect("Last player not found, leaderboard is empty")
-            .clone()
-    }
-
-    /// A function to add the player stats to the leaderboard
-    pub fn add_player_leaderboard(&mut self, player: PlayerStats) {
-        let leaderboard = self.leaderboard.get_mut();
-        if leaderboard.len() > 10 {
-            leaderboard.pop();
-        }
-        leaderboard.push(player);
-    }
+    ///// A function to create and update player stats
+    //pub fn player_stats(&mut self, player_stats: PlayerStats) {
+    //    self.stats.set(player_stats);
+    //}
+    //
+    ///// A function to get the leaderboard
+    //pub fn get_leaderboard(&self) -> Vec<PlayerStats> {
+    //    // need to have a logic to update the leaderboard status with players winning most games
+    //    self.leaderboard.get().to_vec()
+    //}
+    //
+    ///// A function to get the stats of the last player in leaderboard
+    //pub fn bottom_player_stats(&self) -> PlayerStats {
+    //    self.get_leaderboard()
+    //        .last()
+    //        .expect("Last player not found, leaderboard is empty")
+    //        .clone()
+    //}
+    //
+    ///// A function to add the player stats to the leaderboard
+    //pub fn add_player_leaderboard(&mut self, player: PlayerStats) {
+    //    let leaderboard = self.leaderboard.get_mut();
+    //    if leaderboard.len() > 10 {
+    //        leaderboard.pop();
+    //    }
+    //    leaderboard.push(player);
+    //}
 }

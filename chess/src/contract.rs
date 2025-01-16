@@ -9,10 +9,11 @@ use self::state::Chess;
 use chess::{
     chessboard::ChessBoard,
     piece::{Color, Piece},
+    playerprofile::Rank,
     square::Square,
     zobrist::PIECE_KEYS,
-    CastleType, ChessError, ChessResponse, Clock, Game, GameChain, GameState,
-    InstantiationArgument, Message, MoveType, Operation, PlayerStats,
+    CastleType, ChessError, ChessResponse, Clock, FriendId, Game, GameChain, GameState,
+    InstantiationArgument, Message, MoveType, Operation, PlayerRequest,
 };
 use linera_sdk::{
     base::{
@@ -50,17 +51,18 @@ impl Contract for ChessContract {
 
     async fn instantiate(&mut self, argument: Self::InstantiationArgument) {
         self.runtime.application_parameters();
-        self.state
-            .clock
-            .set(Clock::new(self.runtime.system_time(), &argument));
+        //self.state
+        //    .clock
+        //    .set(Clock::new(self.runtime.system_time(), &argument));
 
         let players_colors = vec![
             (argument.players[0], Color::White),
             (argument.players[1], Color::Black),
         ];
 
-        for (player, color) in players_colors {
-            self.state.owners.insert(&player, color).unwrap();
+        for (_player, _color) in players_colors {
+            //self.state.owners.insert(&player, color).unwrap();
+            log::info!("Not setting the owners now, will set when new game_chain starts");
         }
     }
 
@@ -377,15 +379,165 @@ impl Contract for ChessContract {
                 self.state.board.get_mut().state = GameState::Resign;
                 ChessResponse::Ok
             }
+
             Operation::StartGame {
                 players,
                 amount,
                 match_time,
             } => self.start_game(players, amount, match_time).await,
+
+            Operation::RequestGame {
+                player,
+                timer,
+                rank,
+            } => {
+                self.request_game_chain(player, timer, rank);
+                ChessResponse::Ok
+            }
+
+            // Make a request to main_chain_id to play a game with friend
+            Operation::FriendlyGame { player, timer } => self.request_friendly_match(player, timer),
+
+            // Done
+            Operation::StartFriendlyGame { player, hash } => {
+                self.start_friendly_match(player, hash).await
+            }
         }
     }
 
-    async fn execute_message(&mut self, _message: Self::Message) {}
+    async fn execute_message(&mut self, message: Self::Message) {
+        match message {
+            Message::FriendlyGame { hash, player } => {
+                assert_eq!(self.runtime.chain_id(), self.main_chain_id());
+
+                let friendly_match = self.state.friend_lobby.get(&hash).await;
+
+                match friendly_match {
+                    // If retrieving the match succeeded
+                    Ok(Some(friend)) => {
+                        // Safely parse the amount
+                        let amount = Amount::from_str("1").unwrap_or_else(|_| {
+                            eprintln!("Failed to parse amount");
+                            Amount::default() // Or handle this error appropriately
+                        });
+
+                        self.start_game([friend.player, player.player], amount, friend.timer)
+                            .await;
+                    }
+
+                    // If there's no match in the lobby, insert the player
+                    Ok(None) => {
+                        // Insert the player into the friend_lobby and handle errors gracefully
+                        if let Err(e) = self.state.friend_lobby.insert(&hash, player) {
+                            eprintln!("Unable to insert into friend_lobby: {}", e);
+                        } else {
+                            println!("Player inserted into friend_lobby successfully");
+                        }
+                    }
+
+                    // Handle the case where retrieving the match failed
+                    Err(_) => {
+                        // Implement error handling for failure to get the match from the lobby
+                        // You can implement further error handling here (e.g., retry logic, etc.)
+                        todo!()
+                    }
+                }
+            }
+
+            Message::StartGame {
+                player,
+                timer,
+                rank,
+            } => {
+                log::info!(
+                    "Player received {player} Timer: {:?} PlayerRank: {:?}",
+                    timer,
+                    rank
+                );
+                log::info!("ChainId {:?}", self.runtime.chain_id());
+
+                // Try to get the player request from the lobby.
+                let player_request = self.state.lobby.get(&rank).await;
+
+                match player_request {
+                    // If a player is found with that rank, start the game
+                    Ok(Some(existing_player_request)) => {
+                        let player_one = existing_player_request.player; // The player found in the lobby
+                        self.start_game(
+                            [player_one, player], // Start the game with the existing and new player
+                            Amount::from_str("1").unwrap(), // Handle unwrap with care, consider using Result or Option
+                            timer,
+                        )
+                        .await;
+                    }
+
+                    // If no player is found with that rank, insert the new player into the lobby
+                    Ok(None) => {
+                        self.state
+                            .lobby
+                            .insert(
+                                &rank,
+                                PlayerRequest {
+                                    player,
+                                    timer,
+                                    rank: rank.clone(),
+                                },
+                            )
+                            .expect("Unable to insert player into the lobby");
+                    }
+
+                    // If an error occurred while querying the lobby (e.g., database or async error)
+                    Err(e) => {
+                        log::error!("Error retrieving player by rank: {}", e);
+                        // Handle the error gracefully, perhaps return or handle retry logic
+                    }
+                }
+            }
+
+            Message::Start { players, timer } => {
+                // Check that there are exactly two players
+                if players.len() != 2 {
+                    log::error!("Expected exactly two players, but got {}", players.len());
+                    return;
+                }
+
+                // Check if the game is already running (assuming `game_players` holds players in an active game)
+                let game_players = self.state.get_players();
+                if !game_players.is_empty() {
+                    log::info!("Game is already running...");
+                    return;
+                }
+
+                // Create the owners and their associated colors
+                let owners = [Owner::from(&players[0]), Owner::from(&players[1])];
+                let players_colors = vec![(owners[0], Color::White), (owners[1], Color::Black)];
+
+                // Add players and assign colors
+                for (player, color) in players_colors {
+                    // Handle potential errors when adding players or inserting into owners map
+                    self.state.add_player(player);
+
+                    if let Err(e) = self.state.owners.insert(&player, color) {
+                        log::error!("Failed to insert owner: {}", e);
+                        return;
+                    }
+                }
+
+                // Initialize the game state (this can be based on your specific requirements)
+                let game = self.state.board.get().new(); // Or use FEN if needed
+                                                         // let game = self.state.board.get().with_fen("8/7P/7P/8/8/8/8/7r w - - 0 1");
+
+                self.state
+                    .clock
+                    .set(Clock::new(self.runtime.system_time(), timer));
+
+                // Set the game state
+                self.state.board.set(game);
+
+                log::info!("Starting a new match...");
+            }
+        }
+    }
 
     async fn store(mut self) {
         self.state.save().await.expect("Failed to save state");
@@ -401,6 +553,67 @@ impl ChessContract {
             GameState::InPlay => ChessResponse::Ok,
             GameState::Resign => ChessResponse::Err(ChessError::InvalidRequest),
         }
+    }
+
+    /// This method is used to send a cross-chain message to the main-chain with playerRequest and
+    /// generated hash
+    pub fn request_friendly_match(&mut self, player: PublicKey, timer: TimeDelta) -> ChessResponse {
+        assert_ne!(self.runtime.chain_id(), self.main_chain_id());
+        let points = self.state.stats.get().points;
+        let id = FriendId::create_token_id(&player.to_string(), &points)
+            .expect("Unable to generate hash");
+
+        // Todo!() Need to store and return the hash to the user.
+        let main_chain_id = self.main_chain_id();
+        let player_rank = self.state.stats.get().rank.clone();
+        let player = PlayerRequest {
+            player,
+            timer,
+            rank: player_rank,
+        };
+
+        log::info!("Hash_id: {:?}", id);
+        self.runtime
+            .send_message(main_chain_id, Message::FriendlyGame { hash: id, player });
+        ChessResponse::Ok
+    }
+
+    /// This method is used to send hash and player's PlayerRequest to the main_chain_id, requires
+    /// (game hash, and public_key)
+    pub async fn start_friendly_match(
+        &mut self,
+        player: PublicKey,
+        hash: FriendId,
+    ) -> ChessResponse {
+        assert_ne!(self.runtime.chain_id(), self.main_chain_id());
+
+        let main_chain_id = self.main_chain_id();
+        let rank = self.state.stats.get().rank.clone();
+
+        // Timer does not matter here, as the player who generated the hash timer will be used.
+        let player = PlayerRequest {
+            player,
+            timer: TimeDelta::from_micros(0),
+            rank,
+        };
+
+        self.runtime
+            .send_message(main_chain_id, Message::FriendlyGame { hash, player });
+        ChessResponse::Ok
+    }
+
+    /// A method to send a request to the main chain to start a new chain with player's public_key
+    pub fn request_game_chain(&mut self, player: PublicKey, timer: TimeDelta, rank: Rank) {
+        assert_ne!(self.runtime.chain_id(), self.main_chain_id());
+        let main_chain_id = self.main_chain_id();
+        self.runtime.send_message(
+            main_chain_id,
+            Message::StartGame {
+                player,
+                timer,
+                rank,
+            },
+        );
     }
 
     /// Start a new game on new chain, requires two players and the amount to cover the chain fees
@@ -438,6 +651,9 @@ impl ChessContract {
                 timer: match_time,
             },
         );
+
+        log::info!("Game chain_id: {:?}", chain_id);
+
         ChessResponse::Ok
     }
 
@@ -449,14 +665,14 @@ impl ChessContract {
     /// Handles the winner stats, when a match is over, this function is called to update the
     /// leaderboard.
     /// Can only be update by the creation chain(Todo!)
-    pub fn handle_match_over(&mut self, winner: PlayerStats) {
-        let last_player = self.state.bottom_player_stats();
-        if last_player.wins > winner.wins {
-            return;
-        }
-
-        self.state.add_player_leaderboard(winner);
-    }
+    //pub fn handle_match_over(&mut self, winner: PlayerStats) {
+    //    let last_player = self.state.bottom_player_stats();
+    //    if last_player.wins > winner.wins {
+    //        return;
+    //    }
+    //
+    //    self.state.add_player_leaderboard(winner);
+    //}
 
     /// Handles the winner of the game, when a match is over
     pub async fn handle_winner(&mut self) {
@@ -469,11 +685,12 @@ impl ChessContract {
 #[cfg(test)]
 mod tests {
     #![allow(unused_imports)]
-    use std::str::FromStr;
+    use std::{io::Read, str::FromStr};
 
+    use base64::engine::{general_purpose::STANDARD_NO_PAD, Engine as _};
     use chess::{
         piece::{Color, Piece},
-        ChessError, ChessResponse, InstantiationArgument, Operation,
+        ChessError, ChessResponse, FriendId, InstantiationArgument, Operation,
     };
     use env_logger;
     use futures::FutureExt as _;
@@ -486,6 +703,10 @@ mod tests {
         Contract, ContractRuntime,
     };
     use log::LevelFilter;
+    use sha3::{
+        digest::{ExtendableOutput, Update},
+        Shake128,
+    };
 
     use super::{Chess, ChessContract};
 
@@ -736,6 +957,13 @@ mod tests {
             )
         );
 
+        response = resign(&mut app);
+        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
+        assert_eq!(
+            app.state.board.get().active,
+            Color::White,
+            "Active player is now White"
+        );
         // black bishop needs to make a capture to get its king out of check(g8 to f6 wbK)
         // Black captures a piece (from f8 bB captures wP a3)
         response = capture_piece(&mut app, "g8", "f6", "bN", "wN");
@@ -756,6 +984,15 @@ mod tests {
                 &game_data.fullmove_count
             )
         );
+    }
+
+    fn resign(app: &mut ChessContract) -> ChessResponse {
+        let response = app
+            .execute_operation(Operation::Resign)
+            .now_or_never()
+            .expect("Execution of application operation should not await anything");
+
+        response
     }
 
     fn make_move(app: &mut ChessContract, from: &str, to: &str, piece: &str) -> ChessResponse {
@@ -795,6 +1032,12 @@ mod tests {
         initial_value: InstantiationArgument,
         authentic_signer: Owner,
     ) -> ChessContract {
+        let friend_hash = FriendId::create_token_id(&authentic_signer.to_string(), &100).unwrap();
+
+        let token_id = STANDARD_NO_PAD.encode(friend_hash.id);
+
+        log::info!("{:?}", token_id);
+
         let mut runtime = ContractRuntime::new().with_application_parameters(());
         runtime.set_system_time(100000000.into());
         runtime.set_authenticated_signer(authentic_signer);

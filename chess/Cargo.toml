@@ -12,8 +12,9 @@ log = "0.4.22"
 lazy_static = "1.5.0"
 thiserror = "2.0.1"
 futures = "0.3.31"
-component = "0.1.1"
-rust-analyzer = "0.0.1"
+sha3 = "0.10.8"
+bcs = "0.1.6"
+base64 = "0.22.1"
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
