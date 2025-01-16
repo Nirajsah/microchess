@@ -290,10 +290,10 @@ export default function Board({
               square === KingInCheck
                 ? 'purple'
                 : selectedSquare === square
-                  ? 'green'
-                  : number % 2 === 0
-                    ? selectedTheme.light
-                    : selectedTheme.dark
+                ? 'green'
+                : number % 2 === 0
+                ? selectedTheme.light
+                : selectedTheme.dark
 
             const onDrop = (
               e: React.DragEvent<HTMLDivElement>,
