@@ -25,7 +25,6 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.25.1",
-    "vite-plugin-wasm": "^3.3.0",
     "wasm": "link:wasm/pkg"
   },
   "devDependencies": {
@@ -44,6 +43,7 @@
     "typescript": "^5.2.2",
     "vite": "^5.3.4",
     "vite-plugin-top-level-await": "^1.4.4",
+    "vite-plugin-wasm": "^3.3.0",
     "wasm-pack": "^0.13.1"
   }
 }
