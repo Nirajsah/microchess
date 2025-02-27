@@ -1,22 +1,23 @@
 import Tile from './Tile'
-import whitePawn from '../../assets/new_assets/wp.png'
-import whiteRook from '../../assets/new_assets/wr.png'
-import whiteKnight from '../../assets/new_assets/wn.png'
-import whiteBishop from '../../assets/new_assets/wb.png'
-import whiteQueen from '../../assets/new_assets/wq.png'
-import whiteKing from '../../assets/new_assets/wk.png'
-import blackPawn from '../../assets/new_assets/bp.png'
-import blackRook from '../../assets/new_assets/br.png'
-import blackKnight from '../../assets/new_assets/bn.png'
-import blackBishop from '../../assets/new_assets/bb.png'
-import blackQueen from '../../assets/new_assets/bq.png'
-import blackKing from '../../assets/new_assets/bk.png'
+import whitePawn from '@/assets/wp.png'
+import whiteRook from '@/assets/wr.png'
+import whiteKnight from '@/assets/wn.png'
+import whiteBishop from '@/assets/wb.png'
+import whiteQueen from '@/assets/wq.png'
+import whiteKing from '@/assets/wk.png'
+import blackPawn from '@/assets/bp.png'
+import blackRook from '@/assets/br.png'
+import blackKnight from '@/assets/bn.png'
+import blackBishop from '@/assets/bb.png'
+import blackQueen from '@/assets/bq.png'
+import blackKing from '@/assets/bk.png'
 import React from 'react'
 import { useMutation } from '@apollo/client'
 import { CAPTURE_PIECE, MOVE_PIECE } from '../../GraphQL/queries'
 import generatePossibleMoves from './GeneratePossibleMoves'
 import { BoardType, Color, Piece, Square, SquareToPieceMap } from './types'
 import { useChess } from '../../context/ChessProvider'
+import { add } from 'wasm'
 
 const pieceImages: any = {
   wP: whitePawn,
@@ -65,6 +66,8 @@ export default function Board({
     null
   )
   const { chessSettings } = useChess()
+
+  console.log('calling wasm function add', add(3, 4))
 
   const {
     position: board,
@@ -319,10 +322,10 @@ export default function Board({
               square === KingInCheck
                 ? 'purple'
                 : selectedSquare === square
-                  ? 'green'
-                  : number % 2 === 0
-                    ? selectedTheme.light
-                    : selectedTheme.dark
+                ? 'green'
+                : number % 2 === 0
+                ? selectedTheme.light
+                : selectedTheme.dark
 
             const onDrop = (
               e: React.DragEvent<HTMLDivElement>,

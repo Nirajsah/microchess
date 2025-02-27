@@ -5,10 +5,17 @@
 html,
 body,
 #root {
-  height: 100%;
+  /* height: 100%; */
   margin: 0;
   padding: 0;
   /* background-color: #ffffff; */
+}
+
+.chess-board {
+  -webkit-user-select: none; /* Chrome, Safari, Opera */
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .curve {

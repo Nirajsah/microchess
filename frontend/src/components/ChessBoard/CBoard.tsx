@@ -18,7 +18,6 @@ import { LeftSideMenu } from './LeftSideMenu'
 import { PromotionCard } from './PromotionCard'
 import { BoardType, Color, Fen, PromoteData, SquareToPieceMap } from './types'
 import { RightSideMenu } from './RightSideMenu'
-import Navbar from '../../HomePage/Navbar'
 
 const COLUMNS = 'abcdefgh'.split('')
 
@@ -85,7 +84,7 @@ function fenToObj(fen: string): {
 const CBoard = () => {
   const chainId = window.sessionStorage.getItem('chainId') ?? ''
   const owner = window.sessionStorage.getItem('owner') ?? ''
-  const [player, setPlayer] = React.useState('')
+  const [player, setPlayer] = React.useState('WHITE')
   const [boardState, setBoardState] = React.useState<Fen>(fen)
   const [color, setColor] = React.useState<Color>('WHITE')
   const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
@@ -194,7 +193,7 @@ const CBoard = () => {
     const isBlack = color.toLowerCase() === 'black'
 
     return (
-      <div className="w-full">
+      <div className="w-full chess-board">
         <div className="h-[12.5%] z-50 absolute">
           <Ranks color={color as Color} />
         </div>
