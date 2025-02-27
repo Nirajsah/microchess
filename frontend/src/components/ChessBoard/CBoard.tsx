@@ -231,6 +231,7 @@ const CBoard = () => {
     desertSand: '#f4a460', // Sandy Brown
     softViolet: '#f8bbd0', // Light Pink
     default: '#ffebe84a',
+    dark: '#151515',
   }
 
   return (
@@ -238,6 +239,7 @@ const CBoard = () => {
       style={{
         width: '100%',
         height: '100%',
+        background: appBackgrounds.dark,
       }}
       className="w-full min-h-screen p-3"
     >
@@ -245,15 +247,15 @@ const CBoard = () => {
         <Modal select={open} unselect={() => setOpen(!open)}>
           <Welcome />
         </Modal>
-        <div className="absolute left-0 w-full p-2 max-w-[1320px] flex items-center justify-between">
+        {/* <div className="absolute left-0 w-full p-2 max-w-[1320px] flex items-center justify-between">
           <Navbar />
-        </div>
-        <div className="flex flex-col lg:flex-row gap-4 w-full max-w-[1080px]">
-          <div className="flex flex-col w-full max-w-[720px] relative">
-            <div className="flex text-white w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
+        </div> */}
+        <div className="flex gap-4 w-full justify-center">
+          <div className="flex w-full max-w-[720px] relative">
+            {/* <div className="flex text-white w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
               Opponent {opponentId}
-            </div>
-            <div className="w-full relative max-w-[720px] h-full bg-white rounded-md">
+            </div> */}
+            <div className="w-full relative max-w-[720px] max-h-[720px] bg-white rounded-md">
               {renderSquare()}
             </div>
             {promoteData.show && (
@@ -265,9 +267,9 @@ const CBoard = () => {
                 />
               </div>
             )}
-            <div className="flex w-full text-white max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
+            {/* <div className="flex w-full text-white max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
               Player {owner}
-            </div>
+            </div> */}
           </div>
 
           <div className="w-full mt-4 md:mt-8">

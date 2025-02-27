@@ -1,14 +1,11 @@
-import Navbar from './components/Navbar'
-import HomePage from './HomePage/HomePage'
-import LeaderBoard from './HomePage/LeaderBoard'
-import { motion } from 'framer-motion'
+import grain from './assets/grain.png'
 
 export default function App() {
   return (
-    <div className="w-dvw h-dvh overflow-hidden flex bg-white">
-      <div className="relative w-full h-screen overflow-hidden bg-white">
-        {/* Left (Micro) section */}
-        <motion.div
+    <div className="w-dvw h-dvh bg-[#151515]">
+      {/* <div className="relative w-full h-screen overflow-hidden bg-white"> */}
+      {/* Left (Micro) section */}
+      {/** <motion.div
           initial={{ x: '-100%' }}
           animate={{
             x: 0,
@@ -34,7 +31,6 @@ export default function App() {
           </motion.div>
         </motion.div>
 
-        {/* Right (Chess) section */}
         <motion.div
           initial={{ x: '100%' }}
           animate={{
@@ -59,9 +55,9 @@ export default function App() {
           >
             Chess
           </motion.div>
-        </motion.div>
+        </motion.div> 
         {/* <HomePage /> */}
-      </div>
+      {/* </div> */}
     </div>
   )
 }

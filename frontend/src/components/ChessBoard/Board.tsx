@@ -99,7 +99,7 @@ export default function Board({
     piece: string,
     capturedPiece: string
   ) => {
-    const tempBoard = boardData
+    // const tempBoard = boardData.position
     captureMutation({
       variables: {
         piece,
@@ -111,13 +111,14 @@ export default function Board({
       onError: (error) => {
         console.error('Message:', error.message)
         // need to update the board State
-        setBoard(tempBoard)
+        localCapture(to as Square, from as Square, piece as Piece)
+        // setBoard({ position: tempBoard })
       },
     })
   }
 
   const movePiece = async (from: string, to: string, piece: string) => {
-    const tempBoard = boardData
+    // const tempBoard = boardData.position
     moveMutation({
       variables: {
         piece: piece,
@@ -128,7 +129,8 @@ export default function Board({
       onError: (error) => {
         console.error('Message:', error.message)
         // need to update the board State
-        setBoard(tempBoard)
+        localMove(to as Square, from as Square, piece as Piece)
+        // setBoard({ position: tempBoard }) // remove after testing
       },
     })
   }
@@ -220,6 +222,33 @@ export default function Board({
     }
   }
 
+  function localCapture(
+    selectedSquare: Square,
+    to_square: Square,
+    piece: Piece
+  ) {
+    setBoard((prevBoard: BoardType) => ({
+      ...prevBoard,
+      position: {
+        ...prevBoard.position,
+        [selectedSquare]: null,
+        [to_square]: null,
+        [to_square]: piece,
+      },
+    }))
+  }
+
+  function localMove(selectedSquare: Square, to_square: Square, piece: Piece) {
+    setBoard((prevBoard: BoardType) => ({
+      ...prevBoard,
+      position: {
+        ...prevBoard.position,
+        [selectedSquare]: null,
+        [to_square]: piece,
+      },
+    }))
+  }
+
   function reset() {
     setSelectedPiece(null)
     setSelectedSquare(null)
@@ -268,7 +297,7 @@ export default function Board({
   }
 
   return (
-    <div ref={boardRef} className="w-full h-full chess-board relative">
+    <div ref={boardRef} className="w-full h-full relative">
       {ranks.map((rank, rankIndex) => (
         <div key={rank} className="flex w-full h-full">
           {files.map((file, fileIndex) => {
@@ -290,10 +319,10 @@ export default function Board({
               square === KingInCheck
                 ? 'purple'
                 : selectedSquare === square
-                ? 'green'
-                : number % 2 === 0
-                ? selectedTheme.light
-                : selectedTheme.dark
+                  ? 'green'
+                  : number % 2 === 0
+                    ? selectedTheme.light
+                    : selectedTheme.dark
 
             const onDrop = (
               e: React.DragEvent<HTMLDivElement>,
