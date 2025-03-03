@@ -2,9 +2,9 @@ name: chess contract test
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ['main']
   pull_request:
-    branches: [ "main" ]
+    branches: ['main']
 
 env:
   CARGO_TERM_COLOR: always
@@ -14,39 +14,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install Protocol Buffers Compiler
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y protobuf-compiler
-    
-    - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
+      - name: Install Protocol Buffers Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
 
-    - name: Add WebAssembly target
-      run: rustup target add wasm32-unknown-unknown   
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
 
-    - name: Check formatting
-      working-directory: ./chess
-      run: |
-        rustup component add rustfmt
-        cargo fmt -- --check       
+      - name: Install specific Rust toolchain
+        run: rustup toolchain install 1.85.0-x86_64-unknown-linux-gnu
 
-    - name: Run clippy
-      working-directory: ./chess
-      run: |
-        rustup component add clippy
-        cargo clippy -- -D warnings
+      - name: Set specific Rust toolchain as default
+        run: rustup default 1.85.0-x86_64-unknown-linux-gnu
 
-    - name: Build chess project
-      working-directory: ./chess
-      run: cargo build --release --target wasm32-unknown-unknown
-      
+      - name: Add WebAssembly target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Check formatting
+        working-directory: ./chess
+        run: |
+          rustup component add rustfmt
+          cargo fmt -- --check
+
+      - name: Run clippy
+        working-directory: ./chess
+        run: |
+          rustup component add clippy
+          cargo clippy -- -D warnings
+
+      - name: Build chess project
+        working-directory: ./chess
+        run: cargo build --release --target wasm32-unknown-unknown
+
     # - name: Run chess tests # To be fixed in next update
     #   working-directory: ./chess
     #   run: cargo test --verbose
