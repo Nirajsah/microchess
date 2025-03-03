@@ -17,7 +17,7 @@ import { CAPTURE_PIECE, MOVE_PIECE } from '../../GraphQL/queries'
 import generatePossibleMoves from './GeneratePossibleMoves'
 import { BoardType, Color, Piece, Square, SquareToPieceMap } from './types'
 import { useChess } from '../../context/ChessProvider'
-import { add } from 'wasm'
+import { generate_possible_moves } from 'wasm'
 
 const pieceImages: any = {
   wP: whitePawn,
@@ -66,8 +66,6 @@ export default function Board({
     null
   )
   const { chessSettings } = useChess()
-
-  console.log('calling wasm function add', add(3, 4))
 
   const {
     position: board,
@@ -211,15 +209,20 @@ export default function Board({
         reset()
       }
     } else if (piece) {
-      const moves = generatePossibleMoves(
-        piece,
-        to_square,
-        board,
-        true,
-        true,
-        'd3' as Square
-      ) // (true, true, "e3") need to pass castleling flag and en_passant flag
-      setPossMoves(moves)
+      try {
+        const possibleMoves = generate_possible_moves(
+          piece,
+          to_square,
+          board,
+          whiteCastle,
+          blackCastle,
+          en_passant as Square
+        )
+        console.log('Possible moves:', possibleMoves)
+        setPossMoves(possibleMoves as Square[])
+      } catch (err) {
+        console.error('Error generating possible moves:', err)
+      }
       setSelectedPiece(piece)
       setSelectedSquare(to_square)
     }
