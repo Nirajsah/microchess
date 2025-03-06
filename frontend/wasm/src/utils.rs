@@ -1,4 +1,4 @@
-/*  
+/*
     1. generate possible moves
     2. FEN to obj
     3. Timer function if possible
@@ -6,6 +6,8 @@
 #[allow(dead_code)]
 
 use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
 
 const FILES: [char; 8] = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const RANKS: [char; 8] = ['1', '2', '3', '4', '5', '6', '7', '8'];
@@ -16,7 +18,7 @@ pub fn generate_possible_moves(
     board: &HashMap<String, String>,
     white_castle: bool,
     black_castle: bool,
-    en_passant: &str
+    en_passant: &str,
 ) -> Vec<String> {
     let file = square.chars().nth(0).unwrap();
     let rank = square.chars().nth(1).unwrap();
@@ -35,16 +37,21 @@ pub fn generate_possible_moves(
         if piece_at_new_square.is_none() {
             possible_moves.push(new_square);
             return true;
-        } else if piece_at_new_square.unwrap().chars().nth(0).unwrap() != piece.chars().nth(0).unwrap() {
+        } else if piece_at_new_square.unwrap().chars().nth(0).unwrap()
+            != piece.chars().nth(0).unwrap()
+        {
             possible_moves.push(new_square);
             return false;
         }
         return false;
     };
 
-    let add_moves_in_direction = |dx: i8, dy: i8, max_steps: i8| {
+    let mut add_moves_in_direction = |dx: i8, dy: i8, max_steps: i8| {
         for i in 1..=max_steps {
-            if !add_move((file_index as i8 + i * dx) as u8, (rank_index as i8 + i * dy) as u8) {
+            if !add_move(
+                (file_index as i8 + i * dx) as u8,
+                (rank_index as i8 + i * dy) as u8,
+            ) {
                 break;
             }
         }
@@ -55,14 +62,8 @@ pub fn generate_possible_moves(
             if pc.is_empty() || pc.chars().nth(0).unwrap() == if is_white { 'w' } else { 'b' } {
                 continue;
             }
-            let attacking_moves = generate_possible_moves(
-                pc,
-                sq,
-                board,
-                white_castle,
-                black_castle,
-                en_passant
-            );
+            let attacking_moves =
+                generate_possible_moves(pc, sq, board, white_castle, black_castle, en_passant);
             if attacking_moves.contains(&square.to_string()) {
                 return true;
             }
@@ -73,34 +74,161 @@ pub fn generate_possible_moves(
     let piece_type = piece.chars().nth(1).unwrap();
 
     match piece_type {
-      'P' => {
-        let direction = if is_white_piece { 1 } else { -1 }; 
+        'P' => {
+            let direction = if is_white_piece { 1 } else { -1 };
 
-        if add_move(file_index as u8, (rank_index as i8 + direction) as u8) {
-            if (is_white_piece && rank == '2') || (!is_white_piece && rank == '7') {
-                add_move(file_index as u8, (rank_index as i8 + 2 * direction) as u8);
+            if add_move(file_index as u8, (rank_index as i8 + direction) as u8) {
+                if (is_white_piece && rank == '2') || (!is_white_piece && rank == '7') {
+                    add_move(file_index as u8, (rank_index as i8 + 2 * direction) as u8);
+                }
+            }
+
+            // Diagonal captures
+            [-1, 1].iter().for_each(|&dx| {
+                let new_file_index = file_index as i8 + dx;
+                let new_rank_index = rank_index as i8 + direction;
+
+                // Ensure indices are within valid bounds
+                if new_file_index < 0 || new_file_index >= FILES.len() as i8 || new_rank_index < 0 || new_rank_index >= RANKS.len() as i8 {
+                    return;
+                }
+
+                let capture_square = format!("{}{}", FILES[new_file_index as usize], RANKS[new_rank_index as usize]);
+
+                if let Some(piece_at_capture_square) = board.get(&capture_square) {
+                    if piece_at_capture_square.is_empty() || piece_at_capture_square.chars().next() != piece.chars().next() {
+                        possible_moves.push(capture_square.clone());
+                    }
+                }
+
+                if capture_square == en_passant && ((is_white_piece && rank == '5') || (!is_white_piece && rank == '4')) {
+                    possible_moves.push(capture_square);
+                }
+            });
+        }
+        'R' => {
+            for &[dx, dy] in [[0, 1], [0, -1], [1, 0], [-1, 0]].iter() {
+                add_moves_in_direction(dx, dy, 7);
             }
         }
+        'N' => {
+            for &[dx, dy] in [
+                [1, 2],
+                [2, 1],
+                [2, -1],
+                [1, -2],
+                [-1, -2],
+                [-2, -1],
+                [-2, 1],
+                [-1, 2],
+            ].iter()
+            {
+                add_move((file_index as i8 + dx) as u8, (rank_index as i8 + dy) as u8);
+            }
+        }
+        'B' => {
+            for &[dx, dy] in [[1, 1], [1, -1], [-1, -1], [-1, 1]].iter() {
+                add_moves_in_direction(dx, dy, 7);
+            }
+        }
+        'Q' => {
+            for &[dx, dy] in [[0, 1],
+                [0, -1],
+                [1, 0],
+                [-1, 0],
+                [1, 1],
+                [1, -1],
+                [-1, 1],
+                [-1, -1]].iter() {
+                    add_moves_in_direction(dx, dy, 7);
+                }
+        }
+        'K' => {
+            for &[dx, dy] in [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, -1], [-1, 1]]
+                .iter()
+            {
+                add_move((file_index as i8 + dx) as u8, (rank_index as i8 + dy) as u8);
+            }
 
-        // Diagonal captures
-        // [-1, 1].iter().for_each(|&dx| {
-        //     let capture_square = format!("{}{}", FILES[(file_index as i8 + dx) as usize], RANKS[(rank_index as i8 + direction) as usize]);
-        //     if capture_square.is_empty() {
-        //         return;
-        //     }
-        //     if let Some(piece_at_capture_square) = board.get(&capture_square) {
-        //         if piece_at_capture_square.is_empty() || piece_at_capture_square.chars().nth(0).unwrap() != piece.chars().nth(0).unwrap() {
-        //             possible_moves.push(capture_square.clone());
-        //         }
-        //     }
-
-        //     if capture_square == en_passant && ((is_white_piece && rank == '5') || (!is_white_piece && rank == '4')) {
-        //         possible_moves.push(capture_square);
-        //     }
-        // });
-      },
-      _ => {}
+            if is_white_piece {
+                if white_castle {
+                    if board.get("f1").is_none()
+                        && board.get("g1").is_none()
+                        && !is_square_under_attack("e1", true)
+                        && !is_square_under_attack("f1", true)
+                        && !is_square_under_attack("g1", true)
+                    {
+                        possible_moves.push("g1".to_string());
+                    }
+                    if board.get("d1").is_none()
+                        && board.get("c1").is_none()
+                        && board.get("b1").is_none()
+                        && !is_square_under_attack("e1", true)
+                        && !is_square_under_attack("d1", true)
+                        && !is_square_under_attack("c1", true)
+                    {
+                        possible_moves.push("c1".to_string());
+                    }
+                }
+            } else if black_castle {
+                if board.get("f8").is_none()
+                    && board.get("g8").is_none()
+                    && !is_square_under_attack("e8", false)
+                    && !is_square_under_attack("f8", false)
+                    && !is_square_under_attack("g8", false)
+                {
+                    possible_moves.push("g8".to_string());
+                }
+                if board.get("d8").is_none()
+                    && board.get("c8").is_none()
+                    && board.get("b8").is_none()
+                    && !is_square_under_attack("e8", false)
+                    && !is_square_under_attack("d8", false)
+                    && !is_square_under_attack("c8", false)
+                {
+                    possible_moves.push("c8".to_string());
+                }
+            }
+        }
+        _ => {}
     }
 
     possible_moves
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct FenBoard {
+    position: HashMap<String, String>,
+    king_in_check: Option<String>,
+}
+
+pub fn fen_to_board(fen: &str) -> Result<HashMap<String, String>, String> {
+    fen.split_whitespace().next().unwrap_or(fen);
+    let mut position: HashMap<String, String> = HashMap::new();
+    let mut current_row = 8;
+    let rows: Vec<&str> = fen.split('/').collect();
+
+    if rows.len() != 8 {
+        return Err(format!("Invalid FEN: Expected 8 rows, got {}", rows.len()));
+    }
+
+    for row in rows {
+        let mut col_idx = 0;
+        for c in row.chars() {
+            if c.is_digit(10) {
+                col_idx += c.to_digit(10).unwrap();
+            } else {
+                let square = format!("{}{}", FILES[col_idx as usize], current_row);
+                if c.is_uppercase() {
+                    position.insert(square, format!("w{}", c));
+                } else {
+                    position.insert(square, format!("b{}", c.to_string()));
+                }
+                col_idx += 1;
+            }
+        }
+        current_row -= 1;
+    }
+
+    Ok(position)
 }
