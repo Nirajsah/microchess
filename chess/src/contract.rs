@@ -662,9 +662,9 @@ impl ChessContract {
         self.runtime.application_creator_chain_id()
     }
 
-    /// Handles the winner stats, when a match is over, this function is called to update the
-    /// leaderboard.
-    /// Can only be update by the creation chain(Todo!)
+    // Handles the winner stats, when a match is over, this function is called to update the
+    // leaderboard.
+    // Can only be update by the creation chain(Todo!)
     //pub fn handle_match_over(&mut self, winner: PlayerStats) {
     //    let last_player = self.state.bottom_player_stats();
     //    if last_player.wins > winner.wins {

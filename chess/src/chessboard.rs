@@ -718,17 +718,10 @@ impl ChessBoard {
             Self::set(to, self.get_mut_board(piece));
         }
 
-        // reset the enpassant square at the end of a move. if the move was not an en_passant
-        // capture, reset. if it was an en_passant capture then `self.en_passant == 0`
-        //if self.en_passant != 0 {
-        //    self.reset_enpassant();
-        //}
-        // if enpassant square is present i don't want to remove it.
-
         Ok(())
     }
 
-    /** ---------------------------------------- Piece Move Logic ----------------------------------------- */
+    // ---------------------------------------- Piece Move Logic -----------------------------------------
 
     /// Moves a white pawn
     pub fn wP_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
@@ -824,7 +817,7 @@ impl ChessBoard {
         self.move_piece(from, to, piece)
     }
 
-    /** --------------------------------Piece Capture Logic---------------------------------- */
+    // --------------------------------Piece Capture Logic----------------------------------
 
     /// En passant capture
     pub fn en_passant_capture(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
@@ -993,7 +986,7 @@ impl ChessBoard {
         }
     }
 
-    /** ----------------------------------------- Castling Logic ---------------------------------------------- */
+    // ----------------------------------------- Castling Logic ----------------------------------------------
 
     /// White King castling king side
     pub fn wK_castle_king_side(&mut self) -> Result<()> {
@@ -1083,7 +1076,7 @@ impl ChessBoard {
         }
     }
 
-    /** ----------------------------------------- Compute Attack Mask for current pieces-------------------------------- */
+    // ----------------------------------------- Compute Attack Mask for current pieces--------------------------------
 
     pub fn attack_mask(&self, color: Color) -> Bitboard {
         match color {

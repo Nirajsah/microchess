@@ -1,5 +1,3 @@
-use lazy_static::lazy_static;
-
 use crate::bishop_attacks_on_the_fly;
 use crate::chessboard::BitBoard;
 use crate::piece::Piece;
@@ -28,8 +26,6 @@ pub fn set_occupancy(index: u32, bits_in_mask: u32, attack_mask: Bitboard) -> Bi
 pub fn pop_bit(bitboard: &mut Bitboard, index: u32) {
     *bitboard &= !(1u64 << index);
 }
-
-lazy_static! {}
 
 #[derive(Debug, Clone, Copy)]
 pub struct MagicEntry {

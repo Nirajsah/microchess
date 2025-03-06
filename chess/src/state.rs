@@ -12,7 +12,6 @@ use linera_sdk::{
 
 #[derive(RootView, async_graphql::SimpleObject)]
 #[view(context = "ViewStorageContext")]
-
 pub struct Chess {
     /// Players of the game
     pub owners: MapView<Owner, Color>,
