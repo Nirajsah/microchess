@@ -100,7 +100,6 @@ export default function Board({
     piece: string,
     capturedPiece: string
   ) => {
-    // const tempBoard = boardData.position
     captureMutation({
       variables: {
         piece,
@@ -113,13 +112,11 @@ export default function Board({
         console.error('Message:', error.message)
         // need to update the board State
         localCapture(to as Square, from as Square, piece as Piece)
-        // setBoard({ position: tempBoard })
       },
     })
   }
 
   const movePiece = async (from: string, to: string, piece: string) => {
-    // const tempBoard = boardData.position
     moveMutation({
       variables: {
         piece: piece,
@@ -131,7 +128,6 @@ export default function Board({
         console.error('Message:', error.message)
         // need to update the board State
         localMove(to as Square, from as Square, piece as Piece)
-        // setBoard({ position: tempBoard }) // remove after testing
       },
     })
   }
@@ -176,32 +172,17 @@ export default function Board({
         }
 
         if (capturedPiece) {
-          await capturePiece(selectedSquare, to_square, piece, capturedPiece)
           // used to make a capture on the local board
-          setBoard((prevBoard: BoardType) => ({
-            ...prevBoard,
-            position: {
-              ...prevBoard.position,
-              [selectedSquare]: null,
-              [to_square]: null,
-              [to_square]: piece,
-            },
-          }))
+          localCapture(selectedSquare, to_square, piece)
+          await capturePiece(selectedSquare, to_square, piece, capturedPiece)
         } else {
+          // used to make a move on the local board
+          localMove(selectedSquare, to_square, piece)
           await movePiece(
             selectedSquare,
             to_square,
             chessSettings.dragNdrop ? piece : (selectedPiece as Piece)
           )
-          // used to make a move on the local board
-          setBoard((prevBoard: BoardType) => ({
-            ...prevBoard,
-            position: {
-              ...prevBoard.position,
-              [selectedSquare]: null,
-              [to_square]: piece,
-            },
-          }))
         }
 
         reset()
@@ -210,6 +191,7 @@ export default function Board({
       }
     } else if (piece) {
       try {
+        console.log('called inside try block')
         const possibleMoves = generate_possible_moves(
           piece,
           to_square,
@@ -225,6 +207,8 @@ export default function Board({
       }
       setSelectedPiece(piece)
       setSelectedSquare(to_square)
+    } else {
+      reset()
     }
   }
 
@@ -233,26 +217,34 @@ export default function Board({
     to_square: Square,
     piece: Piece
   ) {
-    setBoard((prevBoard: BoardType) => ({
-      ...prevBoard,
-      position: {
-        ...prevBoard.position,
-        [selectedSquare]: null,
-        [to_square]: null,
-        [to_square]: piece,
-      },
-    }))
+    setBoard((prevBoard: BoardType) => {
+      const updatedPosition = { ...prevBoard.position }
+
+      // Remove the piece from the original square
+      delete updatedPosition[selectedSquare]
+
+      // Remove the piece from the destination square
+      delete updatedPosition[to_square]
+
+      // Place the piece in the new square
+      updatedPosition[to_square] = piece
+
+      return { ...prevBoard, position: updatedPosition }
+    })
   }
 
   function localMove(selectedSquare: Square, to_square: Square, piece: Piece) {
-    setBoard((prevBoard: BoardType) => ({
-      ...prevBoard,
-      position: {
-        ...prevBoard.position,
-        [selectedSquare]: null,
-        [to_square]: piece,
-      },
-    }))
+    setBoard((prevBoard: BoardType) => {
+      const updatedPosition = { ...prevBoard.position }
+
+      // Remove the piece from the original square
+      delete updatedPosition[selectedSquare]
+
+      // Place the piece in the new square
+      updatedPosition[to_square] = piece
+
+      return { ...prevBoard, position: updatedPosition }
+    })
   }
 
   function reset() {
@@ -400,6 +392,9 @@ export default function Board({
                     square={square as Square}
                     setSelectedSquare={setSelectedSquare}
                     board={board}
+                    whiteCastle={whiteCastle}
+                    blackCastle={blackCastle}
+                    en_passant={en_passant}
                     setPossMoves={setPossMoves}
                   />
                 }

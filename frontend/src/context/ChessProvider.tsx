@@ -8,7 +8,7 @@ export default function ChessProvider({
   children: React.ReactNode
 }) {
   const [chessSettings, setChessSettings] = React.useState({
-    dragNdrop: false,
+    dragNdrop: true,
   })
 
   React.useEffect(() => {

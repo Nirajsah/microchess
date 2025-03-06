@@ -10,18 +10,18 @@ import {
   TIME_LEFT,
 } from '../../GraphQL/queries'
 import Board from './Board'
-import { Link } from 'react-router-dom'
 import Timer from './Timer'
 import Modal from '../Modal'
 import { Welcome } from '../popup/Welcome'
-import { LeftSideMenu } from './LeftSideMenu'
 import { PromotionCard } from './PromotionCard'
 import { BoardType, Color, Fen, PromoteData, SquareToPieceMap } from './types'
 import { RightSideMenu } from './RightSideMenu'
+import { fen_to_board } from 'wasm'
 
 const COLUMNS = 'abcdefgh'.split('')
 
-const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+// const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+const fen = 'rnbqkbnr/pppppppp/8/BB6/3PPPP1/N2Q3N/PPP4P/R3K2R w KQkq - 0 1'
 
 function fenToPieceCode(piece: any) {
   // black piece
@@ -164,26 +164,53 @@ const CBoard = () => {
 
   const [board, setBoard] = React.useState<BoardType>(() => {
     let obj = fenToObj(boardState)
-    return {
-      position: obj.position,
-      KingInCheck: obj.KingInCheck,
-      whiteCastle: false,
-      blackCastle: false,
-      en_passant: 'e3',
+    try {
+      console.log('Fen to board testing.. ', fen_to_board(fen))
+      return {
+        position: obj.position,
+        KingInCheck: 'bk',
+        whiteCastle: true,
+        blackCastle: true,
+        en_passant: 'e3',
+      }
+    } catch (e) {
+      console.error('WASM Error:', e)
+      return {
+        position: obj.position,
+        KingInCheck: 'bk',
+        whiteCastle: true,
+        blackCastle: true,
+        en_passant: 'e3',
+      }
     }
   })
 
   // Use useEffect to update the boards when boardState changes
   React.useEffect(() => {
     let obj = fenToObj(boardState)
-    setBoard({
-      position: obj.position,
-      KingInCheck: obj.KingInCheck,
-      whiteCastle: false,
-      blackCastle: false,
-      en_passant: 'e3',
-    })
+    try {
+      setBoard({
+        position: obj.position,
+        KingInCheck: 'bk',
+        whiteCastle: true,
+        blackCastle: true,
+        en_passant: 'e3',
+      })
+    } catch (e) {
+      setBoard({
+        position: obj.position,
+        KingInCheck: 'bk',
+        whiteCastle: true,
+        blackCastle: true,
+        en_passant: 'e3',
+      })
+      console.error('WASM Error:', e)
+    }
   }, [boardState])
+
+  setTimeout(() => {
+    console.log(boardState)
+  }, 1000)
 
   const [moves, setMoves] = React.useState<
     Array<{ white: string; black: string }>
