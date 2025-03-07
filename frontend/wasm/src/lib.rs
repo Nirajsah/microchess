@@ -1,7 +1,8 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use serde::Serialize;
 use serde_wasm_bindgen::Serializer;
+use utils::FenBoard;
 use wasm_bindgen::prelude::*;
 
 mod utils;
@@ -34,9 +35,9 @@ pub fn generate_possible_moves(
 
 #[wasm_bindgen]
 pub fn fen_to_board(fen: &str) -> Result<JsValue, JsValue> {
-    let board: BTreeMap<String, String> = match utils::fen_to_board(fen) {
-        Ok(board) => board.into_iter().collect(),
-        Err(_) => return Err(JsValue::from_str("Invalid FEN")),
+    let board: FenBoard = match utils::fen_to_board(fen) {
+        Ok(board) => board,
+        Err(e) => return Err(JsValue::from_str(&e)),
     };
 
     let serializer = Serializer::json_compatible();

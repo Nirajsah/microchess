@@ -1,7 +1,6 @@
 /*
     1. generate possible moves
     2. FEN to obj
-    3. Timer function if possible
 */
 #[allow(dead_code)]
 
@@ -199,36 +198,50 @@ pub fn generate_possible_moves(
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FenBoard {
     position: HashMap<String, String>,
-    king_in_check: Option<String>,
+    player_turn: String,
+    white_c: bool,
+    black_c: bool,
+    en_passant: String,
+    king_in_check: String,
 }
 
-pub fn fen_to_board(fen: &str) -> Result<HashMap<String, String>, String> {
-    fen.split_whitespace().next().unwrap_or(fen);
-    let mut position: HashMap<String, String> = HashMap::new();
-    let mut current_row = 8;
-    let rows: Vec<&str> = fen.split('/').collect();
+pub fn fen_to_board(fen: &str) -> Result<FenBoard, String> {
+    let rows: Vec<&str> = fen.split_whitespace().next().unwrap_or(fen).split('/').collect();
 
     if rows.len() != 8 {
         return Err(format!("Invalid FEN: Expected 8 rows, got {}", rows.len()));
     }
 
-    for row in rows {
+    let mut position: HashMap<String, String> = HashMap::new();
+    let mut current_row = 8;
+    let mut white_c = false;
+    let mut black_c = false;
+    let player_turn = fen.split_whitespace().nth(1).unwrap_or("").to_string();
+    let castling_rights = fen.split_whitespace().nth(2).unwrap_or("").to_string();
+    let en_passant = fen.split_whitespace().nth(3).unwrap_or("").to_string();
+    let king_in_check = fen.split_whitespace().nth(4).unwrap_or("").to_string();
+
+    for row in rows.iter() {
         let mut col_idx = 0;
         for c in row.chars() {
             if c.is_digit(10) {
-                col_idx += c.to_digit(10).unwrap();
+                col_idx += c.to_digit(10).expect("Error occurred parsing c to digit");
             } else {
                 let square = format!("{}{}", FILES[col_idx as usize], current_row);
                 if c.is_uppercase() {
-                    position.insert(square, format!("w{}", c));
+                    position.insert(square, format!("w{}", c.to_string()));
                 } else {
-                    position.insert(square, format!("b{}", c.to_string()));
+                    position.insert(square, format!("b{}", c.to_uppercase().to_string()));
                 }
                 col_idx += 1;
             }
         }
+
         current_row -= 1;
     }
 
-    Ok(position)
+    white_c = castling_rights.contains('K');
+    black_c = castling_rights.contains('k');
+
+    Ok(FenBoard { position, player_turn, white_c, black_c, en_passant, king_in_check })
 }
