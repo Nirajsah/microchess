@@ -10,88 +10,25 @@ import {
   TIME_LEFT,
 } from '../../GraphQL/queries'
 import Board from './Board'
-import Timer from './Timer'
-import Modal from '../Modal'
-import { Welcome } from '../popup/Welcome'
 import { PromotionCard } from './PromotionCard'
-import { BoardType, Color, Fen, PromoteData, SquareToPieceMap } from './types'
+import { BoardType, Color, Fen, PromoteData } from './types'
 import { RightSideMenu } from './RightSideMenu'
 import { fen_to_board } from 'wasm'
 
-const COLUMNS = 'abcdefgh'.split('')
-
 // const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-const fen = 'rnbqkbnr/pppppppp/8/BB6/3PPPP1/N2Q3N/PPP4P/R3K2R w KQkq - 0 1'
-
-function fenToPieceCode(piece: any) {
-  // black piece
-  if (piece.toLowerCase() === piece) {
-    return 'b' + piece.toUpperCase()
-  }
-
-  // white piece
-  return 'w' + piece.toUpperCase()
-}
-
-// we need to return castling rights as well
-function fenToObj(fen: string): {
-  position: SquareToPieceMap
-  KingInCheck: string | null
-} {
-  // cut off any move, castling, etc info from the end
-  // we're only interested in position information
-  const FEN = fen.replace(/ .+$/, '')
-  const rows = FEN.split('/')
-  const position: any = {}
-  const check = fen.split(';')
-  const castling = fen.split('')
-
-  let currentRow = 8
-  for (let i = 0; i < 8; i++) {
-    const row = rows[i].split('')
-    let colIdx = 0
-
-    // loop through each character in the FEN section
-    for (let j = 0; j < row.length; j++) {
-      // number / empty squares
-      if (row[j].search(/[1-8]/) !== -1) {
-        const numEmptySquares = Number.parseInt(row[j], 10)
-        colIdx = colIdx + numEmptySquares
-      } else {
-        // piece
-        const square = COLUMNS[colIdx] + currentRow
-        position[square] = fenToPieceCode(row[j])
-        colIdx = colIdx + 1
-      }
-    }
-
-    currentRow = currentRow - 1
-  }
-  // The last part contains the check status
-  let KingInCheck: string | null = null
-
-  if (check.length > 1) {
-    KingInCheck = check[1].trim()
-    KingInCheck // 'bK' or any other status
-  }
-
-  return {
-    position,
-    KingInCheck,
-  }
-}
+const fen = 'rnbqkbnr/pppppppp/8/BB6/3PPPP1/N2Q3N/PPP4P/R3K2R w KQkq - - 0 1'
 
 const CBoard = () => {
   const chainId = window.sessionStorage.getItem('chainId') ?? ''
   const owner = window.sessionStorage.getItem('owner') ?? ''
-  const [player, setPlayer] = React.useState('WHITE')
+  const [player, setPlayer] = React.useState('')
   const [boardState, setBoardState] = React.useState<Fen>(fen)
-  const [color, setColor] = React.useState<Color>('WHITE')
+  const [color, setColor] = React.useState<Color>('w')
   const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
   const [opponentId, setOpponentId] = React.useState<string | null>(null)
   const [play] = useMutation(NEW_GAME)
-  const [whiteTime, setWhiteTime] = React.useState(0) // 15 minutes
-  const [blackTime, setBlackTime] = React.useState(0) // 15 minutes
+  const [whiteTime, setWhiteTime] = React.useState(900) // 15 minutes
+  const [blackTime, setBlackTime] = React.useState(900) // 15 minutes
 
   const [gameData, { called: callGameData }] = useLazyQuery(GAME_DATA, {
     variables: {
@@ -163,54 +100,30 @@ const CBoard = () => {
   }
 
   const [board, setBoard] = React.useState<BoardType>(() => {
-    let obj = fenToObj(boardState)
-    try {
-      console.log('Fen to board testing.. ', fen_to_board(fen))
-      return {
-        position: obj.position,
-        KingInCheck: 'bk',
-        whiteCastle: true,
-        blackCastle: true,
-        en_passant: 'e3',
-      }
-    } catch (e) {
-      console.error('WASM Error:', e)
-      return {
-        position: obj.position,
-        KingInCheck: 'bk',
-        whiteCastle: true,
-        blackCastle: true,
-        en_passant: 'e3',
-      }
+    let obj = fen_to_board(boardState)
+    setPlayer(obj.player_turn)
+    console.log(obj)
+    return {
+      position: obj.position,
+      KingInCheck: obj.king_in_check,
+      whiteCastle: obj.white_c,
+      blackCastle: obj.black_c,
+      en_passant: obj.en_passant,
     }
   })
 
   // Use useEffect to update the boards when boardState changes
   React.useEffect(() => {
-    let obj = fenToObj(boardState)
-    try {
-      setBoard({
-        position: obj.position,
-        KingInCheck: 'bk',
-        whiteCastle: true,
-        blackCastle: true,
-        en_passant: 'e3',
-      })
-    } catch (e) {
-      setBoard({
-        position: obj.position,
-        KingInCheck: 'bk',
-        whiteCastle: true,
-        blackCastle: true,
-        en_passant: 'e3',
-      })
-      console.error('WASM Error:', e)
-    }
+    let obj = fen_to_board(boardState)
+    setBoard({
+      position: obj.position,
+      KingInCheck: obj.king_in_check,
+      whiteCastle: obj.white_c,
+      blackCastle: obj.black_c,
+      en_passant: obj.en_passant,
+    })
+    setPlayer(obj.player_turn)
   }, [boardState])
-
-  setTimeout(() => {
-    console.log(boardState)
-  }, 1000)
 
   const [moves, setMoves] = React.useState<
     Array<{ white: string; black: string }>
@@ -270,7 +183,7 @@ const CBoard = () => {
       className="w-full min-h-screen p-3"
     >
       <div className="flex flex-col items-center justify-center">
-        <Modal select={open} unselect={() => setOpen(!open)}>
+        {/* <Modal select={open} unselect={() => setOpen(!open)}>
           <Welcome />
         </Modal>
         {/* <div className="absolute left-0 w-full p-2 max-w-[1320px] flex items-center justify-between">
@@ -302,9 +215,12 @@ const CBoard = () => {
             <RightSideMenu
               checkStatus={board.KingInCheck}
               player={player}
+              color={color}
               opponentId={opponentId}
               capturedPieces={capturedPieces}
               moves={moves}
+              whiteTime={whiteTime}
+              blackTime={blackTime}
               startGame={startGame}
               key={chainId}
             />

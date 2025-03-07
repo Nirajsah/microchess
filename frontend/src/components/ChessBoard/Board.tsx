@@ -137,10 +137,10 @@ export default function Board({
     piece: Piece,
     capturedPiece: Piece | null
   ) => {
-    if (color === 'WHITE' && piece?.charAt(0) === 'b') {
+    if (color === 'w' && piece?.charAt(0) === 'b') {
       return
     }
-    if (color === 'BLACK' && piece?.charAt(0) === 'w') {
+    if (color === 'b' && piece?.charAt(0) === 'w') {
       return
     }
 

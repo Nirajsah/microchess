@@ -1,22 +1,29 @@
 import { AlertCircle } from 'lucide-react'
 import CapturedPieces from './CapturedPieces'
-import PlayButton from './PlayButton'
+import Timer from './Timer'
+import { Color } from './types'
 
 interface Props {
   player: string
+  color: Color
   moves: { white: string; black: string }[]
   capturedPieces: string[]
   checkStatus: string | null
   opponentId: string | null
+  whiteTime: number
+  blackTime: number
   startGame: () => void
 }
 
 export const RightSideMenu: React.FC<Props> = ({
   player,
+  color,
   moves,
   capturedPieces,
   checkStatus,
   opponentId,
+  whiteTime,
+  blackTime,
   startGame,
 }) => {
   return (
@@ -28,7 +35,10 @@ export const RightSideMenu: React.FC<Props> = ({
 
       <div className="w-full relative gap-2 flex flex-col">
         <div className="p-2 bg-[#000000] opacity-85 w-[130px] text-center text-2xl tracking-[4px] text-white">
-          15:00
+          <Timer
+            initialTime={color === 'b' ? blackTime : whiteTime}
+            isActive={player === 'b'}
+          />
         </div>
         <div className="w-full relative bg-[#F1F2F6]">
           <div className="w-full">
@@ -59,7 +69,10 @@ export const RightSideMenu: React.FC<Props> = ({
           </div>
         </div>
         <div className="p-2 bg-[#000000] opacity-85 w-[130px] text-center text-2xl tracking-[4px] text-white">
-          15:00
+          <Timer
+            initialTime={color === 'w' ? whiteTime : blackTime}
+            isActive={player === 'w'}
+          />
         </div>
       </div>
       {checkStatus !== null && checkStatus === 'wK' && (

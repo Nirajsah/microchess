@@ -54,7 +54,7 @@ export type Piece =
   | 'bQ'
   | 'bK'
 
-export type Color = 'WHITE' | 'BLACK'
+export type Color = 'w' | 'b'
 
 export type Square =
   | 'a1'
