@@ -4,10 +4,10 @@ import LeaderBoard from './HomePage/LeaderBoard'
 
 export default function App() {
   return (
-    <div className="w-full min-h-full max-w-[90%]">
-      {/* <Navbar /> */}
+    <div className="w-full min-h-full flex flex-col items-center max-w-[1320px]">
+      <Navbar />
       <HomePage />
-      {/* <LeaderBoard /> */}
+      <LeaderBoard />
     </div>
   )
 }

@@ -58,7 +58,7 @@ const PlayerData = [
 
 export default function LeaderBoard() {
   return (
-    <div className="max-w-[1280px] text-sm rounded-xl w-full h-full">
+    <div className="max-w-[1280px] mt-8 p-3 text-sm rounded-xl w-full h-full">
       <div className="w-full flex justify-between px-2 hero-background-circle">
         <span className="w-[165px]">Rank</span>
         <div className="flex justify-between w-full">
