@@ -16,7 +16,7 @@ import { RightSideMenu } from './RightSideMenu'
 import { fen_to_board } from 'wasm'
 
 // const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-const fen = 'rnbqkbnr/pppppppp/8/BB6/3PPPP1/N2Q3N/PPP4P/R3K2R w KQkq - - 0 1'
+const fen = 'rnbqkbnr/pppppppp/8/BB6/3PPPP1/N2Q3N/PPP4P/R3K2R - KQkq - - 0 1'
 
 const CBoard = () => {
   const chainId = window.sessionStorage.getItem('chainId') ?? ''

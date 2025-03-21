@@ -11,13 +11,14 @@ import blackKnight from '@/assets/bn.png'
 import blackBishop from '@/assets/bb.png'
 import blackQueen from '@/assets/bq.png'
 import blackKing from '@/assets/bk.png'
-import React from 'react'
+import React, { useRef, useState } from 'react'
 import { useMutation } from '@apollo/client'
 import { CAPTURE_PIECE, MOVE_PIECE } from '../../GraphQL/queries'
 import generatePossibleMoves from './GeneratePossibleMoves'
 import { BoardType, Color, Piece, Square, SquareToPieceMap } from './types'
 import { useChess } from '../../context/ChessProvider'
-import { generate_possible_moves } from 'wasm'
+import { generate_possible_moves, enable_dragging } from 'wasm'
+import { DndContext, DragEndEvent, useDroppable } from '@dnd-kit/core'
 
 const pieceImages: any = {
   wP: whitePawn,
@@ -184,7 +185,6 @@ export default function Board({
             chessSettings.dragNdrop ? piece : (selectedPiece as Piece)
           )
         }
-
         reset()
       } else {
         reset()
@@ -295,7 +295,7 @@ export default function Board({
   }
 
   return (
-    <div ref={boardRef} className="w-full h-full relative">
+    <div className="w-full h-full relative">
       {ranks.map((rank, rankIndex) => (
         <div key={rank} className="flex w-full h-full">
           {files.map((file, fileIndex) => {
@@ -354,13 +354,9 @@ export default function Board({
 
             return (
               <div
-                onDrop={(e) => {
-                  onDrop(e, square as Square, piece as Piece)
-                }}
-                onDragOver={(e) => {
-                  onDragOver(e)
-                }}
+                ref={boardRef}
                 key={file}
+                id={square}
                 style={{
                   backgroundColor,
                   ...borderRadius,
@@ -381,12 +377,10 @@ export default function Board({
                     }
                   }
                 }}
-                onDrag={(e) => {
-                  e.preventDefault()
-                }}
               >
                 {
                   <Tile
+                    boardRef={boardRef}
                     image={pieceImages[piece as Piece]}
                     piece={piece as Piece}
                     square={square as Square}
