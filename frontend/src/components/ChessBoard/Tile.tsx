@@ -28,7 +28,7 @@ export default function Tile({
   const pieceRef = useRef<HTMLImageElement | null>(null)
   const tileRef = useRef<HTMLImageElement | null>(null)
   const [dragging, setDragging] = useState(false)
-  const [position, setPosition] = useState({ x: 0, y: 0 })
+  const [position, setPosition] = useState({ x: 0, y: 0, z: 10 })
   const offset = useRef({ x: 0, y: 0 })
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -60,19 +60,35 @@ export default function Tile({
     setPosition({
       x: e.clientX - offset.current.x,
       y: e.clientY - offset.current.y,
+      z: 100,
     })
   }
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: any) => {
     setDragging(false)
-    const tileSize = tileRef.current?.getBoundingClientRect().width
+    const tile = tileRef.current
+    const tileSize = tile?.getBoundingClientRect().width
     if (!tileSize) return
     setPosition((prev) => ({
       x: Math.round(prev.x / tileSize) * tileSize,
       y: Math.round(prev.y / tileSize) * tileSize,
+      z: 10,
     }))
+
+    const boardRect = boardRef.current?.getBoundingClientRect()
+    if (!boardRect) return
+
+    const boardLeft = boardRect.left
+    const boardTop = boardRect.top
+    // Calculate the square (0-based index)
+    // Use Math.floor instead of Math.round to get the correct tile
+    const fileIndex = (position.x - boardTop) / tileSize
+    const rankIndex = (position.y - boardLeft) / tileSize
+
+    console.log(boardLeft, boardTop)
+    console.log(fileIndex, rankIndex)
+
     setPossMoves([])
-    setSelectedSquare(null)
   }
 
   useEffect(() => {
@@ -91,17 +107,18 @@ export default function Tile({
   }, [dragging])
 
   return (
-    <div ref={tileRef} className="w-full h-full relative">
+    <div ref={tileRef} className="w-full h-full">
       {piece && (
         <img
           ref={pieceRef}
+          id={piece}
           src={image}
           alt={piece}
           style={{
-            width: '65px',
-            height: '65px',
+            width: '70%',
+            height: '68%',
             position: 'absolute',
-            zIndex: 100,
+            zIndex: position.z,
             left: `${position.x + 12}px`,
             top: `${position.y + 12}px`,
             cursor: dragging ? 'grabbing' : 'grab',
