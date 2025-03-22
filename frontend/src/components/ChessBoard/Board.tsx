@@ -234,6 +234,7 @@ export default function Board({
   }
 
   function localMove(selectedSquare: Square, to_square: Square, piece: Piece) {
+    console.log('from', selectedSquare, 'to', to_square, 'piece', piece)
     setBoard((prevBoard: BoardType) => {
       const updatedPosition = { ...prevBoard.position }
 
@@ -295,7 +296,7 @@ export default function Board({
   }
 
   return (
-    <div className="w-full h-full relative">
+    <div ref={boardRef} className="w-full h-full relative">
       {ranks.map((rank, rankIndex) => (
         <div key={rank} className="flex w-full h-full">
           {files.map((file, fileIndex) => {
@@ -354,7 +355,6 @@ export default function Board({
 
             return (
               <div
-                ref={boardRef}
                 key={file}
                 id={square}
                 style={{
@@ -365,21 +365,23 @@ export default function Board({
                 className="md:h-[90px] w-[12vw] h-[12vw] md:w-[90px] flex justify-center items-center relative pieces"
                 onClick={(e) => {
                   e.preventDefault()
-                  if (color === player && !chessSettings.dragNdrop) {
-                    if (selectedPiece) {
-                      handleSquareClick(
-                        square as Square,
-                        selectedPiece,
-                        piece as Piece
-                      )
-                    } else {
-                      handleSquareClick(square as Square, piece as Piece, null)
-                    }
-                  }
+                  // if (color === player && !chessSettings.dragNdrop) {
+                  //   if (selectedPiece) {
+                  //     handleSquareClick(
+                  //       square as Square,
+                  //       selectedPiece,
+                  //       piece as Piece
+                  //     )
+                  //   } else {
+                  //     handleSquareClick(square as Square, piece as Piece, null)
+                  //   }
+                  // }
                 }}
               >
                 {
                   <Tile
+                    isBlack={isBlack}
+                    localMove={localMove}
                     boardRef={boardRef}
                     image={pieceImages[piece as Piece]}
                     piece={piece as Piece}

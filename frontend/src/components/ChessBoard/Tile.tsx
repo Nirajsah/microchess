@@ -13,14 +13,18 @@ export default function Tile({
   blackCastle,
   en_passant,
   boardRef,
+  localMove,
+  isBlack,
 }: {
+  isBlack: boolean
+  localMove: any
   boardRef: React.RefObject<HTMLDivElement>
   image: string | undefined
   piece: Piece
   square: Square
   setSelectedSquare: React.Dispatch<React.SetStateAction<Square | null>>
   setPossMoves: React.Dispatch<React.SetStateAction<Square[]>>
-  board: SquareToPieceMap
+  board: SquareToPieceMap | any
   whiteCastle: boolean
   blackCastle: boolean
   en_passant: string | null
@@ -30,10 +34,12 @@ export default function Tile({
   const [dragging, setDragging] = useState(false)
   const [position, setPosition] = useState({ x: 0, y: 0, z: 10 })
   const offset = useRef({ x: 0, y: 0 })
+  const [fromSquare, setFromSquare] = useState<Square | null>(null)
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
     setDragging(true)
+    setFromSquare(square)
 
     // Store offset relative to current position
     offset.current = {
@@ -75,18 +81,33 @@ export default function Tile({
       z: 10,
     }))
 
-    const boardRect = boardRef.current?.getBoundingClientRect()
-    if (!boardRect) return
+    const boardR = boardRef.current
+    if (!boardR) return
 
-    const boardLeft = boardRect.left
-    const boardTop = boardRect.top
-    // Calculate the square (0-based index)
-    // Use Math.floor instead of Math.round to get the correct tile
-    const fileIndex = (position.x - boardTop) / tileSize
-    const rankIndex = (position.y - boardLeft) / tileSize
+    const boardRect = boardR.getBoundingClientRect()
 
-    console.log(boardLeft, boardTop)
-    console.log(fileIndex, rankIndex)
+    // Calculate which square was clicked
+    const boardX = e.clientX - boardRect.left
+    const boardY = e.clientY - boardRect.top
+
+    // Calculate file (0-7) and rank (0-7)
+    const fileIndex = Math.floor(boardX / tileSize)
+    const rankIndex = Math.floor(boardY / tileSize)
+
+    let targetSquare
+    if (isBlack) {
+      //For black perspective
+      const file = String.fromCharCode(97 + (7 - fileIndex))
+      const rank = rankIndex + 1
+      targetSquare = `${file}${rank}` as Square
+    } else {
+      // For white perspective
+      const file = String.fromCharCode(97 + fileIndex)
+      const rank = 8 - rankIndex
+      targetSquare = `${file}${rank}` as Square
+    }
+
+    const targetPiece = board[targetSquare]
 
     setPossMoves([])
   }
@@ -107,7 +128,7 @@ export default function Tile({
   }, [dragging])
 
   return (
-    <div ref={tileRef} className="w-full h-full">
+    <div ref={tileRef} className="w-full h-full tile" data-square={square}>
       {piece && (
         <img
           ref={pieceRef}
