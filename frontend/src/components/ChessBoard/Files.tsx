@@ -2,7 +2,7 @@ import { Color } from './types'
 
 export default function Files({ color }: { color: Color }) {
   const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-  if (color.toLowerCase() === 'black') {
+  if (color.toLowerCase() === 'b') {
     return (
       <div className="flex w-full absolute bottom-0 font-bold">
         {files.reverse().map((file) => (

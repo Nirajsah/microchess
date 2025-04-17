@@ -362,7 +362,7 @@ export default function Board({
                   ...borderRadius,
                   ...highlight,
                 }}
-                className="md:h-[90px] w-[12vw] h-[12vw] md:w-[90px] flex justify-center items-center relative pieces"
+                className="md:h-[90px] w-[12vw] aspect-square md:w-[90px] flex justify-center items-center relative pieces"
                 onClick={(e) => {
                   e.preventDefault()
                   // if (color === player && !chessSettings.dragNdrop) {
@@ -380,8 +380,8 @@ export default function Board({
               >
                 {
                   <Tile
+                    handleMove={handleSquareClick}
                     isBlack={isBlack}
-                    localMove={localMove}
                     boardRef={boardRef}
                     image={pieceImages[piece as Piece]}
                     piece={piece as Piece}

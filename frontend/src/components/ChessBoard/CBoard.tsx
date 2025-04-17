@@ -130,7 +130,7 @@ const CBoard = () => {
   >([])
 
   const renderSquare = () => {
-    const isBlack = color.toLowerCase() === 'black'
+    const isBlack = color.toLowerCase() === 'b'
 
     return (
       <div className="w-full chess-board">
@@ -194,7 +194,7 @@ const CBoard = () => {
             {/* <div className="flex text-white w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
               Opponent {opponentId}
             </div> */}
-            <div className="w-full relative max-w-[720px] max-h-[720px] bg-white rounded-md">
+            <div className="w-full relative max-w-[720px] rounded-md">
               {renderSquare()}
             </div>
             {promoteData.show && (
@@ -211,7 +211,7 @@ const CBoard = () => {
             </div> */}
           </div>
 
-          <div className="w-full mt-4 md:mt-8">
+          {/* <div className="w-full mt-4 md:mt-8">
             <RightSideMenu
               checkStatus={board.KingInCheck}
               player={player}
@@ -224,7 +224,7 @@ const CBoard = () => {
               startGame={startGame}
               key={chainId}
             />
-          </div>
+          </div> */}
         </div>
       </div>
     </div>
