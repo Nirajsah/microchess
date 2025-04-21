@@ -14,6 +14,7 @@ import { PromotionCard } from './PromotionCard'
 import { BoardType, Color, Fen, PromoteData } from './types'
 import { RightSideMenu } from './RightSideMenu'
 import { fen_to_board } from 'wasm'
+import ChessBoard from './ChessBoard'
 
 // const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const fen = 'rnbqkbnr/pppppppp/8/BB6/3PPPP1/N2Q3N/PPP4P/R3K2R - KQkq - - 0 1'
@@ -134,18 +135,19 @@ const CBoard = () => {
 
     return (
       <div className="w-full chess-board">
-        <div className="h-[12.5%] z-50 absolute">
+        <div className="h-[12.5%] z-50 absolute text-black">
           <Ranks color={color as Color} />
         </div>
-        <Board
+        {/* <Board
           boardData={board}
           isBlack={isBlack}
           color={color as Color}
           player={player as Color}
           setBoard={setBoard}
           setPromoteData={setPromoteData}
-        />
-        <div className="flex">
+        /> */}
+        <ChessBoard boardData={board} />
+        <div className="flex text-black">
           <Files color={color as Color} />
         </div>
       </div>

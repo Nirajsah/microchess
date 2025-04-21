@@ -1,3 +1,4 @@
+/** TODO: Replace with <ChessTile /> after complete porting */
 import React, { useEffect, useRef, useState } from 'react'
 import { Piece, Square, SquareToPieceMap } from './types'
 import { generate_possible_moves } from 'wasm'
@@ -35,17 +36,38 @@ export default function Tile({
   const [position, setPosition] = useState({ x: 0, y: 0, z: 10 })
   const offset = useRef({ x: 0, y: 0 })
   const [fromSquare, setFromSquare] = useState<Square | null>(null)
+  const [originalPosition, setOriginalPosition] = useState({ x: 0, y: 0 })
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
+
+    const board = boardRef.current
+    const pieceR = pieceRef.current
+    if (!board || !pieceR) return
+
     setDragging(true)
     setFromSquare(square)
 
-    // Store offset relative to current position
+    const boardRect = board.getBoundingClientRect()
+    const pieceRect = pieceR.getBoundingClientRect()
+
+    const relativeX = pieceRect.left - boardRect.left
+    const relativeY = pieceRect.top - boardRect.top
+
+    console.log('Piece X relative to board:', relativeX)
+    console.log('Piece Y relative to board:', relativeY)
+
+    // Calculate offset from the center of the piece
     offset.current = {
       x: e.clientX - position.x,
       y: e.clientY - position.y,
     }
+
+    // Save the original position for reset if needed
+    setOriginalPosition({
+      x: 0,
+      y: 0,
+    })
 
     setSelectedSquare(square)
 
@@ -63,40 +85,71 @@ export default function Tile({
   const handleMouseMove = (e: MouseEvent) => {
     if (!dragging) return
 
+    const board = boardRef.current
+    const pieceR = pieceRef.current
+    if (!board || !pieceR) return
+
+    const boardRect = board.getBoundingClientRect()
+    const pieceRect = pieceR.getBoundingClientRect()
+
+    const relativeX = e.clientX - boardRect.left
+    const relativeY = e.clientY - boardRect.top
+
+    console.log('Mouse X:', relativeX, 'Mouse Y:', relativeY)
+
+    // Calculate new position based on mouse position relative to board
+    let newX = e.clientX - offset.current.x
+    let newY = e.clientY - offset.current.y
+
+    console.log('New X:', newX, 'New Y:', newY)
+    // Clamp to board boundaries
+    // Calculate the adjusted boundaries accounting for piece size
+
     setPosition({
-      x: e.clientX - offset.current.x,
-      y: e.clientY - offset.current.y,
+      x: relativeX,
+      y: relativeY,
       z: 100,
     })
   }
 
-  const handleMouseUp = (e: any) => {
-    setDragging(false)
-    const tile = tileRef.current
-    const tileSize = tile?.getBoundingClientRect().width
-    if (!tileSize) return
-    setPosition((prev) => ({
-      x: Math.round(prev.x / tileSize) * tileSize,
-      y: Math.round(prev.y / tileSize) * tileSize,
-      z: 10,
-    }))
+  const handleMouseUp = (e: MouseEvent) => {
+    if (!dragging) return
 
-    const boardR = boardRef.current
-    if (!boardR) return
+    const boardl = boardRef.current
+    if (!boardl) return
 
-    const boardRect = boardR.getBoundingClientRect()
+    const boardRect = boardl.getBoundingClientRect()
+    const tileSize = boardRect.width / 8 // Assuming 8x8 chess board
 
-    // Calculate which square was clicked
+    // Calculate which square was under the mouse on release
     const boardX = e.clientX - boardRect.left
     const boardY = e.clientY - boardRect.top
+
+    // Make sure the release happened within the board boundaries
+    if (
+      boardX < 0 ||
+      boardX > boardRect.width ||
+      boardY < 0 ||
+      boardY > boardRect.height
+    ) {
+      // If released outside the board, reset to original position
+      setPosition({
+        x: originalPosition.x,
+        y: originalPosition.y,
+        z: 0,
+      })
+      setDragging(false)
+      setPossMoves([])
+      return
+    }
 
     // Calculate file (0-7) and rank (0-7)
     const fileIndex = Math.floor(boardX / tileSize)
     const rankIndex = Math.floor(boardY / tileSize)
 
-    let targetSquare
+    let targetSquare: Square
     if (isBlack) {
-      //For black perspective
+      // For black perspective
       const file = String.fromCharCode(97 + (7 - fileIndex))
       const rank = rankIndex + 1
       targetSquare = `${file}${rank}` as Square
@@ -109,6 +162,18 @@ export default function Tile({
 
     const targetPiece = board[targetSquare]
 
+    // Reset drag state
+    setDragging(false)
+
+    // // If it's a valid move, let your move handler take care of actual piece movement
+    // if (fromSquare && possMoves.includes(targetSquare)) {
+    //   localMove(fromSquare, targetSquare, targetPiece)
+    // } else {
+    //   // Reset to original position if not a valid move
+    //   setPosition(originalPosition)
+    // }
+
+    setSelectedSquare(null)
     setPossMoves([])
   }
 
@@ -128,7 +193,11 @@ export default function Tile({
   }, [dragging])
 
   return (
-    <div ref={tileRef} className="w-full h-full tile" data-square={square}>
+    <div
+      ref={tileRef}
+      className="w-full relative h-full tile flex items-center justify-center"
+      data-square={square}
+    >
       {piece && (
         <img
           ref={pieceRef}
@@ -139,11 +208,11 @@ export default function Tile({
             width: '70%',
             height: '68%',
             position: 'absolute',
-            zIndex: position.z,
-            left: `${position.x + 12}px`,
-            top: `${position.y + 12}px`,
+            zIndex: dragging ? 100 : position.z,
             cursor: dragging ? 'grabbing' : 'grab',
             userSelect: 'none',
+            transform: `translate(${position.x}px, ${position.y}px)`,
+            transition: dragging ? 'none' : 'transform 0.1s ease-out',
           }}
           draggable={false}
           onMouseDown={handleMouseDown}

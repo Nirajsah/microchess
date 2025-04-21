@@ -1,3 +1,4 @@
+/** TODO: Replace with <ChessBoard /> after complete porting */
 import Tile from './Tile'
 import whitePawn from '@/assets/wp.png'
 import whiteRook from '@/assets/wr.png'
@@ -323,6 +324,11 @@ export default function Board({
                 ? selectedTheme.light
                 : selectedTheme.dark
 
+            const bg =
+              number % 2 === 0
+                ? 'bg-green-200/80'
+                : 'bg-lime-400/30 dark:bg-lime-400/30'
+
             const onDrop = (
               e: React.DragEvent<HTMLDivElement>,
               to: Square,
@@ -358,11 +364,11 @@ export default function Board({
                 key={file}
                 id={square}
                 style={{
-                  backgroundColor,
+                  // backgroundColor,
                   ...borderRadius,
                   ...highlight,
                 }}
-                className="md:h-[90px] w-[12vw] aspect-square md:w-[90px] flex justify-center items-center relative pieces"
+                className={`${bg} md:h-[90px] w-[12vw] aspect-square md:w-[90px] flex justify-center items-center relative pieces`}
                 onClick={(e) => {
                   e.preventDefault()
                   // if (color === player && !chessSettings.dragNdrop) {
@@ -380,7 +386,7 @@ export default function Board({
               >
                 {
                   <Tile
-                    handleMove={handleSquareClick}
+                    localMove={localMove}
                     isBlack={isBlack}
                     boardRef={boardRef}
                     image={pieceImages[piece as Piece]}
