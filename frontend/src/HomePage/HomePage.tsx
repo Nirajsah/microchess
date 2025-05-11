@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 const BorderAnimation = () => {
   return (
     <>
@@ -22,7 +24,7 @@ const BorderAnimation = () => {
 
 export default function HomePage() {
   return (
-    <div className="w-full h-full lg:min-h-[880px] flex">
+    <div className="w-full h-full min-h-[880px] flex">
       {/** New UI */}
       <div className="w-full h-full flex flex-col gap-2 p-2">
         <div className="flex w-full gap-2 p-2 justify-between h-full max-h-[600px]">
@@ -127,10 +129,13 @@ export default function HomePage() {
             <div className="text-4xl">Matches Played</div>
             <div className="text-[100px] leading-[80px] self-end">10000000</div>
           </div>
-          <div className="relative border border-[#ffffff24] w-1/3 bg-gradient-to-r from-[#2148ed] to-[#3768f1] rounded-[30px] h-full">
-            <div className="absolute w-[200px] h-[200px] bg-[#2148ed] shadow-lg z-10 rounded-full"></div>
-          </div>
-          <div className="bg-[#0a0a0a] border border-[#ffffff24] w-1/3 rounded-[30px] h-full"></div>
+          <div className="relative border border-[#ffffff24] w-1/3 bg-gradient-to-r from-[#2148ed] to-[#3768f1] rounded-[30px] h-full"></div>
+          <Link
+            to="/chess"
+            className="bg-[#0a0a0a] text-4xl border border-[#ffffff24] w-1/3 rounded-[30px] h-full flex justify-center items-center"
+          >
+            Play Now
+          </Link>
         </div>
       </div>
     </div>
