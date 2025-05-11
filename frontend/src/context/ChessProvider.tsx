@@ -1,14 +1,21 @@
 import React from 'react'
+import { ThemeName } from '../components/ChessBoard/theme'
 
 export const ChessContext = React.createContext<any | null>(null)
+
+interface ChessSettings {
+  dragNdrop: boolean
+  theme: ThemeName
+}
 
 export default function ChessProvider({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const [chessSettings, setChessSettings] = React.useState({
+  const [chessSettings, setChessSettings] = React.useState<ChessSettings>({
     dragNdrop: true,
+    theme: 'default',
   })
 
   React.useEffect(() => {
@@ -16,6 +23,7 @@ export default function ChessProvider({
       const dragNdrop = window.sessionStorage.getItem('dragNdrop') ?? ''
       const isDragNdrop = parseInt(dragNdrop, 10)
       setChessSettings({
+        ...chessSettings,
         dragNdrop: Boolean(isDragNdrop),
       })
     }

@@ -9,20 +9,23 @@ import {
   NOTIFICATIONS,
   TIME_LEFT,
 } from '../../GraphQL/queries'
-import Board from './Board'
+// import Board from './Board'
 import { PromotionCard } from './PromotionCard'
 import { BoardType, Color, Fen, PromoteData } from './types'
 import { RightSideMenu } from './RightSideMenu'
 import { fen_to_board } from 'wasm'
 import ChessBoard from './ChessBoard'
+import Modal from '../Modal'
+import Settings from '../Settings'
 
 // const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const fen = 'rnbqkbnr/pppppppp/8/BB6/3PPPP1/N2Q3N/PPP4P/R3K2R - KQkq - - 0 1'
+type Player = 'w' | 'b' | '-'
 
 const CBoard = () => {
   const chainId = window.sessionStorage.getItem('chainId') ?? ''
   const owner = window.sessionStorage.getItem('owner') ?? ''
-  const [player, setPlayer] = React.useState('')
+  const [player, setPlayer] = React.useState<Player>('-')
   const [boardState, setBoardState] = React.useState<Fen>(fen)
   const [color, setColor] = React.useState<Color>('w')
   const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
@@ -103,7 +106,6 @@ const CBoard = () => {
   const [board, setBoard] = React.useState<BoardType>(() => {
     let obj = fen_to_board(boardState)
     setPlayer(obj.player_turn)
-    console.log(obj)
     return {
       position: obj.position,
       KingInCheck: obj.king_in_check,
@@ -176,22 +178,15 @@ const CBoard = () => {
   }
 
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        background: appBackgrounds.dark,
-      }}
-      className="w-full min-h-screen p-3"
-    >
-      <div className="flex flex-col items-center justify-center">
-        {/* <Modal select={open} unselect={() => setOpen(!open)}>
-          <Welcome />
+    <div className="w-full min-h-full p-3">
+      <div className="flex flex-col items-center justify-center h-full">
+        <Modal select={open} unselect={() => setOpen(!open)}>
+          <Settings />
         </Modal>
         {/* <div className="absolute left-0 w-full p-2 max-w-[1320px] flex items-center justify-between">
           <Navbar />
         </div> */}
-        <div className="flex gap-4 w-full justify-center">
+        <div className="flex gap-4 w-full justify-center items-center">
           <div className="flex w-full max-w-[720px] relative">
             {/* <div className="flex text-white w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
               Opponent {opponentId}
@@ -213,7 +208,7 @@ const CBoard = () => {
             </div> */}
           </div>
 
-          {/* <div className="w-full mt-4 md:mt-8">
+          <div className="w-[30%]">
             <RightSideMenu
               checkStatus={board.KingInCheck}
               player={player}
@@ -226,7 +221,7 @@ const CBoard = () => {
               startGame={startGame}
               key={chainId}
             />
-          </div> */}
+          </div>
         </div>
       </div>
     </div>

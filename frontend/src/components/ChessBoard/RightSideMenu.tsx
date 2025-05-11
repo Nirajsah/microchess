@@ -1,10 +1,21 @@
-import { AlertCircle } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Copy,
+  Eye,
+  EyeOff,
+  Loader2,
+} from 'lucide-react'
 import CapturedPieces from './CapturedPieces'
 import Timer from './Timer'
 import { Color } from './types'
+import { UserPlus, Shuffle, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
-interface Props {
-  player: string
+export interface MatchData {
+  player: string | null
   color: Color
   moves: { white: string; black: string }[]
   capturedPieces: string[]
@@ -15,32 +26,45 @@ interface Props {
   startGame: () => void
 }
 
-export const RightSideMenu: React.FC<Props> = ({
-  player,
-  color,
-  moves,
-  capturedPieces,
-  checkStatus,
-  opponentId,
-  whiteTime,
-  blackTime,
-  startGame,
-}) => {
+export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
+  return (
+    <div>
+      {matchData.player === 'w' || matchData.player === 'b' ? (
+        <MatchDataUI {...matchData} />
+      ) : (
+        <MatchSelect />
+      )}
+    </div>
+  )
+}
+
+const MatchDataUI = (data: MatchData) => {
+  const {
+    player,
+    color,
+    moves,
+    capturedPieces,
+    checkStatus,
+    opponentId,
+    whiteTime,
+    blackTime,
+    startGame,
+  } = data
   return (
     <div className="w-full items-center justify-between flex flex-col gap-4 h-[720px]">
-      <div className="py-4 text-3xl px-2 font-bold w-full border border-black">
+      <div className="py-4 text-3xl px-2 font-bold w-full border border-[#ffffff24] bg-[#0a0a0a]">
         {/* {player} Plays */}
         Status:
       </div>
 
       <div className="w-full relative gap-2 flex flex-col">
-        <div className="p-2 bg-[#000000] opacity-85 w-[130px] text-center text-2xl tracking-[4px] text-white">
+        <div className="p-2 border border-[#ffffff24] bg-[#0a0a0a] opacity-85 w-[130px] text-center text-2xl tracking-[4px] text-white">
           <Timer
             initialTime={color === 'b' ? blackTime : whiteTime}
             isActive={player === 'b'}
           />
         </div>
-        <div className="w-full relative bg-[#F1F2F6]">
+        <div className="w-full relative border border-[#ffffff24] bg-[#0a0a0a]">
           <div className="w-full">
             <table className="w-full">
               <thead className="">
@@ -68,7 +92,7 @@ export const RightSideMenu: React.FC<Props> = ({
             </div>
           </div>
         </div>
-        <div className="p-2 bg-[#000000] opacity-85 w-[130px] text-center text-2xl tracking-[4px] text-white">
+        <div className="p-2 border border-[#ffffff24] bg-[#0a0a0a] opacity-85 w-[130px] text-center text-2xl tracking-[4px] text-white">
           <Timer
             initialTime={color === 'w' ? whiteTime : blackTime}
             isActive={player === 'w'}
@@ -91,12 +115,218 @@ export const RightSideMenu: React.FC<Props> = ({
         <h3 className="text-sm font-medium text-muted-foreground">
           Captured Pieces
         </h3>
-        <div className="border border-black w-full">
+        <div className="border border-[#ffffff24] bg-[#0a0a0a] w-full">
           <div className="flex flex-wrap gap-2 p-2 bg-secondary/10 rounded-md">
             <CapturedPieces pieces={capturedPieces} />
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+const MatchSelect = () => {
+  const generateHash = () =>
+    Math.random().toString(36).substring(2, 14).toUpperCase() // e.g., "K3J9WL48HTZQ"
+  const [step, setStep] = useState<
+    'idle' | 'loading' | 'hash' | 'friendlyhash'
+  >('idle')
+  const [hash, setHash] = useState('')
+  const [showHash, setShowHash] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const handleStepChange = (
+    step: 'idle' | 'loading' | 'hash' | 'friendlyhash'
+  ) => {
+    console.log('handle step change')
+    setStep(step)
+  }
+
+  const handleFriendlyClick = () => {
+    setStep('loading')
+
+    setTimeout(() => {
+      setHash(generateHash())
+      setStep('hash')
+    }, 1500)
+  }
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(hash)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1200)
+  }
+  return (
+    <div className="font-fira max-w-xl mx-auto mt-10 px-6 py-8 border border-[#ffffff24] bg-[#0a0a0a] rounded-2xl shadow-xl">
+      {step === 'idle' && (
+        <>
+          <h2 className="text-2xl font-bold text-white mb-2 text-center">
+            Start a New Game
+          </h2>
+          <p className="text-zinc-400 text-center mb-6">
+            Choose how you want to play
+          </p>
+
+          <div className="grid gap-8">
+            {/* Random Matchmaking */}
+            <div>
+              <button className="flex items-center gap-4 w-full px-6 py-4 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800/50 rounded-xl transition">
+                <Shuffle className="w-6 h-6" />
+                <div className="text-left">
+                  <div className="font-semibold text-lg">
+                    Random Matchmaking
+                  </div>
+                  <div className="text-sm text-blue-700 dark:text-blue-300">
+                    Get matched with a player of similar skill.
+                  </div>
+                </div>
+              </button>
+              <p className="mt-2 text-sm text-blue-300 px-2">
+                Matchmaking uses your rank (ELO) to pair you with a similarly
+                skilled opponent. It's automatic, fair, and fast — ideal for
+                quick competitive games.
+              </p>
+            </div>
+
+            {/* Friendly Match */}
+            <div>
+              <button
+                onClick={handleFriendlyClick}
+                className="flex items-center gap-4 w-full px-6 py-4 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800/50 rounded-xl transition"
+              >
+                <Users className="w-6 h-6" />
+                <div className="text-left">
+                  <div className="font-semibold text-lg">Friendly Match</div>
+                  <div className="text-sm text-green-700 dark:text-green-300">
+                    Invite a friend to a private game.
+                  </div>
+                </div>
+              </button>
+              <p className="mt-2 text-sm text-green-300 px-2">
+                Play casually with someone you know by sending them a Game Hash.
+                Great for practice or fun matches without affecting your rank.
+              </p>
+
+              <button
+                onClick={() => handleStepChange('friendlyhash')}
+                className="mt-2 text-sm text-purple-300 px-2 underline"
+              >
+                Have a Friendly Game Hash?
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {step === 'loading' && (
+        <div className="flex flex-col items-center justify-center text-center space-y-4">
+          <Loader2 className="w-8 h-8 text-white animate-spin" />
+          <p className="text-white">Creating private room...</p>
+        </div>
+      )}
+
+      {step === 'friendlyhash' && (
+        <JoinMatch handleStepChange={handleStepChange} />
+      )}
+
+      {step === 'hash' && (
+        <div className="flex flex-col items-center text-center gap-4">
+          <button
+            onClick={() => handleStepChange('idle')}
+            className="self-start text-sm flex items-center gap-2 hover:scale-110 transition-all"
+          >
+            <ArrowLeft className="ml-2 w-4 h-4" />
+            Go Back
+          </button>
+          <h2 className="text-xl font-semibold text-white">Room Ready!</h2>
+          <p className="text-zinc-400">Share this code with your friend:</p>
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-mono px-4 py-2 bg-zinc-800 rounded-lg text-white tracking-wide">
+              {showHash ? hash : '••••••••••'}
+            </span>
+            <button
+              onClick={() => setShowHash(!showHash)}
+              className="text-zinc-400 hover:text-white"
+              title="Toggle visibility"
+            >
+              {showHash ? (
+                <Eye className="w-5 h-5" />
+              ) : (
+                <EyeOff className="w-5 h-5" />
+              )}
+            </button>
+            <button
+              onClick={handleCopy}
+              className="text-zinc-400 hover:text-white"
+              title="Copy to clipboard"
+            >
+              <Copy className="w-5 h-5" />
+            </button>
+          </div>
+          {copied && <p className="text-green-400 text-sm">Copied!</p>}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(
+                  `${window.location.origin}/chess?gamehash=${hash}`
+                )
+                setCopied(true)
+                setTimeout(() => setCopied(false), 1200)
+              }}
+              className="text-zinc-400 text-sm hover:text-white flex items-center gap-2 transition"
+              title="Copy link"
+            >
+              <UserPlus className="w-4 h-4" />
+              Invite Friend via Link
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+//
+const JoinMatch = ({ handleStepChange }: { handleStepChange: any }) => {
+  const [searchParams] = useSearchParams()
+  const [code, setCode] = useState('')
+
+  useEffect(() => {
+    const incoming = searchParams.get('gamehash')
+    if (incoming) setCode(incoming.toUpperCase())
+  }, [searchParams])
+
+  const handleJoin = () => {
+    if (!code) return alert('Please enter a code.')
+    // logic to join the game
+    alert(`Joining game with code: ${code}`)
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => handleStepChange('idle')}
+        className="self-start text-sm flex items-center gap-2 hover:scale-110 transition-all"
+      >
+        <ArrowLeft className="ml-2 w-4 h-4" />
+        Go Back
+      </button>
+      <h2 className="text-xl font-bold m-4 text-center">
+        Join a Friend’s Game
+      </h2>
+      <input
+        type="text"
+        value={code}
+        onChange={(e) => setCode(e.target.value.toUpperCase())}
+        placeholder="Enter match code"
+        className="w-full px-4 py-2 rounded-lg bg-[#0a0a0a] border border-[#ffffff24] text-white mb-4 outline-none"
+      />
+      <button
+        onClick={handleJoin}
+        className="flex bg-[#0a0a0a] border border-[#ffffff24] items-center justify-center w-full px-4 py-2 hover:bg-[#111111] rounded-lg transition"
+      >
+        Join Game <ArrowRight className="ml-2 w-4 h-4" />
+      </button>
     </div>
   )
 }

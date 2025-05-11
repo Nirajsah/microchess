@@ -44,7 +44,10 @@ export default function ChessTile(props: ChessTileProps) {
   return (
     <div
       onMouseDown={props.handleMouseDown}
-      className={`${background} w-full h-full flex justify-center items-center`}
+      style={{
+        backgroundColor: background,
+      }}
+      className="w-full h-full flex justify-center items-center"
     >
       {piece && !props.isDragging && (
         <img
@@ -53,7 +56,7 @@ export default function ChessTile(props: ChessTileProps) {
           }}
           src={pieceImages[piece]}
           alt={piece}
-          className="w-[90%] h-[90%] object-contain select-none"
+          className="w-[80%] h-[80%] object-contain select-none"
           onMouseDown={props.handleMouseDown}
           draggable={false}
         />

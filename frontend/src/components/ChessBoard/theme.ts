@@ -1,4 +1,24 @@
-export const themes = {
+export type ThemeName =
+  | 'classicWood'
+  | 'modernMinimalist'
+  | 'forest'
+  | 'oceanBreeze'
+  | 'mutedPastel'
+  | 'nightMode'
+  | 'desertSand'
+  | 'softViolet'
+  | 'default'
+
+type Theme = {
+  light: string
+  dark: string
+  background: string
+  selectedSquare: string
+}
+
+type Themes = Record<ThemeName, Theme>
+
+export const themes: Themes = {
   classicWood: {
     light: '#d2b48c', // Tan
     dark: '#8b5a2b', // Saddle Brown
