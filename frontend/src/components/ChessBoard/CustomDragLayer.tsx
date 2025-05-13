@@ -44,8 +44,8 @@ export default function CustomDragLayer({
         <div
           style={{
             position: 'absolute',
-            width: '12.5%', // One tile width (100 / 8)
-            height: '12.5%',
+            width: '10.5%', // One tile width (100 / 8)
+            height: '10.5%',
             backgroundImage: `url(${pieceImages[draggingPiece]})`,
             backgroundSize: 'contain',
             backgroundRepeat: 'no-repeat',

@@ -69,7 +69,7 @@ export const themes: Themes = {
     selectedSquare: '#ff0000',
   },
   default: {
-    light: '#ff685324',
+    light: '#ff6853',
     dark: '#ff2a00bf',
     background: '#ffebe84a',
     selectedSquare: '#ff0000',

@@ -6,6 +6,7 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  LucideProps,
 } from 'lucide-react'
 import CapturedPieces from './CapturedPieces'
 import Timer from './Timer'
@@ -138,7 +139,6 @@ const MatchSelect = () => {
   const handleStepChange = (
     step: 'idle' | 'loading' | 'hash' | 'friendlyhash'
   ) => {
-    console.log('handle step change')
     setStep(step)
   }
 
@@ -170,17 +170,11 @@ const MatchSelect = () => {
           <div className="grid gap-8">
             {/* Random Matchmaking */}
             <div>
-              <button className="flex items-center gap-4 w-full px-6 py-4 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800/50 rounded-xl transition">
-                <Shuffle className="w-6 h-6" />
-                <div className="text-left">
-                  <div className="font-semibold text-lg">
-                    Random Matchmaking
-                  </div>
-                  <div className="text-sm text-blue-700 dark:text-blue-300">
-                    Get matched with a player of similar skill.
-                  </div>
-                </div>
-              </button>
+              <MatchButton
+                handleFriendlyMatch={handleFriendlyClick}
+                name="Random Match"
+                icon={<Shuffle className="w-6 h-6" />}
+              />
               <p className="mt-2 text-sm text-blue-300 px-2">
                 Matchmaking uses your rank (ELO) to pair you with a similarly
                 skilled opponent. It's automatic, fair, and fast — ideal for
@@ -190,18 +184,11 @@ const MatchSelect = () => {
 
             {/* Friendly Match */}
             <div>
-              <button
-                onClick={handleFriendlyClick}
-                className="flex items-center gap-4 w-full px-6 py-4 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800/50 rounded-xl transition"
-              >
-                <Users className="w-6 h-6" />
-                <div className="text-left">
-                  <div className="font-semibold text-lg">Friendly Match</div>
-                  <div className="text-sm text-green-700 dark:text-green-300">
-                    Invite a friend to a private game.
-                  </div>
-                </div>
-              </button>
+              <MatchButton
+                handleFriendlyMatch={handleFriendlyClick}
+                name="Friendly Match"
+                icon={<Users className="w-6 h-6" />}
+              />
               <p className="mt-2 text-sm text-green-300 px-2">
                 Play casually with someone you know by sending them a Game Hash.
                 Great for practice or fun matches without affecting your rank.
@@ -282,6 +269,40 @@ const MatchSelect = () => {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+type MatchMakingButtonType = {
+  handleFriendlyMatch: () => void
+  name: string
+  icon: any
+}
+
+const MatchButton = (props: MatchMakingButtonType) => {
+  const [pressed, setPressed] = useState(false)
+
+  function handleClick() {
+    setPressed(true)
+    setTimeout(() => setPressed(false), 120) // revert after 120ms
+  }
+
+  return (
+    <div className="relative w-full h-[80px]">
+      <div className="w-full h-full bg-purple-500/40 shadow-inner"></div>
+      <button
+        onClick={handleClick}
+        style={{
+          top: pressed ? '0px' : '-4px',
+          left: pressed ? '0px' : '-4px',
+        }}
+        className="absolute bg-purple-400/40 w-full h-full transition-all flex justify-center items-center gap-3 px-6 py-4"
+      >
+        {props.icon}
+        <div className="text-left">
+          <div className="font-semibold text-lg">{props.name}</div>
+        </div>
+      </button>
     </div>
   )
 }
