@@ -1,26 +1,27 @@
 use std::collections::BTreeSet;
 
+use async_graphql::SimpleObject;
 use chess::{
     piece::Color,
     playerprofile::{PlayerProfile, Rank},
     Clock, FriendId, Game, GameChain, PlayerRequest,
 };
 use linera_sdk::{
-    base::{Amount, Owner, PublicKey},
+    linera_base_types::{AccountOwner, Amount},
     views::{linera_views, MapView, RegisterView, RootView, ViewStorageContext},
 };
 
-#[derive(RootView, async_graphql::SimpleObject)]
-#[view(context = "ViewStorageContext")]
+#[derive(RootView, SimpleObject)]
+#[view(context = ViewStorageContext)]
 pub struct Chess {
     /// Players of the game
-    pub owners: MapView<Owner, Color>,
+    pub owners: MapView<AccountOwner, Color>,
     /// The current game state
     pub board: RegisterView<Game>,
     /// The current game clock
     pub clock: RegisterView<Clock>,
     /// The current game players
-    pub players: RegisterView<Vec<Owner>>,
+    pub players: RegisterView<Vec<AccountOwner>>,
     /// Player Request, requesting a game
     pub lobby: MapView<Rank, PlayerRequest>,
     /// Player Requesting to play with a Friend(need a hash)
@@ -30,7 +31,7 @@ pub struct Chess {
     /// Player Stats
     pub stats: RegisterView<PlayerProfile>,
     /// Temporary chains for individual games, by player.
-    pub game_chains: MapView<PublicKey, BTreeSet<GameChain>>,
+    pub game_chains: MapView<AccountOwner, BTreeSet<GameChain>>,
     /// store the betting amount on temp chain.
     pub bet_amount: RegisterView<Amount>,
 }
@@ -38,15 +39,15 @@ pub struct Chess {
 #[allow(dead_code)]
 impl Chess {
     /// A function to get all the players
-    pub fn get_players(&self) -> &Vec<Owner> {
+    pub fn get_players(&self) -> &Vec<AccountOwner> {
         self.players.get()
     }
     /// A function to add player to a game
-    pub fn add_player(&mut self, player: Owner) {
+    pub fn add_player(&mut self, player: AccountOwner) {
         self.players.get_mut().push(player);
     }
     /// A function to validate both players are differnt owners
-    pub fn opponent(&self, player: Owner) -> Option<Owner> {
+    pub fn opponent(&self, player: AccountOwner) -> Option<AccountOwner> {
         let players = self.players.get();
 
         if players.len() != 2 {

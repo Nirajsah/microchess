@@ -12,8 +12,8 @@ use chess::{
 };
 
 use linera_sdk::{
-    base::{Owner, PublicKey, WithServiceAbi},
     graphql::GraphQLMutationRoot,
+    linera_base_types::{AccountOwner, WithServiceAbi},
     views::View,
     Service, ServiceRuntime,
 };
@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone)]
 pub struct ChessService {
     state: Arc<Chess>,
+    runtime: Arc<ServiceRuntime<ChessService>>,
 }
 
 linera_sdk::service!(ChessService);
@@ -39,29 +40,34 @@ impl Service for ChessService {
             .expect("Failed to load state");
         ChessService {
             state: Arc::new(state),
+            runtime: Arc::new(runtime),
         }
     }
 
     async fn handle_query(&self, query: Request) -> Response {
-        let schema =
-            Schema::build(self.clone(), Operation::mutation_root(), EmptySubscription).finish();
+        let schema = Schema::build(
+            self.clone(),
+            Operation::mutation_root(self.runtime.clone()),
+            EmptySubscription,
+        )
+        .finish();
         schema.execute(query).await
     }
 }
 
 #[derive(Deserialize, Serialize, SimpleObject)]
 struct GameData {
-    board: String,         // ChessBoard
-    player_turn: Color,    // player's color to move
-    player: Color,         // players color
-    moves: Vec<Move>,      // moves made till now
-    opponent: Owner,       // opponent player id(Owner)
-    game_state: GameState, // State of the Game, Play, StaleMate or CheckMate
+    board: String,          // ChessBoard
+    player_turn: Color,     // player's color to move
+    player: Color,          // players color
+    moves: Vec<Move>,       // moves made till now
+    opponent: AccountOwner, // opponent player id(Owner)
+    game_state: GameState,  // State of the Game, Play, StaleMate or CheckMate
 }
 
 #[Object]
 impl ChessService {
-    async fn game_data(&self, player: Owner) -> GameData {
+    async fn game_data(&self, player: AccountOwner) -> GameData {
         let game = self.state.board.get();
         GameData {
             board: game.board.to_fen(
@@ -76,7 +82,7 @@ impl ChessService {
             game_state: game.state,
         }
     }
-    async fn owners(&self) -> Vec<Owner> {
+    async fn owners(&self) -> Vec<AccountOwner> {
         self.state.players.get().to_vec()
     }
     async fn captured_pieces(&self) -> &Vec<Piece> {
@@ -91,7 +97,7 @@ impl ChessService {
     //async fn get_leaderboard(&self) -> Vec<PlayerStats> {
     //    self.state.get_leaderboard()
     //}
-    async fn get_game_chain(&self, pub_key: PublicKey) -> BTreeSet<GameChain> {
+    async fn get_game_chain(&self, pub_key: AccountOwner) -> BTreeSet<GameChain> {
         self.state
             .game_chains
             .get(&pub_key)
