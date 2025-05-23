@@ -29,7 +29,7 @@ export interface MatchData {
 
 export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
   return (
-    <div>
+    <div className="h-full w-full">
       {matchData.player === 'w' || matchData.player === 'b' ? (
         <MatchDataUI {...matchData} />
       ) : (
@@ -157,7 +157,7 @@ const MatchSelect = () => {
     setTimeout(() => setCopied(false), 1200)
   }
   return (
-    <div className="font-fira max-w-xl mx-auto mt-10 px-6 py-8 border border-[#ffffff24] bg-[#0a0a0a] rounded-2xl shadow-xl">
+    <div className="font-fira h-full w-full px-6 py-8 border border-[#ffffff24] bg-[#0a0a0a] rounded-2xl shadow-xl">
       {step === 'idle' && (
         <>
           <h2 className="text-2xl font-bold text-white mb-2 text-center">
@@ -289,14 +289,14 @@ const MatchButton = (props: MatchMakingButtonType) => {
 
   return (
     <div className="relative w-full h-[80px]">
-      <div className="w-full h-full bg-purple-500/40 shadow-inner"></div>
+      <div className="w-full h-full bg-[#ffffff24] shadow-inner"></div>
       <button
         onClick={handleClick}
         style={{
           top: pressed ? '0px' : '-4px',
           left: pressed ? '0px' : '-4px',
         }}
-        className="absolute bg-purple-400/40 w-full h-full transition-all flex justify-center items-center gap-3 px-6 py-4"
+        className="absolute bg-[#0a0a0a] border border-[#ffffff24] w-full h-full transition-all flex justify-center items-center gap-3 px-6 py-4"
       >
         {props.icon}
         <div className="text-left">

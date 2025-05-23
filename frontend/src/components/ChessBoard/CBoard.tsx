@@ -17,6 +17,7 @@ import { fen_to_board } from 'wasm'
 import ChessBoard from './ChessBoard'
 import Modal from '../Modal'
 import Settings from '../Settings'
+import Navbar from './Navbar'
 
 // const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const fen = 'rnbqkbnr/pppppppp/8/BB6/3PPPP1/N2Q3N/PPP4P/R3K2R - KQkq - - 0 1'
@@ -156,7 +157,7 @@ const CBoard = () => {
     )
   }
 
-  const [open, setOpen] = React.useState(true)
+  const [open, setOpen] = React.useState(false)
   const [promoteData, setPromoteData] = React.useState<PromoteData>({
     from: '',
     to: '',
@@ -178,15 +179,16 @@ const CBoard = () => {
   }
 
   return (
-    <div className="w-full min-h-full p-3">
-      <div className="flex flex-col items-center justify-center h-full">
+    <div className="w-full min-h-full relative">
+      <Navbar />
+      <div className="flex flex-col items-center justify-center p-3">
         <Modal select={open} unselect={() => setOpen(!open)}>
           <Settings />
         </Modal>
         {/* <div className="absolute left-0 w-full p-2 max-w-[1320px] flex items-center justify-between">
           <Navbar />
         </div> */}
-        <div className="flex gap-4 w-full justify-center items-center">
+        <div className="flex flex-col lg:flex-row gap-4 w-full justify-center items-center">
           <div className="flex w-full max-w-[720px] relative">
             {/* <div className="flex text-white w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
               Opponent {opponentId}
@@ -208,7 +210,7 @@ const CBoard = () => {
             </div> */}
           </div>
 
-          <div className="w-[30%]">
+          <div className="w-full lg:w-[30%]">
             <RightSideMenu
               checkStatus={board.KingInCheck}
               player={player}

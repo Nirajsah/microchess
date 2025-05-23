@@ -15,7 +15,7 @@ export default function ChessProvider({
 }) {
   const [chessSettings, setChessSettings] = React.useState<ChessSettings>({
     dragNdrop: true,
-    theme: 'default',
+    theme: 'forest',
   })
 
   React.useEffect(() => {

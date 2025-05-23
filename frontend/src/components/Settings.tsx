@@ -20,7 +20,7 @@ const Settings = () => {
   const Button = ({ name }: { name: string }) => {
     return (
       <button
-        className="px-3 py-2 w-full text-start rounded-xl text-purple-400/80 hover:bg-purple-700/20"
+        className="px-3 py-2 w-full text-start rounded-xl bg-gray-700/20"
         onClick={() => handleMenuChange(name)}
       >
         {name}
@@ -28,15 +28,14 @@ const Settings = () => {
     )
   }
   return (
-    <div className="font-fira rounded-xl bg-[#0a0a0a] border border-[#ffffff24] w-[650px] h-[600px] p-5 flex justify-between">
+    <div className="font-fira rounded-xl bg-[#0a0a0a] border border-[#ffffff24] w-[650px] h-[600px] p-3 flex justify-between">
       <div className="w-[30%]">
         <div className="flex flex-col w-full h-full gap-2">
           <Button name={'Themes'} />
-          <Button name={'Misc'} />
         </div>
       </div>
       {settingMenu === 'Themes' && (
-        <div className="max-w-full h-full">
+        <div className="max-w-full h-full border-l border-[#ffffff24] px-3">
           <ThemePreviewGrid
             selected={themeSelected}
             onSelect={(themeKey) => {
@@ -44,10 +43,6 @@ const Settings = () => {
             }}
           />
         </div>
-      )}
-
-      {settingMenu === 'Misc' && (
-        <div className="max-w-full h-full">showing misc setting</div>
       )}
     </div>
   )

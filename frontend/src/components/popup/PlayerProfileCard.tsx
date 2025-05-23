@@ -1,149 +1,160 @@
+// import React from 'react'
+
+// interface GameHistoryItem {
+//   opponent: string
+//   result: 'Win' | 'Loss' | 'Draw'
+//   date: string
+// }
+
+// export interface PlayerProfile {
+//   username: string
+//   avatarUrl: string
+//   title: string
+//   rating: number
+//   gamesPlayed: number
+//   wins: number
+//   losses: number
+//   draws: number
+//   winPercentage: number
+//   bestRating: number
+//   country: string
+//   bio: string
+//   recentGames: GameHistoryItem[]
+// }
+
+// export const PlayerProfileCard: React.FC<{ player: PlayerProfile }> = ({
+//   player,
+// }) => {
+//   return (
+//     <div className="max-w-sm w-full mx-auto my-5 p-4 shadow-md rounded-lg bg-background-primary border border-[#ffffff24] text-white">
+//       <div className="flex items-center mb-4">
+//         <img
+//           src={player.avatarUrl}
+//           alt="Avatar"
+//           className="w-20 h-20 rounded-full object-cover mr-4"
+//         />
+//         <div>
+//           <h2 className="text-xl font-semibold m-0">{player.username}</h2>
+//           <p className="text-gray-500 m-0">{player.title}</p>
+//         </div>
+//       </div>
+
+//       <div className="flex flex-wrap justify-between mb-4">
+//         <div className="w-[48%] mb-2">
+//           <strong>Rating:</strong> {player.rating}
+//         </div>
+//         <div className="w-[48%] mb-2">
+//           <strong>Best Rating:</strong> {player.bestRating}
+//         </div>
+//         <div className="w-[48%] mb-2">
+//           <strong>Games Played:</strong> {player.gamesPlayed}
+//         </div>
+//         <div className="w-[48%] mb-2">
+//           <strong>Record:</strong> {player.wins}W / {player.losses}L /{' '}
+//           {player.draws}D
+//         </div>
+//         <div className="w-[48%] mb-2">
+//           <strong>Win %:</strong> {player.winPercentage}%
+//         </div>
+//       </div>
+
+//       <div className="mb-4">
+//         <p>
+//           <strong>Country:</strong> {player.country}
+//         </p>
+//         <p>
+//           <strong>Bio:</strong> {player.bio}
+//         </p>
+//       </div>
+
+//       <div className="border-t pt-3">
+//         <h3 className="font-semibold text-lg mb-2">Recent Games</h3>
+//         {player.recentGames.map((game, index) => (
+//           <div
+//             key={index}
+//             className="flex justify-between text-sm py-1 border-b last:border-b-0"
+//           >
+//             <span className="text-gray-600">{game.date}</span>
+//             <span>
+//               vs {game.opponent} - {game.result}
+//             </span>
+//           </div>
+//         ))}
+//       </div>
+//     </div>
+//   )
+// }
+
 import React from 'react'
 
-// Define type for game history item
 interface GameHistoryItem {
   opponent: string
   result: 'Win' | 'Loss' | 'Draw'
   date: string
 }
 
-// Define type for player data
 export interface PlayerProfile {
   username: string
   avatarUrl: string
   title: string
   rating: number
-  gamesPlayed: number
-  wins: number
-  losses: number
-  draws: number
-  winPercentage: number
   bestRating: number
   country: string
-  bio: string
   recentGames: GameHistoryItem[]
-  // You can add additional fields (e.g., preferred openings) as needed
 }
 
 export const PlayerProfileCard: React.FC<{ player: PlayerProfile }> = ({
   player,
 }) => {
   return (
-    <div style={styles.card}>
-      {/* Header Section */}
-      <div style={styles.header}>
-        <img src={player.avatarUrl} alt="Avatar" style={styles.avatar} />
+    <div className="max-w-sm w-full mx-auto my-5 p-4 shadow-md rounded-lg bg-background-primary border border-[#ffffff24] text-white">
+      {/* Header */}
+      <div className="flex items-center mb-4">
+        <img
+          src={player.avatarUrl}
+          alt="Avatar"
+          className="w-20 h-20 rounded-full object-cover mr-4"
+        />
         <div>
-          <h2 style={styles.username}>{player.username}</h2>
-          <p style={styles.title}>{player.title}</p>
+          <h2 className="text-xl font-semibold m-0">{player.username}</h2>
+          <p className="text-gray-500 m-0">{player.title}</p>
+          <p className="text-sm mt-1">{player.country}</p>
         </div>
       </div>
 
-      {/* Rating and Stats */}
-      <div style={styles.stats}>
-        <div style={styles.statItem}>
-          <strong>Rating:</strong> {player.rating}
+      {/* Stats */}
+      <div className="mb-4">
+        <div className="mb-1">
+          <strong>Current Rating:</strong> {player.rating}
         </div>
-        <div style={styles.statItem}>
+        <div className="mb-1">
           <strong>Best Rating:</strong> {player.bestRating}
         </div>
-        <div style={styles.statItem}>
-          <strong>Games Played:</strong> {player.gamesPlayed}
-        </div>
-        <div style={styles.statItem}>
-          <strong>Record:</strong> {player.wins}W / {player.losses}L /{' '}
-          {player.draws}D
-        </div>
-        <div style={styles.statItem}>
-          <strong>Win %:</strong> {player.winPercentage}%
-        </div>
-      </div>
-
-      {/* Additional Info */}
-      <div style={styles.additional}>
-        <p>
-          <strong>Country:</strong> {player.country}
-        </p>
-        <p>
-          <strong>Bio:</strong> {player.bio}
-        </p>
       </div>
 
       {/* Recent Games */}
-      <div style={styles.games}>
-        <h3>Recent Games</h3>
+      <div className="border-t pt-3">
+        <h3 className="font-semibold text-lg mb-2">Recent Games</h3>
         {player.recentGames.map((game, index) => (
-          <div key={index} style={styles.gameItem}>
-            <span style={styles.gameDate}>{game.date}</span>
-            <span style={styles.gameDetail}>
-              vs {game.opponent} - {game.result}
+          <div
+            key={index}
+            className="flex justify-between text-sm py-1 border-b last:border-b-0"
+          >
+            <span className="text-gray-600">{game.date}</span>
+            <span
+              className={
+                game.result === 'Win'
+                  ? 'text-green-400'
+                  : game.result === 'Loss'
+                  ? 'text-red-400'
+                  : 'text-yellow-400'
+              }
+            >
+              vs {game.opponent} — {game.result}
             </span>
           </div>
         ))}
       </div>
     </div>
   )
-}
-
-// Inline CSS styles (Feel free to move them to a CSS/SCSS file)
-const styles: { [key: string]: React.CSSProperties } = {
-  card: {
-    maxWidth: '400px',
-    margin: '20px auto',
-    padding: '15px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    borderRadius: '8px',
-    fontFamily: 'Arial, sans-serif',
-    backgroundColor: '#fff',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    marginBottom: '15px',
-  },
-  avatar: {
-    width: '80px',
-    height: '80px',
-    borderRadius: '50%',
-    marginRight: '15px',
-    objectFit: 'cover',
-  },
-  username: {
-    margin: '0',
-    fontSize: '1.5rem',
-  },
-  title: {
-    margin: '0',
-    color: '#777',
-  },
-  stats: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: '15px',
-  },
-  statItem: {
-    width: '48%',
-    marginBottom: '8px',
-  },
-  additional: {
-    marginBottom: '15px',
-  },
-  games: {
-    borderTop: '1px solid #eee',
-    paddingTop: '10px',
-  },
-  gameItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '5px 0',
-    borderBottom: '1px solid #f4f4f4',
-  },
-  gameDate: {
-    fontSize: '0.9rem',
-    color: '#555',
-  },
-  gameDetail: {
-    fontSize: '0.9rem',
-  },
 }
