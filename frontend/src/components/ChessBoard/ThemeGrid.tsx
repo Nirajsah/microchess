@@ -25,7 +25,7 @@ const ThemePreviewGrid: React.FC<ThemePreviewProps> = ({
           key={name}
           onClick={() => onSelect?.(name as ThemeKey)}
           className={`p-1 w-fit rounded-lg ${
-            selected === name ? 'bg-purple-500' : 'hover:bg-purple-400'
+            selected === name ? 'bg-[#ffffff24]' : 'hover:bg-[#ffffff24]'
           } transition`}
           title={name}
         >

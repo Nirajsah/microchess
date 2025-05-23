@@ -7,7 +7,6 @@ export type ThemeName =
   | 'nightMode'
   | 'desertSand'
   | 'softViolet'
-  | 'default'
 
 type Theme = {
   light: string
@@ -66,12 +65,6 @@ export const themes: Themes = {
     light: '#f3e5f5', // Light Violet
     dark: '#9575cd', // Deep Violet
     background: '#f8bbd0', // Light Pink
-    selectedSquare: '#ff0000',
-  },
-  default: {
-    light: '#ff6853',
-    dark: '#ff2a00bf',
-    background: '#ffebe84a',
     selectedSquare: '#ff0000',
   },
 }

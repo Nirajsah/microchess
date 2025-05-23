@@ -9,6 +9,14 @@ export default {
         silkscreen: ['Silkscreen'],
         jolly: ['Jolly Lodger'],
         homenaje: ['Homenaje'],
+        sansation: ['Sansation', 'sans-serif'],
+        ancizar: ['Ancizar Sans', 'sans-serif'],
+        russo: ['Russo One'],
+      },
+      colors: {
+        background: {
+          primary: '#0a0a0a',
+        },
       },
       animation: {
         'pulse-and-move-inward': 'pulseAndMoveInward 3s infinite',
