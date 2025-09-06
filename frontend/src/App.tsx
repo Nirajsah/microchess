@@ -1,12 +1,24 @@
-import Navbar from './components/Navbar'
+import Navbar from './HomePage/Navbar'
 import About from './HomePage/About'
 import Footer from './HomePage/Footer'
 import HomePage from './HomePage/HomePage'
 import LeaderBoard from './HomePage/LeaderBoard'
+import { getCapturedPieces } from './GraphQL/walletQueries'
 
 export default function App() {
+  // const query = getCapturedPieces()
+  // ;(async function calling() {
+  //   const aaaa = {
+  //     type: 'QUERY',
+  //     applicationId:
+  //       '6ccedd77a4fb7eb1648b115200642bdb1445f36b25b2608861860b79cb82af82',
+  //     query: query,
+  //   }
+  //   const data = await window.linera?.request(aaaa)
+  //   console.log(data, 'data received')
+  // })()
   return (
-    <div className="w-full min-h-full flex flex-col items-center max-w-[1320px]">
+    <div className="relative w-full min-h-full flex flex-col items-center max-w-[1320px]">
       <Navbar />
       <HomePage />
       <LeaderBoard />

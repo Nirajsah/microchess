@@ -5,14 +5,14 @@ import { createApolloClient } from './GraphQL/URI.ts'
 import { ApolloProvider } from '@apollo/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import CBoard from './components/ChessBoard/CBoard.tsx'
-import ChessProvider from './context/ChessProvider.tsx'
 import NotFound from './NotFound.tsx'
+import MicroChessProvider from './context/MicroChessProvider.tsx'
 
 const client = createApolloClient()
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <ChessProvider>
+  <MicroChessProvider>
     <ApolloProvider client={client}>
-      <div className="font-russo text-white min-h-screen w-full flex justify-center">
+      <div className="font-sansation text-white min-h-screen w-full flex justify-center">
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<App />} />
@@ -22,5 +22,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         </BrowserRouter>
       </div>
     </ApolloProvider>
-  </ChessProvider>
+  </MicroChessProvider>
 )

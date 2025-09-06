@@ -18,6 +18,13 @@ body,
   padding: 0;
 }
 
+@media (width: 1024px) {
+  .exact-1024 {
+    width: 300px;
+    height: 200px;
+  }
+}
+
 .chess-board {
   -webkit-user-select: none; /* Chrome, Safari, Opera */
   -moz-user-select: none;
