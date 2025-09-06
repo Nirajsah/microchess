@@ -13,12 +13,13 @@ export type Scalars = {
   Boolean: { input: boolean; output: boolean; }
   Int: { input: number; output: number; }
   Float: { input: number; output: number; }
+  /** A unique identifier for a user or an application. */
+  AccountOwner: { input: any; output: any; }
   /** A non-negative amount of tokens. */
   Amount: { input: any; output: any; }
-  /** The owner of a chain. This is currently the hash of the owner's public key used to verify signatures. */
-  Owner: { input: any; output: any; }
-  /** A signature public key */
-  PublicKey: { input: any; output: any; }
+  /** The unique identifier (UID) of a chain. This is currently computed as the hash value of a ChainDescription. */
+  ChainId: { input: any; output: any; }
+  Rank: { input: any; output: any; }
   /** A duration in microseconds */
   TimeDelta: { input: any; output: any; }
   /** A timestamp, in microseconds since the Unix epoch */
@@ -29,14 +30,20 @@ export type ChessService = {
   __typename?: 'ChessService';
   capturedPieces: Array<Piece>;
   gameData: GameData;
-  getLeaderboard: Array<PlayerStats>;
+  getGameChain: Array<GameChain>;
+  owners: Array<Scalars['AccountOwner']['output']>;
   timeLeft: PlayerTime;
   timer: Clock;
 };
 
 
 export type ChessServiceGameDataArgs = {
-  player: Scalars['Owner']['input'];
+  player: Scalars['AccountOwner']['input'];
+};
+
+
+export type ChessServiceGetGameChainArgs = {
+  pubKey: Scalars['AccountOwner']['input'];
 };
 
 /** A struct to represent a Clock */
@@ -44,7 +51,6 @@ export type Clock = {
   __typename?: 'Clock';
   blockDelay: Scalars['TimeDelta']['output'];
   currentTurnStart: Scalars['Timestamp']['output'];
-  increment: Scalars['TimeDelta']['output'];
   timeLeft: Array<Scalars['TimeDelta']['output']>;
 };
 
@@ -54,18 +60,33 @@ export enum Color {
   White = 'WHITE'
 }
 
+export type FriendIdInput = {
+  id: Scalars['String']['input'];
+};
+
+/** The IDs of a temporary chain for a single game. */
+export type GameChain = {
+  __typename?: 'GameChain';
+  /**
+   * The ID of the `OpenChain` message that created the chain.
+   * The ID of the temporary game chain itself.
+   */
+  chainId: Scalars['ChainId']['output'];
+};
+
 export type GameData = {
   __typename?: 'GameData';
   board: Scalars['String']['output'];
   gameState: GameState;
   moves: Array<Move>;
-  opponent: Scalars['Owner']['output'];
+  opponent: Scalars['AccountOwner']['output'];
   player: Color;
   playerTurn: Color;
 };
 
 export enum GameState {
   Checkmate = 'CHECKMATE',
+  Draw = 'DRAW',
   InPlay = 'IN_PLAY',
   Resign = 'RESIGN',
   Stalemate = 'STALEMATE'
@@ -80,10 +101,13 @@ export type Move = {
 export type OperationMutationRoot = {
   __typename?: 'OperationMutationRoot';
   capturePiece: Array<Scalars['Int']['output']>;
+  friendlyGame: Array<Scalars['Int']['output']>;
   makeMove: Array<Scalars['Int']['output']>;
   newGame: Array<Scalars['Int']['output']>;
   pawnPromotion: Array<Scalars['Int']['output']>;
+  requestGame: Array<Scalars['Int']['output']>;
   resign: Array<Scalars['Int']['output']>;
+  startFriendlyGame: Array<Scalars['Int']['output']>;
   startGame: Array<Scalars['Int']['output']>;
 };
 
@@ -96,6 +120,12 @@ export type OperationMutationRootCapturePieceArgs = {
 };
 
 
+export type OperationMutationRootFriendlyGameArgs = {
+  player: Scalars['AccountOwner']['input'];
+  timer: Scalars['TimeDelta']['input'];
+};
+
+
 export type OperationMutationRootMakeMoveArgs = {
   from: Scalars['String']['input'];
   piece: Scalars['String']['input'];
@@ -104,7 +134,7 @@ export type OperationMutationRootMakeMoveArgs = {
 
 
 export type OperationMutationRootNewGameArgs = {
-  player: Scalars['Owner']['input'];
+  player: Scalars['AccountOwner']['input'];
 };
 
 
@@ -116,10 +146,23 @@ export type OperationMutationRootPawnPromotionArgs = {
 };
 
 
+export type OperationMutationRootRequestGameArgs = {
+  player: Scalars['AccountOwner']['input'];
+  rank: Scalars['Rank']['input'];
+  timer: Scalars['TimeDelta']['input'];
+};
+
+
+export type OperationMutationRootStartFriendlyGameArgs = {
+  hash: FriendIdInput;
+  player: Scalars['AccountOwner']['input'];
+};
+
+
 export type OperationMutationRootStartGameArgs = {
   amount: Scalars['Amount']['input'];
   matchTime: Scalars['TimeDelta']['input'];
-  players: Array<Scalars['PublicKey']['input']>;
+  players: Array<Scalars['AccountOwner']['input']>;
 };
 
 export enum Piece {
@@ -136,16 +179,6 @@ export enum Piece {
   WhiteQueen = 'WHITE_QUEEN',
   WhiteRook = 'WHITE_ROOK'
 }
-
-export type PlayerStats = {
-  __typename?: 'PlayerStats';
-  draws: Scalars['Int']['output'];
-  gamesPlayed: Scalars['Int']['output'];
-  losses: Scalars['Int']['output'];
-  playerId: Scalars['String']['output'];
-  winRate: Scalars['Float']['output'];
-  wins: Scalars['Int']['output'];
-};
 
 export type PlayerTime = {
   __typename?: 'PlayerTime';

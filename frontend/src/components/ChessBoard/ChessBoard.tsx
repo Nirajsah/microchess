@@ -3,7 +3,7 @@ import { BoardType, Piece, Square } from './types'
 import ChessTile from './ChessTile'
 import CustomDragLayer from './CustomDragLayer'
 import { generate_possible_moves } from 'wasm'
-import { useChess } from '../../context/ChessProvider'
+import { useMicroChess } from '../../context/MicroChessProvider'
 import { ThemeName, themes } from './theme'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
@@ -14,7 +14,7 @@ interface BoardProps {
 }
 
 export default function ChessBoard(props: BoardProps) {
-  const { chessSettings } = useChess()
+  const { chessSettings } = useMicroChess()
   const boardRef = useRef<HTMLDivElement>(null)
   const board = props.boardData.position
 
@@ -143,10 +143,10 @@ export default function ChessBoard(props: BoardProps) {
               selectedSquare === square
                 ? selectedTheme.selectedSquare
                 : possMoves.includes(square as Square) && piece
-                  ? 'bg-red-400'
-                  : number % 2 === 0
-                    ? selectedTheme.dark
-                    : selectedTheme.light
+                ? 'bg-red-400'
+                : number % 2 === 0
+                ? selectedTheme.dark
+                : selectedTheme.light
 
             return (
               <div>

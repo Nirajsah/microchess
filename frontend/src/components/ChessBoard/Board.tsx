@@ -12,14 +12,13 @@ import blackKnight from '@/assets/bn.png'
 import blackBishop from '@/assets/bb.png'
 import blackQueen from '@/assets/bq.png'
 import blackKing from '@/assets/bk.png'
-import React, { useRef, useState } from 'react'
+import React from 'react'
 import { useMutation } from '@apollo/client'
 import { CAPTURE_PIECE, MOVE_PIECE } from '../../GraphQL/queries'
 import generatePossibleMoves from './GeneratePossibleMoves'
 import { BoardType, Color, Piece, Square, SquareToPieceMap } from './types'
-import { useChess } from '../../context/ChessProvider'
-import { generate_possible_moves, enable_dragging } from 'wasm'
-import { DndContext, DragEndEvent, useDroppable } from '@dnd-kit/core'
+import { useMicroChess } from '../../context/MicroChessProvider'
+import { generate_possible_moves } from 'wasm'
 
 const pieceImages: any = {
   wP: whitePawn,
@@ -67,7 +66,7 @@ export default function Board({
   const [selectedSquare, setSelectedSquare] = React.useState<Square | null>(
     null
   )
-  const { chessSettings } = useChess()
+  const { chessSettings } = useMicroChess()
 
   const {
     position: board,
@@ -147,7 +146,7 @@ export default function Board({
     }
 
     if (
-      (piece && selectedSquare && chessSettings.dragNdrop) ||
+      (piece && selectedSquare && chessSettings.enableDrag) ||
       (selectedPiece && selectedSquare)
     ) {
       if (possMoves.includes(to_square)) {
@@ -183,7 +182,7 @@ export default function Board({
           await movePiece(
             selectedSquare,
             to_square,
-            chessSettings.dragNdrop ? piece : (selectedPiece as Piece)
+            chessSettings.enableDrag ? piece : (selectedPiece as Piece)
           )
         }
         reset()

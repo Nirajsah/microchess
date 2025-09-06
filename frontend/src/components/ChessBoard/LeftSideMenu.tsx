@@ -1,9 +1,9 @@
 import React from 'react'
 import Modal from '../Modal'
-import { useChess } from '../../context/ChessProvider'
+import { useMicroChess } from '../../context/MicroChessProvider'
 
 const Settings = () => {
-  const { chessSettings, setChessSettings } = useChess()
+  const { chessSettings, setChessSettings } = useMicroChess()
 
   const setValue = () => {
     if (chessSettings.dragNdrop) {
