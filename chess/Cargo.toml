@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-async-graphql = { version = "=7.0.2", default-features = false }
-async-graphql-derive = { version = "=7.0.2", default-features = false }
-linera-sdk = { version = "0.13.1", default-features = false }
+async-graphql = { version = "=7.0.17", default-features = false }
+async-graphql-derive = { version = "=7.0.17", default-features = false }
+linera-sdk = { version = "0.15.0", default-features = false }
 serde = { version = "1.0.203", features = ["derive"] }
 log = "0.4.22"
 lazy_static = "1.5.0"
@@ -18,10 +18,10 @@ base64 = "0.22.1"
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-linera-sdk = { version = "0.13.1", default-features = false, features = ["test"]}
+linera-sdk = { version = "0.15.0", default-features = false, features = ["test"]}
 
 [dev-dependencies]
-linera-sdk = { version = "0.13.1", default-features = false, features = ["test"]}
+linera-sdk = { version = "0.15.0", default-features = false, features = ["test"]}
 env_logger = "0.11.5"
 
 [[bin]]
