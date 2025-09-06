@@ -1,0 +1,16 @@
+[package]
+name = "chess-lib"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-graphql = { version = "=7.0.17", default-features = false }
+serde = { version = "1.0.203", features = ["derive"] }
+log = "0.4.22"
+
+
+[[bin]]
+name = "test"
+path = "bin/test.rs"
+
+
