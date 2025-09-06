@@ -1,0 +1,42 @@
+{
+  "name": "DevSetup",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "latest"
+    }
+  },
+  "postCreateCommand": "npm install --prefix frontend || true",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "vadimcn.vscode-lldb",
+        "ms-vscode.vscode-typescript-next",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "vscodevim.vim"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "files.exclude": {
+          "**/target": true,
+          "**/node_modules": true
+        },
+        "vim.insertModeKeyBindings": [
+          {
+            "before": ["j", "j"],
+            "after": ["<Esc>"]
+          }
+        ]
+      }
+    }
+  },
+  "forwardPorts": [3000, 5173],
+  "remoteUser": "vscode"
+}
