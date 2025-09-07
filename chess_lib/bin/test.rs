@@ -1,9 +1,14 @@
-use chess_lib::board::{bitboard::BitBoard, chessboard::ChessBoard};
+use chess_lib::{
+    board::{bitboard::BitBoard, chessboard::ChessBoard},
+    pieces::Color,
+};
 
 fn main() {
-    let res = ChessBoard::new();
-    println!("FEN {:?}", res.to_fen(&20, &59));
-    print_bitboard(res.all_pieces());
+    let res = ChessBoard::with_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq d4 0 1");
+    let result = ChessBoard::new();
+    println!("FEN {:?}", result.to_fen(Color::White, &20, &59));
+
+    println!("FEN {:?}", res);
 }
 
 pub fn print_bitboard(board: BitBoard) {
@@ -18,7 +23,6 @@ pub fn print_bitboard(board: BitBoard) {
             } else {
                 print!("  0  ");
             }
-            // print!("  {}  ", piece);
         }
         println!("        {}", rank + 1);
     }

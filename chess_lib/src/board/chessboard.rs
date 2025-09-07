@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::pieces::Color;
+
 use super::{bitboard::BitBoard, square::Square};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -18,7 +20,7 @@ pub struct ChessBoard {
     pub bk: BitBoard,
 
     /// Castling rights
-    pub castling_rights: [bool; 4], // [White, Black](KingSide, QueenSide)
+    pub castling_rights: u8, // [White, Black](KingSide, QueenSide)
     /// En passant
     pub en_passant: BitBoard,
 }
@@ -40,7 +42,7 @@ impl ChessBoard {
             bq: BitBoard(0x0800000000000000),
             bk: BitBoard(0x1000000000000000),
 
-            castling_rights: [true; 4],
+            castling_rights: 0b1111,
             en_passant: BitBoard::EMPTY,
         }
     }
@@ -54,12 +56,13 @@ impl ChessBoard {
     ///A function to generate FEN string using bitboard
     pub fn to_fen(
         &self,
+        active_player: Color,
         halfmove_count: &u32,
         fullmove_count: &u32,
     ) -> String {
         let bitboards = [
-            self.wp, self.wn, self.wb, self.wr, self.wq, self.wk, self.bp, self.bn, self.bb,
-            self.br, self.bq, self.bk,
+            self.wp, self.wn, self.wb, self.wr, self.wq, self.wk,
+            self.bp, self.bn, self.bb, self.br, self.bq, self.bk,
         ];
         let pieces = ['P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'];
 
@@ -71,10 +74,11 @@ impl ChessBoard {
 
             for file in 0..8 {
                 let square = rank * 8 + file;
+
                 let mut piece_found = false;
 
                 for (i, &bitboard) in bitboards.iter().enumerate() {
-                    if (bitboard & (1u64 << square)) != 0 {
+                    if (bitboard.as_u64() & (1u64 << square)) != 0 {
                         if empty_squares > 0 {
                             fen.push_str(&empty_squares.to_string());
                             empty_squares = 0;
@@ -98,21 +102,26 @@ impl ChessBoard {
                 fen.push('/');
             }
         }
+        fen.push(' '); // just to have a whitespace
+        
+        fen.push(active_player.into());
 
         fen.push(' '); // just to have a whitespace
-
+    
         // Add placeholder values for the rest of the FEN string
         // castling rights for K(0)Q(1)k(2)q(3)
         // Castling rights for K (White Kingside), Q (White Queenside),
         // k (Black Kingside), q (Black Queenside)
-        let mut castling_rights_str = String::from(" ");
+        let mut castling_str = String::with_capacity(4);
+        let mask = self.castling_rights;
 
-        // If there are no castling rights, add "-" to indicate no castling is allowed
-        if castling_rights_str.is_empty() {
-            castling_rights_str.push('-');
-        }
-
-        fen.push_str(&castling_rights_str);
+        if mask & 0b0001 != 0 { castling_str.push('K'); }
+        if mask & 0b0010 != 0 { castling_str.push('Q'); }
+        if mask & 0b0100 != 0 { castling_str.push('k'); }
+        if mask & 0b1000 != 0 { castling_str.push('q'); }
+        if castling_str.is_empty() { castling_str.push('-'); }
+        
+        fen.push_str(&castling_str);
 
         if self.en_passant != 0 {
             let en_passant_square = self.en_passant.trailing_zeros();
@@ -131,9 +140,10 @@ impl ChessBoard {
 
         fen.push_str(&fullmove_count.to_string());
 
-
         fen
     }
+
+    
     /// Generates a ChessBoard from a FEN string
     pub fn with_fen(fen: &str) -> Self {
         let mut board = ChessBoard::default();
@@ -147,7 +157,7 @@ impl ChessBoard {
         for (rank_idx, rank) in piece_placement.split('/').enumerate() {
             let mut file_idx = 0;
             for c in rank.chars() {
-                let square = 63 - (rank_idx * 8 + file_idx);
+                let square = (7 - rank_idx) * 8 + file_idx;
                 let mask = 1u64 << square;
 
                 match c {
@@ -174,10 +184,18 @@ impl ChessBoard {
         }
 
         // Parse castling rights
-        board.castling_rights[0] = castling_rights.contains('K');
-        board.castling_rights[1] = castling_rights.contains('Q');
-        board.castling_rights[2] = castling_rights.contains('k');
-        board.castling_rights[3] = castling_rights.contains('q');
+        let mut mask = 0;
+        for ch in castling_rights.chars() {
+            match ch {
+                'K' => mask |= 0b0001,
+                'Q' => mask |= 0b0010,
+                'k' => mask |= 0b0100,
+                'q' => mask |= 0b1000,
+                '-' => {},
+                _   => panic!("Invalid castling char: {}", ch),
+            }
+        }
+        board.castling_rights = mask;
 
         // Parse en passant
         if *en_passant != "-" {
@@ -191,7 +209,6 @@ impl ChessBoard {
                 board.en_passant |= 1u64 << square;
             }
         }
-
         board
     }
 
@@ -220,4 +237,51 @@ impl ChessBoard {
 }
 
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_board() {
+        let board: ChessBoard = ChessBoard::new();    
+        let default_board = ChessBoard {
+            wp: BitBoard(0x000000000000FF00),
+            wn: BitBoard(0x0000000000000042),
+            wb: BitBoard(0x0000000000000024),
+            wr: BitBoard(0x0000000000000081),
+            wq: BitBoard(0x0000000000000008),
+            wk: BitBoard(0x0000000000000010),
+            bp: BitBoard(0x00FF000000000000),
+            bn: BitBoard(0x4200000000000000),
+            bb: BitBoard(0x2400000000000000),
+            br: BitBoard(0x8100000000000000),
+            bq: BitBoard(0x0800000000000000),
+            bk: BitBoard(0x1000000000000000),
+            castling_rights: 0b1111,
+            en_passant: BitBoard::EMPTY,
+        };    
+
+        assert_eq!(board, default_board);
+    }
+
+    
+    #[test]
+    fn test_board_to_fen_method() {
+        let starting_board: ChessBoard = ChessBoard::new();    
+        let fen_string = starting_board.to_fen(Color::White, &0, &1);
+        let correct_fen_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+        assert_eq!(correct_fen_string, fen_string);
+    }
+
+
+    #[test]
+    fn test_board_with_fen_method() {
+        let fen_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let starting_board: ChessBoard = ChessBoard::with_fen(fen_string);
+        let generated_fen = starting_board.to_fen(Color::White, &0, &1); // halfmove=0, fullmove=1
+
+        assert_eq!(generated_fen, fen_string, "FEN generated from board does not match original FEN");
+    }
+}
 

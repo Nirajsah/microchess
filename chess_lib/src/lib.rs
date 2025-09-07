@@ -1,5 +1,6 @@
 pub mod board;
 pub mod moves;
+pub mod pieces;
 pub mod utils;
 
 #[cfg(test)]
