@@ -1,7 +1,7 @@
 use async_graphql::Enum;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
-use std::ops::{Shl, Shr};
+use std::ops::{BitAnd, Shl, Shr};
 use std::str::FromStr;
 
 #[rustfmt::skip]
@@ -16,6 +16,26 @@ pub enum Square {
     A6, B6, C6, D6, E6, F6, G6, H6,
     A7, B7, C7, D7, E7, F7, G7, H7,
     A8, B8, C8, D8, E8, F8, G8, H8,
+}
+
+impl PartialEq<u8> for Square {
+    fn eq(&self, rhs: &u8) -> bool {
+        self == rhs
+    }
+}
+
+impl PartialOrd<u8> for Square {
+    fn partial_cmp(&self, other: &u8) -> Option<std::cmp::Ordering> {
+        (*self as u8).partial_cmp(other)
+    }
+}
+
+impl BitAnd<u8> for Square {
+    type Output = Self;
+
+    fn bitand(self, rhs: u8) -> Self::Output {
+        Square::uint_to_square((self as u8) & rhs)
+    }
 }
 
 impl Shl<Square> for u64 {
@@ -53,8 +73,8 @@ impl FromStr for Square {
         let file_idx = (file as u8 - b'a') as u8;
         let rank_idx = (rank as u8 - b'1') as u8;
 
-        let index = (rank_idx * 8 + file_idx) as usize;
-        Ok(Square::usize_to_square(index))
+        let index = rank_idx * 8 + file_idx;
+        Ok(Square::uint_to_square(index))
     }
 }
 
@@ -81,10 +101,10 @@ impl Square {
         ((*self as usize / 8) as u8) + 1
     }
 
-    pub const fn usize_to_square(i: usize) -> Self {
-        assert!(i < 64);
+    pub const fn uint_to_square(i: u8) -> Self {
+        debug_assert!(i < 64, "Square value must be 0-63");
         // SAFETY: `Square` is #[repr(u8)] and contiguous from 0..63
-        unsafe { std::mem::transmute(i as u8) }
+        unsafe { std::mem::transmute(i) }
     }
 
     pub fn usize_to_string(i: usize) -> String {
@@ -148,10 +168,10 @@ mod tests {
     }
 
     #[test]
-    fn test_usize_to_square() {
+    fn test_uint_to_square() {
         for i in 0..64 {
-            let sq = Square::usize_to_square(i);
-            assert_eq!(sq as usize, i);
+            let sq = Square::uint_to_square(i);
+            assert_eq!(sq as u8, i);
         }
     }
 
@@ -167,7 +187,7 @@ mod tests {
     #[test]
     fn test_shl_and_shr_consistency() {
         for i in 0..64 {
-            let sq = Square::usize_to_square(i);
+            let sq = Square::uint_to_square(i);
             let x: u64 = 1;
             assert_eq!(x << sq >> sq, x);
         }

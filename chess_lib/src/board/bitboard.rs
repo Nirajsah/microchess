@@ -24,6 +24,16 @@ impl BitBoard {
         (self.0 >> sq) & 1 == 1
     }
 
+    #[inline(always)]
+    pub fn get_bit(&self, square: u32) -> bool {
+        println!("square: {:?}", square);
+        if square > 63 {
+            return false;
+        }
+        debug_assert!(square < 64, "Square must be 0-63");
+        (self.0 >> square) & 1 == 1
+    }
+
     #[inline]
     pub fn popcount(&self) -> u32 {
         self.0.count_ones()
@@ -79,6 +89,21 @@ impl BitOr<BitBoard> for BitBoard {
     }
 }
 
+impl BitAnd<BitBoard> for BitBoard {
+    type Output = BitBoard;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        BitBoard(self.0 & rhs.0)
+    }
+}
+
+impl BitAnd<BitBoard> for u64 {
+    type Output = Self;
+
+    fn bitand(self, rhs: BitBoard) -> Self::Output {
+        self & rhs.0
+    }
+}
 impl BitAnd<u64> for BitBoard {
     type Output = BitBoard;
 
@@ -113,6 +138,21 @@ impl BitAndAssign<u64> for BitBoard {
     }
 }
 
+impl Shr<u64> for BitBoard {
+    type Output = Self;
+
+    fn shr(self, rhs: u64) -> Self {
+        BitBoard(self.0 >> rhs)
+    }
+}
+
+impl Shl<u64> for BitBoard {
+    type Output = Self;
+
+    fn shl(self, rhs: u64) -> Self {
+        BitBoard(self.0 << rhs)
+    }
+}
 impl Shr<u32> for BitBoard {
     type Output = Self;
 
@@ -266,20 +306,20 @@ mod tests {
     #[test]
     fn test_shr_trait() {
         let bb = BitBoard(0b1000);
-        let result = bb >> 3;
+        let result = bb >> 3u32;
         assert_eq!(result, BitBoard(0b0001));
 
-        let result2 = BitBoard(0b1000) >> 1;
+        let result2 = BitBoard(0b1000) >> 1u32;
         assert_eq!(result2, BitBoard(0b0100));
     }
 
     #[test]
     fn test_shl_trait() {
         let bb = BitBoard(0b0001);
-        let result = bb << 3;
+        let result = bb << 3u32;
         assert_eq!(result, BitBoard(0b1000));
 
-        let result2 = BitBoard(0b0010) << 2;
+        let result2 = BitBoard(0b0010) << 2u32;
         assert_eq!(result2, BitBoard(0b1000));
     }
 
