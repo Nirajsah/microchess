@@ -6,6 +6,15 @@ pub enum Color {
     Black,
 }
 
+impl Color {
+    pub fn opposite(self) -> Self {
+        match self {
+            Self::White => Self::Black,
+            Self::Black => Self::White,
+        }
+    }
+}
+
 impl From<Color> for char {
     fn from(color: Color) -> Self {
         match color {

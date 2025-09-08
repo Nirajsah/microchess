@@ -16,3 +16,9 @@ pub fn print_bitboard(board: BitBoard) {
         println!("        {}", rank + 1);
     }
 }
+
+/// Create an algebraic capture string like "cxb4".
+pub fn create_capture_string(from: &str, to: &str) -> String {
+    let from_file = &from[0..1];
+    format!("{}x{}", from_file, to)
+}
