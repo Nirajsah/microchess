@@ -206,7 +206,7 @@ impl ChessBoard {
                 None => None,
             };
             if let Some(square) = en_passant_square {
-                board.en_passant |= 1u64 << square;
+                board.en_passant = BitBoard(1u64 << square); // Placing en_passant
             }
         }
         board
@@ -233,6 +233,17 @@ impl ChessBoard {
     pub fn all_pieces(&self) -> BitBoard {
         self.wp | self.wn | self.wb | self.wr | self.wq | self.wk |
         self.bp | self.bn | self.bb | self.br | self.bq | self.bk
+    }
+
+    /// A function to revoke the castling right, when rook is moved for a player
+    pub fn revoke_castling_rights(&mut self, color: Color, rook_position: Square) {
+        match (color, rook_position) {
+            (Color::White, Square::H1) => self.castling_rights &= !0b0001, // White kingside
+            (Color::White, Square::A1) => self.castling_rights &= !0b0010, // White queenside
+            (Color::Black, Square::H8) => self.castling_rights &= !0b0100, // Black kingside
+            (Color::Black, Square::A8) => self.castling_rights &= !0b1000, // Black queenside
+            _ => {}
+        }
     }
 }
 
@@ -282,6 +293,51 @@ mod tests {
         let generated_fen = starting_board.to_fen(Color::White, &0, &1); // halfmove=0, fullmove=1
 
         assert_eq!(generated_fen, fen_string, "FEN generated from board does not match original FEN");
+    }
+
+    #[test]
+    fn test_revoke_castling_rights_method() {
+        let mut board = ChessBoard::new();
+
+        // Start with all castling rights enabled
+        assert_eq!(board.castling_rights, 0b1111);
+
+        // White Queenside (A1)
+        board.revoke_castling_rights(Color::White, Square::A1);
+        let fen = board.to_fen(Color::Black, &0, &1);
+        let should_be_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b Kkq - 0 1";
+
+        assert_eq!(board.castling_rights, 0b1101, "White queenside should be revoked");
+        assert_eq!(fen, should_be_fen, "White queenside should be revoked in fen");
+
+        // White Kingside (H1)
+        board.castling_rights = 0b1111; // Reset
+
+        board.revoke_castling_rights(Color::White, Square::H1);
+        let fen = board.to_fen(Color::White, &0, &1);
+        let should_be_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w Qkq - 0 1";
+
+        assert_eq!(board.castling_rights, 0b1110, "White kingside should be revoked");
+        assert_eq!(fen, should_be_fen, "White kingside should be revoked in fen");
+        
+        // Black Kingside (H8)
+        board.castling_rights = 0b1111; // Reset
+
+        board.revoke_castling_rights(Color::Black, Square::H8);
+        let fen = board.to_fen(Color::Black, &0, &1);
+        let should_be_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQq - 0 1";
+      
+        assert_eq!(board.castling_rights, 0b1011, "Black kingside should be revoked");
+        assert_eq!(fen, should_be_fen, "Black kingside should be revoked in fen");
+
+
+        // Black Queenside (A8)
+        board.revoke_castling_rights(Color::Black, Square::A8);
+        let fen = board.to_fen(Color::White, &0, &1);
+        let should_be_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1";
+
+        assert_eq!(board.castling_rights, 0b0011, "Black queenside should be revoked");
+        assert_eq!(fen, should_be_fen, "Black queenside should be revoked in fen");
     }
 }
 
