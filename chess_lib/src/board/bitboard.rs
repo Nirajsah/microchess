@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::ops::{BitAnd, BitOr, BitOrAssign};
+use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Shl, Shr, Sub};
 
 use super::square::Square;
 
@@ -38,6 +38,17 @@ impl BitBoard {
     pub fn as_u64(&self) -> u64 {
         self.0
     }
+
+    #[inline]
+    pub fn pop_lsb(&mut self) -> Option<u32> {
+        if self.0 == 0 {
+            None
+        } else {
+            let lsb_index = self.0.trailing_zeros();
+            self.0 &= self.0 - 1; // remove LSB
+            Some(lsb_index)
+        }
+    }
 }
 
 impl BitOrAssign<u64> for BitBoard {
@@ -46,8 +57,15 @@ impl BitOrAssign<u64> for BitBoard {
     }
 }
 
+impl BitOrAssign<BitBoard> for u64 {
+    fn bitor_assign(&mut self, rhs: BitBoard) {
+        *self |= rhs.0
+    }
+}
+
 impl BitOr<u64> for BitBoard {
     type Output = BitBoard;
+
     fn bitor(self, rhs: u64) -> Self::Output {
         BitBoard(self.0 | rhs)
     }
@@ -55,6 +73,7 @@ impl BitOr<u64> for BitBoard {
 
 impl BitOr<BitBoard> for BitBoard {
     type Output = BitBoard;
+
     fn bitor(self, rhs: BitBoard) -> Self::Output {
         BitBoard(self.0 | rhs.0)
     }
@@ -62,6 +81,7 @@ impl BitOr<BitBoard> for BitBoard {
 
 impl BitAnd<u64> for BitBoard {
     type Output = BitBoard;
+
     fn bitand(self, rhs: u64) -> Self::Output {
         BitBoard(self.0 & rhs)
     }
@@ -76,6 +96,36 @@ impl PartialEq<u64> for BitBoard {
 impl From<BitBoard> for u64 {
     fn from(bb: BitBoard) -> u64 {
         bb.0
+    }
+}
+
+impl Sub<u64> for BitBoard {
+    type Output = Self;
+
+    fn sub(self, rhs: u64) -> Self {
+        BitBoard(self.0.wrapping_sub(rhs))
+    }
+}
+
+impl BitAndAssign<u64> for BitBoard {
+    fn bitand_assign(&mut self, rhs: u64) {
+        self.0 &= rhs
+    }
+}
+
+impl Shr<u32> for BitBoard {
+    type Output = Self;
+
+    fn shr(self, rhs: u32) -> Self {
+        BitBoard(self.0 >> rhs)
+    }
+}
+
+impl Shl<u32> for BitBoard {
+    type Output = Self;
+
+    fn shl(self, rhs: u32) -> Self {
+        BitBoard(self.0 << rhs)
     }
 }
 
@@ -187,5 +237,65 @@ mod tests {
         let bb = BitBoard(99);
         let raw: u64 = bb.into();
         assert_eq!(raw, 99u64);
+    }
+
+    #[test]
+    fn test_sub_trait() {
+        let bb = BitBoard(10);
+        let result = bb - 3u64;
+        assert_eq!(result, BitBoard(7));
+
+        let result2 = bb - 10u64;
+        assert_eq!(result2, BitBoard(0));
+
+        // underflow behavior (same as u64 subtraction, wrapping)
+        let result3 = BitBoard(0) - 1u64;
+        assert_eq!(result3, BitBoard(u64::MAX));
+    }
+
+    #[test]
+    fn test_bitand_assign_trait() {
+        let mut bb = BitBoard(0b1111);
+        bb &= 0b1010u64;
+        assert_eq!(bb, BitBoard(0b1010));
+
+        bb &= 0b0001u64;
+        assert_eq!(bb, BitBoard(0b0000));
+    }
+
+    #[test]
+    fn test_shr_trait() {
+        let bb = BitBoard(0b1000);
+        let result = bb >> 3;
+        assert_eq!(result, BitBoard(0b0001));
+
+        let result2 = BitBoard(0b1000) >> 1;
+        assert_eq!(result2, BitBoard(0b0100));
+    }
+
+    #[test]
+    fn test_shl_trait() {
+        let bb = BitBoard(0b0001);
+        let result = bb << 3;
+        assert_eq!(result, BitBoard(0b1000));
+
+        let result2 = BitBoard(0b0010) << 2;
+        assert_eq!(result2, BitBoard(0b1000));
+    }
+
+    #[test]
+    fn test_pop_lsb() {
+        let mut bb = BitBoard(0b1011000); // bits set at positions 3, 4, 6
+
+        assert_eq!(bb.pop_lsb(), Some(3)); // removes bit 3
+        assert_eq!(bb.0, 0b1010000);
+
+        assert_eq!(bb.pop_lsb(), Some(4)); // removes bit 4
+        assert_eq!(bb.0, 0b1000000);
+
+        assert_eq!(bb.pop_lsb(), Some(6)); // removes bit 6
+        assert_eq!(bb.0, 0);
+
+        assert_eq!(bb.pop_lsb(), None); // empty now
     }
 }
