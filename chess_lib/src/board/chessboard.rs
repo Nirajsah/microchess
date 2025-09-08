@@ -1,8 +1,14 @@
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
-use crate::pieces::Color;
+use crate::{moves::generator::{computed_knight_attacks, computed_king_moves, bishop_attacks_on_the_fly, queen_attacks_on_the_fly, rook_attacks_on_the_fly, NOT_A_FILE, NOT_H_FILE}, pieces::Color};
 
 use super::{bitboard::BitBoard, square::Square};
+
+lazy_static! {
+    pub static ref KNIGHT_MOVES: [BitBoard; 64] = computed_knight_attacks();
+    pub static ref KING_MOVES: [BitBoard; 64] = computed_king_moves();
+}
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct ChessBoard {
@@ -45,6 +51,31 @@ impl ChessBoard {
             castling_rights: 0b1111,
             en_passant: BitBoard::EMPTY,
         }
+    }
+
+    pub fn clear(&mut self) {
+        // Clear all white pieces
+        self.wp = BitBoard::EMPTY; // White pawns
+        self.wr = BitBoard::EMPTY; // White rooks  
+        self.wn = BitBoard::EMPTY; // White knights
+        self.wb = BitBoard::EMPTY; // White bishops
+        self.wq = BitBoard::EMPTY; // White queens
+        self.wk = BitBoard::EMPTY; // White king
+        
+        // Clear all black pieces
+        self.bp = BitBoard::EMPTY; // Black pawns
+        self.br = BitBoard::EMPTY; // Black rooks
+        self.bn = BitBoard::EMPTY; // Black knights
+        self.bb = BitBoard::EMPTY; // Black bishops
+        self.bq = BitBoard::EMPTY; // Black queens
+        self.bk = BitBoard::EMPTY; // Black king
+        
+        // Reset other game state if you have them
+        self.castling_rights = 0b1111;
+        self.en_passant = BitBoard::EMPTY;
+        // self.halfmove_clock = 0;
+        // self.fullmove_number = 1;
+        // self.side_to_move = Color::White;
     }
 
     /// method to reset en_passant square
@@ -213,15 +244,12 @@ impl ChessBoard {
     }
 
     /// Helper function to extract moves from a bitboard
-    pub fn extract_moves(&self, bitboard: u64) -> Vec<Square> {
-        let mut moves = Vec::new();
+    pub fn extract_moves(&self, bitboard: BitBoard) -> Vec<Square> {
+        let mut moves = Vec::with_capacity(64);
         let mut bb = bitboard;
-
-        while bb != 0 {
-            let lsb = bb & bb.wrapping_neg(); // Get least significant bit (LSB)
-            let sq_index = lsb.trailing_zeros() as usize; // Get index of LSB
-            moves.push(Square::usize_to_square(sq_index)); // Convert to Square and add to moves
-            bb &= bb - 1; // Clear the LSB
+        
+        while let Some(piece_pos) = bb.pop_lsb() {
+            moves.push(Square::uint_to_square(piece_pos as u8))
         }
 
         moves
@@ -235,7 +263,7 @@ impl ChessBoard {
         self.bp | self.bn | self.bb | self.br | self.bq | self.bk
     }
 
-    /// A function to revoke the castling right, when rook is moved for a player
+    /// A function to perma revoke the castling right, when rook is moved for a player
     pub fn revoke_castling_rights(&mut self, color: Color, rook_position: Square) {
         match (color, rook_position) {
             (Color::White, Square::H1) => self.castling_rights &= !0b0001, // White kingside
@@ -244,6 +272,114 @@ impl ChessBoard {
             (Color::Black, Square::A8) => self.castling_rights &= !0b1000, // Black queenside
             _ => {}
         }
+    }
+
+    /// Returns true if the king of the given color is in check
+    pub fn in_check(&self, color: Color) -> bool {
+        let king = match color {
+            Color::White => self.wk,
+            Color::Black => self.bk,
+        };
+
+        let attack_mask = self.attack_mask(color.opposite());
+
+        (attack_mask & king.0) != 0
+    }
+
+    // ----------------------------------------- Compute Attack Mask for current pieces--------------------------------
+
+    pub fn attack_mask(&self, color: Color) -> BitBoard {
+        match color {
+            Color::White => self.white_attack_mask(),
+            Color::Black => self.black_attack_mask(),
+        }
+    }
+
+    /// A function to calculate the attack mask for white pieces
+    pub fn white_attack_mask(&self) -> BitBoard {
+        const PAWN_ATTACK_DOWN_LEFT: u32 = 7;
+        const PAWN_ATTACK_DOWN_RIGHT: u32 = 9;
+        let mut attacks = BitBoard::EMPTY;
+
+        // Pawn attacks
+        attacks |= ((self.wp << PAWN_ATTACK_DOWN_LEFT) & NOT_H_FILE).into();
+        attacks |= ((self.wp << PAWN_ATTACK_DOWN_RIGHT) & NOT_A_FILE).into();
+
+        // Knight attacks
+        let mut knights = self.wn;
+        while let Some(knight_pos) = knights.pop_lsb() {
+            attacks |= KNIGHT_MOVES[knight_pos as usize].into();
+        }
+
+        // King attacks
+        let mut king = self.wk;
+        while let Some(king_pos) = king.pop_lsb() {
+            attacks |= KING_MOVES[king_pos as usize].into();
+        }
+
+        // Bishop attacks
+        let mut bishops = self.wb;
+        while let Some(bishop_pos) = bishops.pop_lsb() {
+            attacks |= bishop_attacks_on_the_fly(bishop_pos as u8, self.all_pieces()).into();
+        }
+
+        // Rook attacks
+        let mut rooks = self.wr;
+        while let Some(rook_pos) = rooks.pop_lsb() {
+            attacks |= rook_attacks_on_the_fly(rook_pos as u8, self.all_pieces()).into();
+        }
+
+        // Queen attacks
+        let mut queen = self.wq;
+        while let Some(queen_pos) = queen.pop_lsb() {
+            attacks |= queen_attacks_on_the_fly(queen_pos as u8, self.all_pieces()).into();
+        }
+
+        attacks
+    }
+
+    /// A function to calculate attacks mask for black pieces
+    pub fn black_attack_mask(&self) -> BitBoard {
+        const PAWN_ATTACK_DOWN_LEFT: u32 = 7;
+        const PAWN_ATTACK_DOWN_RIGHT: u32 = 9;
+        let mut attacks = BitBoard::EMPTY;
+
+
+        // Pawn attacks
+        attacks |= ((self.bp >> PAWN_ATTACK_DOWN_LEFT) & NOT_A_FILE).into();
+        attacks |= ((self.bp >> PAWN_ATTACK_DOWN_RIGHT) & NOT_H_FILE).into();
+
+        // Knight attacks
+        let mut knights = self.bn;
+        while let Some(knight_pos) = knights.pop_lsb() {
+            attacks |= KNIGHT_MOVES[knight_pos as usize].into();
+        }
+
+        // King attacks
+        let mut king = self.bk;
+        while let Some(king_pos) = king.pop_lsb() {
+            attacks |= KING_MOVES[king_pos as usize].into();
+        }
+
+        // Bishop attacks
+        let mut bishops = self.bb;
+        while let Some(bishop_pos) = bishops.pop_lsb() {
+            attacks |= bishop_attacks_on_the_fly(bishop_pos as u8, self.all_pieces()).into();
+        }
+
+        // Rook attacks
+        let mut rooks = self.br;
+        while let Some(rook_pos) = rooks.pop_lsb() {
+            attacks |= rook_attacks_on_the_fly(rook_pos as u8, self.all_pieces()).into();
+        }
+
+        // Queen attacks
+        let mut queen = self.bq;
+        while let Some(queen_pos) = queen.pop_lsb() {
+            attacks |= queen_attacks_on_the_fly(queen_pos as u8, self.all_pieces()).into();
+        }
+
+        attacks
     }
 }
 
@@ -338,6 +474,386 @@ mod tests {
 
         assert_eq!(board.castling_rights, 0b0011, "Black queenside should be revoked");
         assert_eq!(fen, should_be_fen, "Black queenside should be revoked in fen");
+    }
+
+    #[test]
+    fn test_in_check_white_king() {
+        let mut board = ChessBoard::new();
+    
+        // Initial position - white king not in check
+        assert!(!board.in_check(Color::White));
+    
+        // Place black rook attacking white king
+        board.clear();
+        board.wk = BitBoard(1u64 << 4); // e1 (square 4)
+        board.br = BitBoard(1u64 << 60); // e8 (square 60) - attacks down the e-file
+        assert!(board.in_check(Color::White), "White king should be in check from rook on e8");
+    
+        // Block the attack with a piece between king and rook
+        board.wp = BitBoard(1u64 << 28); // e4 (square 28) - blocks the attack
+        assert!(!board.in_check(Color::White), "Attack should be blocked by pawn on e4");
+    }
+
+    #[test]
+    fn test_in_check_black_king() {
+        let mut board = ChessBoard::new();
+        
+        // Initial position - black king not in check
+        assert!(!board.in_check(Color::Black));
+        
+        // Place white queen attacking black king
+        board.clear();
+        board.bk = BitBoard(1u64 << 60); // e8
+        board.wq = BitBoard(1u64 << 52); // e7
+        assert!(board.in_check(Color::Black));
+    }
+
+    #[test]
+    fn test_white_pawn_attacks() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White pawn on e4 (square 28)
+        board.wp = BitBoard(1u64 << 28);
+        let attacks = board.white_attack_mask();
+        
+        // Should attack d5 (35) and f5 (37)
+        assert!(attacks.get_bit(35)); // d5
+        assert!(attacks.get_bit(37)); // f5
+        assert!(!attacks.get_bit(36)); // e5 (not attacked by pawn)
+    }
+
+    #[test]
+    fn test_white_pawn_attacks_edge_files() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White pawn on a4 (square 24) - should only attack b5
+        board.wp = BitBoard(1u64 << 24);
+        let attacks = board.white_attack_mask();
+        
+        assert!(attacks.get_bit(33)); // b5
+        assert!(!attacks.get_bit(31)); // Invalid - would wrap around
+        
+        board.clear();
+        // White pawn on h4 (square 31) - should only attack g5
+        board.wp = BitBoard(1u64 << 31);
+        let attacks = board.white_attack_mask();
+        
+        assert!(attacks.get_bit(38)); // g5
+        assert!(!attacks.get_bit(40)); // Invalid - would wrap around
+    }
+
+    #[test]
+    fn test_black_pawn_attacks() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // Black pawn on e5 (square 36)
+        board.bp = BitBoard(1u64 << 36);
+        let attacks = board.black_attack_mask();
+        
+        // Should attack d4 (27) and f4 (29)
+        assert!(attacks.get_bit(27)); // d4
+        assert!(attacks.get_bit(29)); // f4
+        assert!(!attacks.get_bit(28)); // e4 (not attacked by pawn)
+    }
+
+    #[test]
+    fn test_black_pawn_attacks_edge_files() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // Black pawn on a5 (square 32) - should only attack b4
+        board.bp = BitBoard(1u64 << 32);
+        let attacks = board.black_attack_mask();
+        
+        assert!(attacks.get_bit(25)); // b4
+        
+        board.clear();
+        // Black pawn on h5 (square 39) - should only attack g4
+        board.bp = BitBoard(1u64 << 39);
+        let attacks = board.black_attack_mask();
+        
+        assert!(attacks.get_bit(30)); // g4
+    }
+
+    #[test]
+    fn test_knight_attacks() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White knight on e4 (square 28)
+        board.wn = BitBoard(1u64 << 28);
+        let attacks = board.white_attack_mask();
+        
+        // Knight should attack all 8 possible squares
+        let expected_squares = [11, 13, 18, 22, 34, 38, 43, 45];
+        for &square in &expected_squares {
+            if square < 64 {
+                assert!(attacks.get_bit(square), "Knight should attack square {}", square);
+            }
+        }
+    }
+
+    #[test]
+    fn test_knight_attacks_corner() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White knight on a1 (square 0) - corner case
+        board.wn = BitBoard(1u64 << 0);
+        let attacks = board.white_attack_mask();
+        
+        // Should only attack valid squares
+        assert!(attacks.get_bit(10)); // c2
+        assert!(attacks.get_bit(17)); // b3
+        assert!(!attacks.get_bit(64)); // Invalid square
+    }
+
+    #[test]
+    fn test_king_attacks() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White king on e4 (square 28)
+        board.wk = BitBoard(1u64 << 28);
+        let attacks = board.white_attack_mask();
+        
+        // King attacks all 8 adjacent squares
+        let expected_squares = [19, 20, 21, 27, 29, 35, 36, 37];
+        for &square in &expected_squares {
+            assert!(attacks.get_bit(square), "King should attack square {}", square);
+        }
+    }
+
+    #[test]
+    fn test_rook_attacks_clear_path() {
+        let mut board = ChessBoard::new();
+        board.clear();
+    
+        // White rook on e4 (square 28)
+        board.wr = BitBoard(1u64 << 28);
+        let attacks = board.white_attack_mask();
+    
+        // Should attack entire rank and file
+        let rook_rank = 28 / 8; // 3 (4th rank, zero-indexed)
+        let rook_file = 28 % 8; // 4 (e-file, zero-indexed)
+    
+        // Attack all squares on the same rank (rank 3)
+        for file in 0..8 {
+            if file != rook_file { // Skip the rook's own square
+                let square = rook_rank * 8 + file;
+                assert!(attacks.get_bit(square), "Rook should attack square {} on same rank", square);
+            }
+        }
+    
+        // Attack all squares on the same file (e-file)
+        for rank in 0..8 {
+            if rank != rook_rank { // Skip the rook's own square
+                let square = rank * 8 + rook_file;
+                assert!(attacks.get_bit(square), "Rook should attack square {} on same file", square);
+            }
+        }
+    
+        // Verify it doesn't attack its own square
+        assert!(!attacks.get_bit(28), "Rook shouldn't attack its own square");
+    }
+
+    #[test]
+    fn test_rook_attacks_blocked() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White rook on e4, white pawn on e6 blocking
+        board.wr = BitBoard(1u64 << 28); // e4
+        board.wp = BitBoard(1u64 << 44); // e6
+        let attacks = board.white_attack_mask();
+        
+        // Should attack e5 but not e7 or e8
+        assert!(attacks.get_bit(36)); // e5
+        assert!(attacks.get_bit(44)); // e6 (can capture own piece in attack mask)
+        assert!(!attacks.get_bit(52)); // e7 (blocked)
+        assert!(!attacks.get_bit(60)); // e8 (blocked)
+    }
+
+    #[test]
+    fn test_bishop_attacks_clear_path() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White bishop on e4 (square 28)
+        board.wb = BitBoard(1u64 << 28);
+        let attacks = board.white_attack_mask();
+        
+        // Should attack diagonals
+        assert!(attacks.get_bit(19)); // d3
+        assert!(attacks.get_bit(37)); // f5
+        assert!(attacks.get_bit(46)); // g6
+        assert!(attacks.get_bit(10)); // c2
+        assert!(attacks.get_bit(1));  // b1
+    }
+
+    #[test]
+    fn test_bishop_attacks_blocked() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White bishop on e4, black pawn on f5
+        board.wb = BitBoard(1u64 << 28); // e4
+        board.bp = BitBoard(1u64 << 37); // f5
+        let attacks = board.white_attack_mask();
+        
+        // Should attack f5 but not beyond
+        assert!(attacks.get_bit(37)); // f5
+        assert!(!attacks.get_bit(46)); // g6 (blocked)
+        assert!(!attacks.get_bit(55)); // h7 (blocked)
+    }
+
+    #[test]
+    fn test_queen_attacks() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White queen on d4 (square 27)
+        board.wq = BitBoard(1u64 << 27);
+        let attacks = board.white_attack_mask();
+        
+        // Should combine rook and bishop attacks
+        // Test a few key squares
+        assert!(attacks.get_bit(19)); // d3 (vertical)
+        assert!(attacks.get_bit(35)); // d5 (vertical)
+        assert!(attacks.get_bit(26)); // c4 (horizontal)
+        assert!(attacks.get_bit(28)); // e4 (horizontal)
+        assert!(attacks.get_bit(18)); // c3 (diagonal)
+        assert!(attacks.get_bit(36)); // e5 (diagonal)
+    }
+
+    #[test]
+    fn test_multiple_pieces_attack_mask() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // Multiple white pieces
+        board.wp = BitBoard(1u64 << 12); // e2
+        board.wn = BitBoard(1u64 << 28); // e4
+        board.wr = BitBoard(1u64 << 0);  // a1
+        
+        let attacks = board.white_attack_mask();
+        
+        // Should include attacks from all pieces
+        assert!(attacks.get_bit(19)); // d3 (pawn attack)
+        assert!(attacks.get_bit(21)); // f3 (pawn attack)
+        assert!(attacks.get_bit(11)); // d2 (knight attack from e4)
+        assert!(attacks.get_bit(1));  // b1 (rook attack from a1)
+    }
+
+    #[test]
+    fn test_check_detection_multiple_attackers() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White king on e1, black rook on e8 and black bishop on a5
+        board.wk = BitBoard(1u64 << 4);  // e1
+        board.br = BitBoard(1u64 << 60); // e8
+        board.bb = BitBoard(1u64 << 32); // a5
+        
+        // King should be in check from rook
+        assert!(board.in_check(Color::White));
+    }
+
+    #[test]
+    fn test_discovered_check() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White king on e1, black rook on e8, white piece on e4 initially blocking
+        board.wk = BitBoard(1u64 << 4);  // e1
+        board.br = BitBoard(1u64 << 60); // e8
+        board.wp = BitBoard(1u64 << 28); // e4 (blocking)
+        
+        // Initially not in check
+        assert!(!board.in_check(Color::White));
+        
+        // Move the blocking piece
+        board.wp = BitBoard(1u64 << 29); // f4
+        
+        // Now should be in check
+        assert!(board.in_check(Color::White));
+    }
+
+    #[test]
+    fn test_empty_board_no_attacks() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        let white_attacks = board.white_attack_mask();
+        let black_attacks = board.black_attack_mask();
+        
+        assert_eq!(white_attacks, BitBoard::EMPTY);
+        assert_eq!(black_attacks, BitBoard::EMPTY);
+    }
+
+    #[test]
+    fn test_attack_mask_symmetry() {
+        // Test that attack patterns are symmetric for same piece types
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White knight on e4
+        board.wn = BitBoard(1u64 << 28);
+        let white_attacks = board.white_attack_mask();
+        
+        board.clear();
+        // Black knight on e4
+        board.bn = BitBoard(1u64 << 28);
+        let black_attacks = board.black_attack_mask();
+        
+        // Attack patterns should be identical for knights
+        assert_eq!(white_attacks, black_attacks);
+    }
+
+    #[test]
+    fn test_pawn_promotion_rank_attacks() {
+        let mut board = ChessBoard::new();
+        board.clear();
+        
+        // White pawn on 7th rank
+        board.wp = BitBoard(1u64 << 52); // e7
+        let attacks = board.white_attack_mask();
+        
+        // Should attack 8th rank
+        assert!(attacks.get_bit(59)); // d8
+        assert!(attacks.get_bit(61)); // f8
+    }
+
+    #[test]
+    fn test_in_check_variations() {
+        let mut board = ChessBoard::new();
+
+        // Test 1: Rook check along rank 
+        board.clear();
+        board.wk = BitBoard(1u64 << 4);  // e1
+        board.br = BitBoard(1u64 << 0);  // a1 - attacks along 1st rank
+        assert!(board.in_check(Color::White), "Rook should give check along rank");
+
+        // Test 2: Bishop check along diagonal
+        board.clear();
+        board.wk = BitBoard(1u64 << 4);  // e1 (dark square)
+        board.bb = BitBoard(1u64 << 31); // h4 (dark square) - attacks along diagonal
+        assert!(board.in_check(Color::White), "Bishop should give check along diagonal");
+
+        // Test 3: Knight check 
+        board.clear();
+        board.wk = BitBoard(1u64 << 4);  // e1
+        board.bn = BitBoard(1u64 << 19); // d3 - knight attacks e1
+        assert!(board.in_check(Color::White), "Knight should give check");
+
+        // Test 4: Pawn check 
+        board.clear();
+        board.wk = BitBoard(1u64 << 4);  // e1
+        board.bp = BitBoard(1u64 << 11); // d2 - pawn attacks e1
+        assert!(board.in_check(Color::White), "Pawn should give check");
     }
 }
 
