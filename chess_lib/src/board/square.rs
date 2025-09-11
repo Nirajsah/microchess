@@ -18,6 +18,12 @@ pub enum Square {
     A8, B8, C8, D8, E8, F8, G8, H8,
 }
 
+impl From<Square> for u8 {
+    fn from(value: Square) -> Self {
+        value as u8
+    }
+}
+
 impl PartialEq<u8> for Square {
     fn eq(&self, rhs: &u8) -> bool {
         self == rhs

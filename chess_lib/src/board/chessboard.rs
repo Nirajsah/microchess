@@ -1,13 +1,33 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
-use crate::{moves::generator::{computed_knight_attacks, computed_king_moves, bishop_attacks_on_the_fly, queen_attacks_on_the_fly, rook_attacks_on_the_fly, NOT_A_FILE, NOT_H_FILE}, pieces::Color};
+use crate::{moves::generator::{bishop_attacks_on_the_fly, computed_king_moves, computed_knight_attacks, computed_pawn_attacks, computed_pawn_moves, queen_attacks_on_the_fly, rook_attacks_on_the_fly, NOT_A_FILE, NOT_H_FILE}, pieces::Color, ChessError, Result};
 
 use super::{bitboard::BitBoard, square::Square};
 
 lazy_static! {
     pub static ref KNIGHT_MOVES: [BitBoard; 64] = computed_knight_attacks();
     pub static ref KING_MOVES: [BitBoard; 64] = computed_king_moves();
+    pub static ref WHITE_PMOVES: [BitBoard; 64] = computed_pawn_moves(&Color::White);
+    pub static ref WHITE_PATTACKS: [BitBoard; 64] = computed_pawn_attacks(&Color::White);
+    pub static ref BLACK_PATTACKS: [BitBoard; 64] = computed_pawn_attacks(&Color::Black);
+    pub static ref BLACK_PMOVES: [BitBoard; 64] = computed_pawn_moves(&Color::Black);
+}
+
+#[derive(Copy, Clone)]
+pub enum Piece {
+    WhitePawn, WhiteKnight, WhiteBishop, WhiteRook, WhiteQueen, WhiteKing,
+    BlackPawn, BlackKnight, BlackBishop, BlackRook, BlackQueen, BlackKing,
+}
+
+impl Piece {
+    #[rustfmt::skip]
+    pub fn color(&self) -> Color {
+      match self {
+        Piece::WhitePawn | Piece::WhiteKnight | Piece::WhiteBishop | Piece::WhiteRook | Piece::WhiteQueen | Piece::WhiteKing => Color::White,
+        Piece::BlackPawn | Piece::BlackKnight | Piece::BlackBishop | Piece::BlackRook | Piece::BlackQueen | Piece::BlackKing => Color::Black,
+      }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -27,6 +47,8 @@ pub struct ChessBoard {
 
     /// Castling rights
     pub castling_rights: u8, // [White, Black](KingSide, QueenSide)
+    pub halfmove_clock: u8,
+    pub fullmove_number: u8,
     /// En passant
     pub en_passant: BitBoard,
 }
@@ -49,6 +71,8 @@ impl ChessBoard {
             bk: BitBoard(0x1000000000000000),
 
             castling_rights: 0b1111,
+            halfmove_clock: 0,
+            fullmove_number: 1,
             en_passant: BitBoard::EMPTY,
         }
     }
@@ -73,9 +97,8 @@ impl ChessBoard {
         // Reset other game state if you have them
         self.castling_rights = 0b1111;
         self.en_passant = BitBoard::EMPTY;
-        // self.halfmove_clock = 0;
-        // self.fullmove_number = 1;
-        // self.side_to_move = Color::White;
+        self.halfmove_clock = 0;
+        self.fullmove_number = 1;
     }
 
     /// method to reset en_passant square
@@ -88,8 +111,6 @@ impl ChessBoard {
     pub fn to_fen(
         &self,
         active_player: Color,
-        halfmove_count: &u32,
-        fullmove_count: &u32,
     ) -> String {
         let bitboards = [
             self.wp, self.wn, self.wb, self.wr, self.wq, self.wk,
@@ -165,11 +186,11 @@ impl ChessBoard {
 
         fen.push(' '); // just to have a whitespace
 
-        fen.push_str(&halfmove_count.to_string());
+        fen.push_str(&self.halfmove_clock.to_string());
 
         fen.push(' '); // just to have a whitespace
 
-        fen.push_str(&fullmove_count.to_string());
+        fen.push_str(&self.fullmove_number.to_string());
 
         fen
     }
@@ -183,8 +204,9 @@ impl ChessBoard {
         let piece_placement = parts[0];
         let castling_rights = parts.get(2).unwrap_or(&"-");
         let en_passant = parts.get(3).unwrap_or(&"-");
+        let halfmove_clock = parts.get(4).unwrap_or(&"0");
+        let fullmove_number = parts.get(5).unwrap_or(&"1");        // Parse the piece placement
 
-        // Parse the piece placement
         for (rank_idx, rank) in piece_placement.split('/').enumerate() {
             let mut file_idx = 0;
             for c in rank.chars() {
@@ -240,6 +262,10 @@ impl ChessBoard {
                 board.en_passant = BitBoard(1u64 << square); // Placing en_passant
             }
         }
+
+        board.halfmove_clock = halfmove_clock.parse().unwrap();
+        board.fullmove_number = fullmove_number.parse().unwrap();
+
         board
     }
 
@@ -263,15 +289,191 @@ impl ChessBoard {
         self.bp | self.bn | self.bb | self.br | self.bq | self.bk
     }
 
-    /// A function to perma revoke the castling right, when rook is moved for a player
-    pub fn revoke_castling_rights(&mut self, color: Color, rook_position: Square) {
+    /// Returns the bitboard of all white pieces on the board
+    pub fn white_pieces(&self) -> BitBoard {
+        self.wp | self.wn | self.wb | self.wr | self.wq | self.wk
+    }
+
+    /// Returns the bitboard of all black pieces on the board
+    pub fn black_pieces(&self) -> BitBoard {
+        self.bp | self.bn | self.bb | self.br | self.bq | self.bk
+    }
+
+    /// Revoke castling rights permanently.
+    ///
+    /// - If `rook_position` is `Some(square)`, revoke only that rook's side.
+    /// - If `rook_position` is `None`, revoke both sides (king moved).
+    pub fn revoke_castling_rights(&mut self, color: Color, rook_position: Option<Square>) {
         match (color, rook_position) {
-            (Color::White, Square::H1) => self.castling_rights &= !0b0001, // White kingside
-            (Color::White, Square::A1) => self.castling_rights &= !0b0010, // White queenside
-            (Color::Black, Square::H8) => self.castling_rights &= !0b0100, // Black kingside
-            (Color::Black, Square::A8) => self.castling_rights &= !0b1000, // Black queenside
+            (Color::White, Some(Square::H1)) => self.castling_rights &= !0b0001, // White kingside
+            (Color::White, Some(Square::A1)) => self.castling_rights &= !0b0010, // White queenside
+            (Color::Black, Some(Square::H8)) => self.castling_rights &= !0b0100, // Black kingside
+            (Color::Black, Some(Square::A8)) => self.castling_rights &= !0b1000, // Black queenside
+
+            // King moved → revoke both rights
+            (Color::White, None) => self.castling_rights &= !(0b0001 | 0b0010),
+            (Color::Black, None) => self.castling_rights &= !(0b0100 | 0b1000),
+
             _ => {}
         }
+    }
+
+    /// A function to get the mutable bitboard for a piece
+    pub fn get_mut_board(&mut self, piece: &Piece) -> &mut BitBoard {
+        match piece {
+            Piece::WhitePawn => &mut self.wp,
+            Piece::WhiteKnight => &mut self.wn,
+            Piece::WhiteBishop => &mut self.wb,
+            Piece::WhiteRook => &mut self.wr,
+            Piece::WhiteQueen => &mut self.wq,
+            Piece::WhiteKing => &mut self.wk,
+            Piece::BlackPawn => &mut self.bp,
+            Piece::BlackKnight => &mut self.bn,
+            Piece::BlackBishop => &mut self.bb,
+            Piece::BlackRook => &mut self.br,
+            Piece::BlackQueen => &mut self.bq,
+            Piece::BlackKing => &mut self.bk,
+        }
+    }
+
+    /// A function to get the bitboard of a piece as immutable reference
+    pub fn get_board(&mut self, piece: &Piece) -> &BitBoard {
+        match piece {
+            Piece::WhitePawn => &self.wp,
+            Piece::WhiteKnight => &self.wn,
+            Piece::WhiteBishop => &self.wb,
+            Piece::WhiteRook => &self.wr,
+            Piece::WhiteQueen => &self.wq,
+            Piece::WhiteKing => &self.wk,
+            Piece::BlackPawn => &self.bp,
+            Piece::BlackKnight => &self.bn,
+            Piece::BlackBishop => &self.bb,
+            Piece::BlackRook => &self.br,
+            Piece::BlackQueen => &self.bq,
+            Piece::BlackKing => &self.bk,
+        }
+    }
+
+    /// Moves a piece on the board, while checking if the king is in check
+    pub fn move_piece(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        let color = piece.color();
+
+        // Check if the piece is at the 'from' square
+        if *self.get_board(piece) & (1u64 << from) == 0 {
+            return Err(ChessError::InvalidMove);
+        }
+        
+        // Make the move temporarily
+        {
+            let board = self.get_mut_board(piece);
+            board.clear(from);
+            board.set(to);
+        }
+
+        // if the player is already in_check, does making the move get king out of check?, if not don't move.
+        if self.in_check(color) {
+            let board = self.get_mut_board(piece);
+            board.clear(to);
+            board.set(from);
+            return Err(ChessError::InvalidMove);
+        } 
+        
+        Ok(())
+    } 
+
+    // ---------------------------------------- Piece Move Logic -----------------------------------------
+
+    /// Moves a white pawn
+    pub fn wp_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        if WHITE_PMOVES[from as usize] & (1u64 << to) == 0 {
+            return Err(ChessError::InvalidMove);
+        }
+
+        // For two-square moves, check if the intermediate square is also clear
+        if to as usize == from as usize + 16 {
+            let intermediate_sq = from as usize + 8;
+            if self.all_pieces() & (1u64 << intermediate_sq) != 0 {
+                return Err(ChessError::InvalidMove);
+            }
+        }
+
+        // Attempt the move
+        self.move_piece(from, to, piece)?;
+
+        // Set en passant square only for two-square moves
+        if to as usize == from as usize + 16 {
+            self.en_passant = BitBoard(1u64 << (from as usize + 8));
+        }
+
+        Ok(())
+    }
+
+    /// Moves a black pawn
+    pub fn bp_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        if BLACK_PMOVES[from as usize] & (1u64 << to as usize) == 0 {
+            return Err(ChessError::InvalidMove);
+        }
+
+        // For two-square moves, check if the intermediate square is also clear
+        if to as usize == from as usize - 16 {
+            let intermediate_sq = from as usize - 8;
+            if self.all_pieces() & (1u64 << intermediate_sq) != 0 {
+                return Err(ChessError::InvalidMove);
+            }
+        }
+
+        // Attempt the move
+        self.move_piece(from, to, piece)?;
+
+        // Set en passant square only for two-square moves
+        if to as usize == from as usize + 16 {
+            self.en_passant = BitBoard(1u64 << (from as usize + 8));
+        }
+
+        Ok(())
+    }
+
+    /// Moves a knight
+    pub fn knight_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        if KNIGHT_MOVES[from as usize] & (1u64 << to) == 0 {
+            return Err(ChessError::InvalidMove);
+        }
+        self.move_piece(from, to, piece)
+    }
+
+    /// Moves a King
+    pub fn king_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        let color = piece.color();
+        if KING_MOVES[from as usize] & (1u64 << to) == 0 {
+            return Err(ChessError::InvalidMove);
+        }
+        self.revoke_castling_rights(color, None);
+        self.move_piece(from, to, piece)
+    }
+
+    /// Moves a Rook
+    pub fn rook_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        let color = piece.color();
+        if rook_attacks_on_the_fly(from.into(), self.all_pieces()) & (1u64 << to) == 0 {
+            return Err(ChessError::InvalidMove);
+        }
+        self.revoke_castling_rights(color, Some(from));
+        self.move_piece(from, to, piece)
+    }
+
+    /// Moves a Bishop
+    pub fn bishop_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        if bishop_attacks_on_the_fly(from.into(), self.all_pieces()) & (1u64 << to) == 0 {
+            return Err(ChessError::InvalidMove);
+        }
+        self.move_piece(from, to, piece)
+    }
+
+    pub fn queen_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
+        if queen_attacks_on_the_fly(from.into(), self.all_pieces()) & (1u64 << to) == 0 {
+            return Err(ChessError::InvalidMove);
+        }
+        self.move_piece(from, to, piece)
     }
 
     /// Returns true if the king of the given color is in check
@@ -405,6 +607,8 @@ mod tests {
             bq: BitBoard(0x0800000000000000),
             bk: BitBoard(0x1000000000000000),
             castling_rights: 0b1111,
+            halfmove_clock: 0,
+            fullmove_number: 1,
             en_passant: BitBoard::EMPTY,
         };    
 
@@ -415,7 +619,7 @@ mod tests {
     #[test]
     fn test_board_to_fen_method() {
         let starting_board: ChessBoard = ChessBoard::new();    
-        let fen_string = starting_board.to_fen(Color::White, &0, &1);
+        let fen_string = starting_board.to_fen(Color::White);
         let correct_fen_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
         assert_eq!(correct_fen_string, fen_string);
@@ -426,7 +630,7 @@ mod tests {
     fn test_board_with_fen_method() {
         let fen_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         let starting_board: ChessBoard = ChessBoard::with_fen(fen_string);
-        let generated_fen = starting_board.to_fen(Color::White, &0, &1); // halfmove=0, fullmove=1
+        let generated_fen = starting_board.to_fen(Color::White); // halfmove=0, fullmove=1
 
         assert_eq!(generated_fen, fen_string, "FEN generated from board does not match original FEN");
     }
@@ -439,8 +643,9 @@ mod tests {
         assert_eq!(board.castling_rights, 0b1111);
 
         // White Queenside (A1)
-        board.revoke_castling_rights(Color::White, Square::A1);
-        let fen = board.to_fen(Color::Black, &0, &1);
+        board.revoke_castling_rights(Color::White, Some(Square::A1));
+
+        let fen = board.to_fen(Color::Black);
         let should_be_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b Kkq - 0 1";
 
         assert_eq!(board.castling_rights, 0b1101, "White queenside should be revoked");
@@ -449,8 +654,8 @@ mod tests {
         // White Kingside (H1)
         board.castling_rights = 0b1111; // Reset
 
-        board.revoke_castling_rights(Color::White, Square::H1);
-        let fen = board.to_fen(Color::White, &0, &1);
+        board.revoke_castling_rights(Color::White, Some(Square::H1));
+        let fen = board.to_fen(Color::White);
         let should_be_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w Qkq - 0 1";
 
         assert_eq!(board.castling_rights, 0b1110, "White kingside should be revoked");
@@ -459,8 +664,8 @@ mod tests {
         // Black Kingside (H8)
         board.castling_rights = 0b1111; // Reset
 
-        board.revoke_castling_rights(Color::Black, Square::H8);
-        let fen = board.to_fen(Color::Black, &0, &1);
+        board.revoke_castling_rights(Color::Black, Some(Square::H8));
+        let fen = board.to_fen(Color::Black);
         let should_be_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQq - 0 1";
       
         assert_eq!(board.castling_rights, 0b1011, "Black kingside should be revoked");
@@ -468,8 +673,8 @@ mod tests {
 
 
         // Black Queenside (A8)
-        board.revoke_castling_rights(Color::Black, Square::A8);
-        let fen = board.to_fen(Color::White, &0, &1);
+        board.revoke_castling_rights(Color::Black, Some(Square::A8));
+        let fen = board.to_fen(Color::White);
         let should_be_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1";
 
         assert_eq!(board.castling_rights, 0b0011, "Black queenside should be revoked");
@@ -855,5 +1060,90 @@ mod tests {
         board.bp = BitBoard(1u64 << 11); // d2 - pawn attacks e1
         assert!(board.in_check(Color::White), "Pawn should give check");
     }
+
+    //---------------------------------------------------------------------------------------------------------//
+    #[test]
+    fn test_simple_move() {
+        let mut board = ChessBoard::new();
+        // Move white pawn from e2 to e4
+        board.wp_moves(Square::E2, Square::E4, &Piece::WhitePawn).unwrap();
+        assert_eq!(board.to_fen(Color::Black), "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
+    }
+
+    #[test]
+    fn test_illegal_move_same_color_blocking() {
+        let mut board = ChessBoard::new();
+        // Try to move white queen out when pawn is blocking at d2
+        let result = board.queen_moves(Square::D1, Square::H5, &Piece::WhiteQueen);
+        assert!(result.is_err(), "Queen should not be able to move through pawn at d2");
+    }
+
+    //--------------------------------------------------------------------------------------------------------//
+    /* #[test]
+    fn test_capture_piece() {
+        let mut board = ChessBoard::new();
+        // Move e2 -> e4 and d7 -> d5, then e4 -> d5 (pawn capture)
+        board.move_piece(Square::E2, Square::E4, &Piece::WhitePawn).unwrap();
+        board.move_piece(Square::D7, Square::D5, &Piece::BlackPawn).unwrap();
+        board.move_piece(Square::E4, Square::D5, &Piece::WhitePawn).unwrap();
+
+        assert_eq!(board.to_fen(Color::Black), "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPP1PPPP/RNBQKBNR b KQkq - 0 2");
+    } */
+
+    /* #[test]
+    fn test_illegal_move_into_check() {
+        let mut board = ChessBoard::new();
+        // Fool’s mate setup: f2 -> f3, e7 -> e5, g2 -> g4, Qd8 -> h4
+        board.move_piece(Square::F2, Square::F3, &Piece::WhitePawn).unwrap();
+        board.move_piece(Square::E7, Square::E5, &Piece::BlackPawn).unwrap();
+        board.move_piece(Square::G2, Square::G4, &Piece::WhitePawn).unwrap();
+        board.move_piece(Square::D8, Square::H4, &Piece::BlackQueen).unwrap();
+        
+        // Now try moving g1 -> f3 (knight into pinned square), which should be illegal
+        let result = board.move_piece(Square::G1, Square::F3, &Piece::WhiteKnight);
+        assert!(result.is_err(), "Knight cannot move if it leaves king in check");
+    }
+
+    #[test]
+    fn test_castling_kingside() {
+        let mut board = ChessBoard::new();
+        // Set up a position where castling is legal (clear path for white king)
+        // e.g. after 1.e4 e5 2.Nf3 Nc6 3.Bc4 Nf6 4.O-O
+        board.move_piece(Square::E2, Square::E4, &Piece::WhitePawn).unwrap();
+        board.move_piece(Square::E7, Square::E5, &Piece::BlackPawn).unwrap();
+        board.move_piece(Square::G1, Square::F3, &Piece::WhiteKnight).unwrap();
+        board.move_piece(Square::B8, Square::C6, &Piece::BlackKnight).unwrap();
+        board.move_piece(Square::F1, Square::C4, &Piece::WhiteBishop).unwrap();
+        board.move_piece(Square::G8, Square::F6, &Piece::BlackKnight).unwrap();
+
+        // Castling move: king e1 -> g1
+        board.move_piece(Square::E1, Square::G1, &Piece::WhiteKing).unwrap();
+
+        assert_eq!(board.to_fen(Color::Black), "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 4 4");
+    }
+
+    #[test]
+    fn test_en_passant() {
+        let mut board = ChessBoard::new();
+        // e2 -> e4, d7 -> d5, e4 -> e5, f7 -> f5, e5xf6 en passant
+        board.move_piece(Square::E2, Square::E4, &Piece::WhitePawn).unwrap();
+        board.move_piece(Square::D7, Square::D5, &Piece::BlackPawn).unwrap();
+        board.move_piece(Square::E4, Square::E5, &Piece::WhitePawn).unwrap();
+        board.move_piece(Square::F7, Square::F5, &Piece::BlackPawn).unwrap();
+        board.move_piece(Square::E5, Square::F6, &Piece::WhitePawn).unwrap();
+
+        assert_eq!(board.to_fen(Color::Black), "rnbqkbnr/pppp1ppp/5P2/3p4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3");
+    }
+
+    #[test]
+    fn test_promotion() {
+        let mut board = ChessBoard::new();
+        // Minimal setup: push a white pawn to promotion (e7 -> e8=Q)
+        board.move_piece(Square::E2, Square::E4, &Piece::WhitePawn).unwrap();
+        // You’d need to keep pushing the pawn manually or set up a near-promotion board
+        // For simplicity, let’s assume your move_piece handles promotion choice automatically
+        // (otherwise you’ll need an extended function like move_piece_with_promotion)
+        todo!("Implement pawn promotion test when promotion logic is ready");
+    } */
 }
 
