@@ -1,9 +1,9 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
-use crate::{moves::generator::{bishop_attacks_on_the_fly, computed_king_moves, computed_knight_attacks, computed_pawn_attacks, computed_pawn_moves, queen_attacks_on_the_fly, rook_attacks_on_the_fly, NOT_A_FILE, NOT_H_FILE}, pieces::Color, ChessError, Result};
+use crate::{moves::{generator::{bishop_attacks_on_the_fly, computed_king_moves, computed_knight_attacks, computed_pawn_attacks, computed_pawn_moves, queen_attacks_on_the_fly, rook_attacks_on_the_fly, NOT_A_FILE, NOT_H_FILE}, move_type::MoveData}, pieces::Color, ChessError, Result};
 
-use super::{bitboard::BitBoard, square::Square};
+use super::{bitboard::BitBoard, piece::Piece, square::Square};
 
 lazy_static! {
     pub static ref KNIGHT_MOVES: [BitBoard; 64] = computed_knight_attacks();
@@ -14,21 +14,6 @@ lazy_static! {
     pub static ref BLACK_PMOVES: [BitBoard; 64] = computed_pawn_moves(&Color::Black);
 }
 
-#[derive(Copy, Clone)]
-pub enum Piece {
-    WhitePawn, WhiteKnight, WhiteBishop, WhiteRook, WhiteQueen, WhiteKing,
-    BlackPawn, BlackKnight, BlackBishop, BlackRook, BlackQueen, BlackKing,
-}
-
-impl Piece {
-    #[rustfmt::skip]
-    pub fn color(&self) -> Color {
-      match self {
-        Piece::WhitePawn | Piece::WhiteKnight | Piece::WhiteBishop | Piece::WhiteRook | Piece::WhiteQueen | Piece::WhiteKing => Color::White,
-        Piece::BlackPawn | Piece::BlackKnight | Piece::BlackBishop | Piece::BlackRook | Piece::BlackQueen | Piece::BlackKing => Color::Black,
-      }
-    }
-}
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct ChessBoard {
@@ -47,8 +32,6 @@ pub struct ChessBoard {
 
     /// Castling rights
     pub castling_rights: u8, // [White, Black](KingSide, QueenSide)
-    pub halfmove_clock: u8,
-    pub fullmove_number: u8,
     /// En passant
     pub en_passant: BitBoard,
 }
@@ -71,8 +54,6 @@ impl ChessBoard {
             bk: BitBoard(0x1000000000000000),
 
             castling_rights: 0b1111,
-            halfmove_clock: 0,
-            fullmove_number: 1,
             en_passant: BitBoard::EMPTY,
         }
     }
@@ -97,8 +78,6 @@ impl ChessBoard {
         // Reset other game state if you have them
         self.castling_rights = 0b1111;
         self.en_passant = BitBoard::EMPTY;
-        self.halfmove_clock = 0;
-        self.fullmove_number = 1;
     }
 
     /// method to reset en_passant square
@@ -110,6 +89,8 @@ impl ChessBoard {
     ///A function to generate FEN string using bitboard
     pub fn to_fen(
         &self,
+        halfmove_clock: u8,
+        fullmove_number: u8,
         active_player: Color,
     ) -> String {
         let bitboards = [
@@ -186,90 +167,17 @@ impl ChessBoard {
 
         fen.push(' '); // just to have a whitespace
 
-        fen.push_str(&self.halfmove_clock.to_string());
+        fen.push_str(&halfmove_clock.to_string());
 
         fen.push(' '); // just to have a whitespace
 
-        fen.push_str(&self.fullmove_number.to_string());
+        fen.push_str(&fullmove_number.to_string());
 
         fen
     }
 
     
-    /// Generates a ChessBoard from a FEN string
-    pub fn with_fen(fen: &str) -> Self {
-        let mut board = ChessBoard::default();
-
-        let parts: Vec<&str> = fen.split_whitespace().collect();
-        let piece_placement = parts[0];
-        let castling_rights = parts.get(2).unwrap_or(&"-");
-        let en_passant = parts.get(3).unwrap_or(&"-");
-        let halfmove_clock = parts.get(4).unwrap_or(&"0");
-        let fullmove_number = parts.get(5).unwrap_or(&"1");        // Parse the piece placement
-
-        for (rank_idx, rank) in piece_placement.split('/').enumerate() {
-            let mut file_idx = 0;
-            for c in rank.chars() {
-                let square = (7 - rank_idx) * 8 + file_idx;
-                let mask = 1u64 << square;
-
-                match c {
-                    'P' => board.wp |= mask,
-                    'N' => board.wn |= mask,
-                    'B' => board.wb |= mask,
-                    'R' => board.wr |= mask,
-                    'Q' => board.wq |= mask,
-                    'K' => board.wk |= mask,
-                    'p' => board.bp |= mask,
-                    'n' => board.bn |= mask,
-                    'b' => board.bb |= mask,
-                    'r' => board.br |= mask,
-                    'q' => board.bq |= mask,
-                    'k' => board.bk |= mask,
-                    '1'..='8' => {
-                        let empty_squares = c.to_digit(10).unwrap() as usize;
-                        file_idx += empty_squares - 1;
-                    }
-                    _ => {}
-                }
-                file_idx += 1;
-            }
-        }
-
-        // Parse castling rights
-        let mut mask = 0;
-        for ch in castling_rights.chars() {
-            match ch {
-                'K' => mask |= 0b0001,
-                'Q' => mask |= 0b0010,
-                'k' => mask |= 0b0100,
-                'q' => mask |= 0b1000,
-                '-' => {},
-                _   => panic!("Invalid castling char: {}", ch),
-            }
-        }
-        board.castling_rights = mask;
-
-        // Parse en passant
-        if *en_passant != "-" {
-            let en_passant_square = match en_passant.chars().nth(0) {
-                Some(file) => en_passant.chars().nth(1).map(|rank| {
-                    (rank.to_digit(10).unwrap() as u64 - 1) * 8 + (file as u64 - 'a' as u64)
-                }),
-                None => None,
-            };
-            if let Some(square) = en_passant_square {
-                board.en_passant = BitBoard(1u64 << square); // Placing en_passant
-            }
-        }
-
-        board.halfmove_clock = halfmove_clock.parse().unwrap();
-        board.fullmove_number = fullmove_number.parse().unwrap();
-
-        board
-    }
-
-    /// Helper function to extract moves from a bitboard
+       /// Helper function to extract moves from a bitboard
     pub fn extract_moves(&self, bitboard: BitBoard) -> Vec<Square> {
         let mut moves = Vec::with_capacity(64);
         let mut bb = bitboard;
@@ -337,7 +245,7 @@ impl ChessBoard {
     }
 
     /// A function to get the bitboard of a piece as immutable reference
-    pub fn get_board(&mut self, piece: &Piece) -> &BitBoard {
+    pub fn get_board(&self, piece: &Piece) -> &BitBoard {
         match piece {
             Piece::WhitePawn => &self.wp,
             Piece::WhiteKnight => &self.wn,
@@ -381,6 +289,34 @@ impl ChessBoard {
         Ok(())
     } 
 
+    
+    pub fn wp_move_or_capture(&mut self, mv: MoveData) {
+        todo!()
+    }
+
+    pub fn bp_move_or_capture(&mut self, mv: MoveData) {
+        todo!()
+    }
+
+    pub fn rook_move_or_capture(&mut self, mv: MoveData) {
+        todo!()
+    }
+
+    pub fn bishop_move_or_capture(&mut self, mv: MoveData) {
+        todo!()
+    }
+
+    pub fn queen_move_or_capture(&mut self, mv: MoveData) {
+        todo!()
+    }
+
+    pub fn knight_move_or_capture(&mut self, mv: MoveData) {
+        todo!()
+    }
+
+    pub fn king_move_or_capture(&mut self, mv: MoveData) {
+        todo!()
+    }    
     // ---------------------------------------- Piece Move Logic -----------------------------------------
 
     /// Moves a white pawn
@@ -607,8 +543,6 @@ mod tests {
             bq: BitBoard(0x0800000000000000),
             bk: BitBoard(0x1000000000000000),
             castling_rights: 0b1111,
-            halfmove_clock: 0,
-            fullmove_number: 1,
             en_passant: BitBoard::EMPTY,
         };    
 
@@ -619,21 +553,21 @@ mod tests {
     #[test]
     fn test_board_to_fen_method() {
         let starting_board: ChessBoard = ChessBoard::new();    
-        let fen_string = starting_board.to_fen(Color::White);
+        let fen_string = starting_board.to_fen(0, 1, Color::White);
         let correct_fen_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
         assert_eq!(correct_fen_string, fen_string);
     }
 
 
-    #[test]
+    /* #[test]
     fn test_board_with_fen_method() {
         let fen_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         let starting_board: ChessBoard = ChessBoard::with_fen(fen_string);
         let generated_fen = starting_board.to_fen(Color::White); // halfmove=0, fullmove=1
 
         assert_eq!(generated_fen, fen_string, "FEN generated from board does not match original FEN");
-    }
+    } */
 
     #[test]
     fn test_revoke_castling_rights_method() {
@@ -645,7 +579,7 @@ mod tests {
         // White Queenside (A1)
         board.revoke_castling_rights(Color::White, Some(Square::A1));
 
-        let fen = board.to_fen(Color::Black);
+        let fen = board.to_fen(0, 1, Color::Black);
         let should_be_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b Kkq - 0 1";
 
         assert_eq!(board.castling_rights, 0b1101, "White queenside should be revoked");
@@ -655,7 +589,7 @@ mod tests {
         board.castling_rights = 0b1111; // Reset
 
         board.revoke_castling_rights(Color::White, Some(Square::H1));
-        let fen = board.to_fen(Color::White);
+        let fen = board.to_fen(0, 1, Color::White);
         let should_be_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w Qkq - 0 1";
 
         assert_eq!(board.castling_rights, 0b1110, "White kingside should be revoked");
@@ -665,7 +599,7 @@ mod tests {
         board.castling_rights = 0b1111; // Reset
 
         board.revoke_castling_rights(Color::Black, Some(Square::H8));
-        let fen = board.to_fen(Color::Black);
+        let fen = board.to_fen(0, 1, Color::Black);
         let should_be_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQq - 0 1";
       
         assert_eq!(board.castling_rights, 0b1011, "Black kingside should be revoked");
@@ -674,7 +608,7 @@ mod tests {
 
         // Black Queenside (A8)
         board.revoke_castling_rights(Color::Black, Some(Square::A8));
-        let fen = board.to_fen(Color::White);
+        let fen = board.to_fen(0, 1, Color::White);
         let should_be_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1";
 
         assert_eq!(board.castling_rights, 0b0011, "Black queenside should be revoked");
@@ -1067,7 +1001,7 @@ mod tests {
         let mut board = ChessBoard::new();
         // Move white pawn from e2 to e4
         board.wp_moves(Square::E2, Square::E4, &Piece::WhitePawn).unwrap();
-        assert_eq!(board.to_fen(Color::Black), "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
+        assert_eq!(board.to_fen(0, 1, Color::Black), "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
     }
 
     #[test]
