@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::pieces::Color;
 
-#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[repr(u8)]
 pub enum Piece {
     WhitePawn,
     WhiteKnight,
@@ -25,6 +26,11 @@ impl Piece {
         Piece::WhitePawn | Piece::WhiteKnight | Piece::WhiteBishop | Piece::WhiteRook | Piece::WhiteQueen | Piece::WhiteKing => Color::White,
         Piece::BlackPawn | Piece::BlackKnight | Piece::BlackBishop | Piece::BlackRook | Piece::BlackQueen | Piece::BlackKing => Color::Black,
       }
+    }
+
+    #[inline]
+    pub fn index(self) -> usize {
+        self as usize
     }
 
     pub fn move_index(&self) -> usize {

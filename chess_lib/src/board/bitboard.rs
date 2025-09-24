@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Shl, Shr, Sub};
+use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXorAssign, Shl, Shr, Sub};
 
 use super::square::Square;
 
@@ -8,6 +8,11 @@ pub struct BitBoard(pub u64);
 
 impl BitBoard {
     pub const EMPTY: Self = BitBoard(0);
+
+    #[inline]
+    pub fn empty(&mut self) {
+        self.0 = 0xb0000
+    }
 
     #[inline]
     pub fn set(&mut self, sq: Square) {
@@ -58,6 +63,12 @@ impl BitBoard {
             self.0 &= self.0 - 1; // remove LSB
             Some(lsb_index)
         }
+    }
+}
+
+impl BitXorAssign<u64> for BitBoard {
+    fn bitxor_assign(&mut self, rhs: u64) {
+        self.0 ^= rhs
     }
 }
 

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ChessError, Result,
-    board::{chessboard::ChessBoard, piece::Piece},
+    board::{bitboard::BitBoard, chessboard::ChessBoard, piece::Piece},
     moves::move_type::{MoveData, MoveType},
 };
 
@@ -22,14 +22,14 @@ pub struct Game {
     pub current_hash: u64,
     /// position_count
     pub position_count: HashMap<u64, u32>,
-    /// 50-Move Rule Counter
-    pub halfmove_clock: u32,
-    // represents full moves(increments when black makes a move)
-    pub fullmove_count: u32,
     */
+    /// 50-Move Rule Counter
+    pub halfmove_clock: u8,
+    // represents full moves(increments when black makes a move)
+    pub fullmove_number: u8,
 }
 
-type PieceFn = fn(&mut ChessBoard, MoveData);
+type PieceFn = fn(&mut ChessBoard, MoveData) -> Result<()>;
 
 lazy_static! {
     pub static ref PIECE_FUNCS: [PieceFn; 7] = [
@@ -46,9 +46,18 @@ lazy_static! {
 impl Game {
     /// A function to create a new game using defaults
     pub fn new() -> Self {
-        log::info!("Game is starting....");
         Game {
             board: ChessBoard::new(),
+            halfmove_clock: 0,
+            fullmove_number: 1,
+        }
+    }
+
+    pub fn raw() -> Self {
+        Game {
+            board: ChessBoard::default(),
+            halfmove_clock: 0,
+            fullmove_number: 1,
         }
     }
 
@@ -57,7 +66,7 @@ impl Game {
         let moving_piece_board = self.board.get_board(&mv.piece);
         if !moving_piece_board.is_set(mv.from) || self.board.all_pieces().is_set(mv.to) {
             println!(
-                "pieces not present at :{:?}, and present at :{:?}",
+                "piece not present at :{:?}, and present at :{:?}",
                 mv.from, mv.to
             );
             return Err(ChessError::InvalidMove);
@@ -71,7 +80,7 @@ impl Game {
         let capture_piece_board = self.board.get_board(&capture_piece);
         if !moving_piece_board.is_set(mv.from) || !capture_piece_board.is_set(mv.to) {
             println!(
-                "pieces not present at :{:?}, capture piece not present at :{:?}",
+                "piece not present at :{:?}, capture piece not present at :{:?}",
                 mv.from, mv.to
             );
             return Err(ChessError::InvalidCapture);
@@ -85,15 +94,12 @@ impl Game {
             MoveType::Move => self.is_move_valid(mv).and_then(|_| {
                 let chessboard = &mut self.board;
                 let piece_function = PIECE_FUNCS[mv.piece.move_index()];
-                piece_function(chessboard, mv); // this makes the move on the board
-                Ok(())
+                piece_function(chessboard, mv) // this makes the move on the board
             }),
             MoveType::Capture(piece) => self.is_capture_valid(piece, mv).and_then(|_| {
                 let chessboard = &mut self.board;
                 let piece_function = PIECE_FUNCS[mv.piece.move_index()];
-                piece_function(chessboard, mv);
-
-                Ok(())
+                piece_function(chessboard, mv)
             }),
             MoveType::Castle(_) => Ok(()),
             MoveType::EnPassant => Ok(()),
@@ -101,17 +107,17 @@ impl Game {
         }
     }
 
-    // This should be a part of the game struct
-    /* /// Generates a ChessBoard from a FEN string
+    /// Generates a ChessBoard from a FEN string
     pub fn with_fen(fen: &str) -> Self {
-        let mut board = ChessBoard::default();
+        let mut game = Game::raw();
+        let mut boards = game.board.bitboards;
 
         let parts: Vec<&str> = fen.split_whitespace().collect();
         let piece_placement = parts[0];
         let castling_rights = parts.get(2).unwrap_or(&"-");
         let en_passant = parts.get(3).unwrap_or(&"-");
-        let halfmove_clock = parts.get(4).unwrap_or(&"0");
-        let fullmove_number = parts.get(5).unwrap_or(&"1");        // Parse the piece placement
+        let halfmove_clock: &str = parts.get(4).unwrap_or(&"0");
+        let fullmove_number: &str = parts.get(5).unwrap_or(&"1"); // Parse the piece placement
 
         for (rank_idx, rank) in piece_placement.split('/').enumerate() {
             let mut file_idx = 0;
@@ -120,18 +126,18 @@ impl Game {
                 let mask = 1u64 << square;
 
                 match c {
-                    'P' => board.wp |= mask,
-                    'N' => board.wn |= mask,
-                    'B' => board.wb |= mask,
-                    'R' => board.wr |= mask,
-                    'Q' => board.wq |= mask,
-                    'K' => board.wk |= mask,
-                    'p' => board.bp |= mask,
-                    'n' => board.bn |= mask,
-                    'b' => board.bb |= mask,
-                    'r' => board.br |= mask,
-                    'q' => board.bq |= mask,
-                    'k' => board.bk |= mask,
+                    'P' => boards[0] |= mask,
+                    'N' => boards[1] |= mask,
+                    'B' => boards[2] |= mask,
+                    'R' => boards[3] |= mask,
+                    'Q' => boards[4] |= mask,
+                    'K' => boards[5] |= mask,
+                    'p' => boards[6] |= mask,
+                    'n' => boards[7] |= mask,
+                    'b' => boards[8] |= mask,
+                    'r' => boards[9] |= mask,
+                    'q' => boards[10] |= mask,
+                    'k' => boards[11] |= mask,
                     '1'..='8' => {
                         let empty_squares = c.to_digit(10).unwrap() as usize;
                         file_idx += empty_squares - 1;
@@ -150,11 +156,12 @@ impl Game {
                 'Q' => mask |= 0b0010,
                 'k' => mask |= 0b0100,
                 'q' => mask |= 0b1000,
-                '-' => {},
-                _   => panic!("Invalid castling char: {}", ch),
+                '-' => {}
+                _ => panic!("Invalid castling char: {}", ch),
             }
         }
-        board.castling_rights = mask;
+
+        game.board.castling_rights = mask;
 
         // Parse en passant
         if *en_passant != "-" {
@@ -165,15 +172,23 @@ impl Game {
                 None => None,
             };
             if let Some(square) = en_passant_square {
-                board.en_passant = BitBoard(1u64 << square); // Placing en_passant
+                game.board.en_passant = BitBoard(1u64 << square); // Placing en_passant
             }
         }
 
-        halfmove_clock = halfmove_clock.parse().unwrap();
-        fullmove_number = fullmove_number.parse().unwrap();
+        // build occupancies
+        game.board.occupancies[0] = boards[0..6]
+            .iter()
+            .fold(BitBoard::EMPTY, |acc, &bb| acc | bb);
+        game.board.occupancies[1] = boards[6..12]
+            .iter()
+            .fold(BitBoard::EMPTY, |acc, &bb| acc | bb);
 
-        board
-    } */
+        game.halfmove_clock = halfmove_clock.parse().unwrap();
+        game.fullmove_number = fullmove_number.parse().unwrap();
+
+        game
+    }
 
     /*
     /// A function to compute zobrist hashing

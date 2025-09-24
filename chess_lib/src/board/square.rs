@@ -1,7 +1,7 @@
 use async_graphql::Enum;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
-use std::ops::{BitAnd, Shl, Shr};
+use std::ops::{Add, BitAnd, Shl, Shr, Sub};
 use std::str::FromStr;
 
 #[rustfmt::skip]
@@ -36,6 +36,25 @@ impl PartialOrd<u8> for Square {
     }
 }
 
+impl Add<u8> for Square {
+    type Output = Self;
+
+    fn add(self, rhs: u8) -> Self::Output {
+        let val = self as u8 + rhs;
+        // SAFETY: `Square` is #[repr(u8)] and contiguous from 0..63
+        unsafe { std::mem::transmute::<u8, Square>(val) }
+    }
+}
+
+impl Sub<u8> for Square {
+    type Output = Self;
+
+    fn sub(self, rhs: u8) -> Self::Output {
+        let val = self as u8 - rhs;
+        // SAFETY: `Square` is #[repr(u8)] and contiguous from 0..63
+        unsafe { std::mem::transmute::<u8, Square>(val) }
+    }
+}
 impl BitAnd<u8> for Square {
     type Output = Self;
 
