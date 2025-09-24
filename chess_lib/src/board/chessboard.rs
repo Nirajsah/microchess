@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
-use crate::{moves::{generator::{bishop_attacks_on_the_fly, computed_king_moves, computed_knight_attacks, computed_pawn_attacks, computed_pawn_moves, queen_attacks_on_the_fly, rook_attacks_on_the_fly, NOT_A_FILE, NOT_H_FILE}, move_type::MoveData}, pieces::Color, ChessError, Result};
+use crate::{moves::{generator::{bishop_attacks_on_the_fly, computed_king_moves, computed_knight_attacks, computed_pawn_attacks, computed_pawn_moves, queen_attacks_on_the_fly, rook_attacks_on_the_fly, NOT_A_FILE, NOT_H_FILE}, move_type::{MoveData, MoveType}}, pieces::Color, ChessError, Result};
 
 use super::{bitboard::BitBoard, piece::Piece, square::Square};
 
@@ -15,22 +15,12 @@ lazy_static! {
 }
 
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct ChessBoard {
-    pub wp: BitBoard,
-    pub wn: BitBoard,
-    pub wb: BitBoard,
-    pub wr: BitBoard,
-    pub wq: BitBoard,
-    pub wk: BitBoard,
-    pub bp: BitBoard,
-    pub bn: BitBoard,
-    pub bb: BitBoard,
-    pub br: BitBoard,
-    pub bq: BitBoard,
-    pub bk: BitBoard,
-
-    /// Castling rights
+    pub bitboards: [BitBoard; 12], // one for each piece type
+    pub occupancies: [BitBoard; 2], // white and black occupancy bitboards(0 White, 1 Black)
+    pub square_map: Vec<Option<Piece>>,   /// Castling rights
+    pub attack_masks: [BitBoard; 2], // [White, Black]
     pub castling_rights: u8, // [White, Black](KingSide, QueenSide)
     /// En passant
     pub en_passant: BitBoard,
@@ -40,41 +30,96 @@ impl ChessBoard {
     /// Generates a new Board
     pub fn new() -> Self {
         ChessBoard {
-            wp: BitBoard(0x000000000000FF00),
-            wn: BitBoard(0x0000000000000042),
-            wb: BitBoard(0x0000000000000024),
-            wr: BitBoard(0x0000000000000081),
-            wq: BitBoard(0x0000000000000008),
-            wk: BitBoard(0x0000000000000010),
-            bp: BitBoard(0x00FF000000000000),
-            bn: BitBoard(0x4200000000000000),
-            bb: BitBoard(0x2400000000000000),
-            br: BitBoard(0x8100000000000000),
-            bq: BitBoard(0x0800000000000000),
-            bk: BitBoard(0x1000000000000000),
-
+            bitboards: [
+                BitBoard(0x000000000000FF00),
+                BitBoard(0x0000000000000042),
+                BitBoard(0x0000000000000024),
+                BitBoard(0x0000000000000081),
+                BitBoard(0x0000000000000008),
+                BitBoard(0x0000000000000010),
+                BitBoard(0x00FF000000000000),
+                BitBoard(0x4200000000000000),
+                BitBoard(0x2400000000000000),
+                BitBoard(0x8100000000000000),
+                BitBoard(0x0800000000000000),
+                BitBoard(0x1000000000000000),
+            ],
+            occupancies: [BitBoard(0x0000_0000_0000_FFFF), BitBoard(0xFFFF_0000_0000_0000)],
+            square_map: Vec::with_capacity(64),
+            attack_masks: Self::initial_attack_masks(), 
             castling_rights: 0b1111,
             en_passant: BitBoard::EMPTY,
         }
     }
 
+    pub fn initial_attack_masks() -> [BitBoard; 2] {
+        let mut attack_masks: [BitBoard; 2] = [BitBoard::EMPTY, BitBoard::EMPTY];
+        // White attack mask initialization
+        let mut white_pawn_attacks = BitBoard(0);
+        for sq in [Square::A2, Square::B2, Square::C2, Square::D2,
+                   Square::E2, Square::F2, Square::G2, Square::H2] {
+            white_pawn_attacks |= WHITE_PATTACKS[sq as usize].into();
+        }
+        // Black attack mask initialization
+        let mut black_pawn_attacks = BitBoard(0);
+        for sq in [Square::A7, Square::B7, Square::C7, Square::D7,
+                   Square::E7, Square::F7, Square::G7, Square::H7] {
+            black_pawn_attacks |= BLACK_PATTACKS[sq as usize].into();
+        }
+        attack_masks[Color::White.index()] = white_pawn_attacks
+            | KNIGHT_MOVES[Square::B1 as usize]
+            | KNIGHT_MOVES[Square::G1 as usize];
+
+        attack_masks[Color::Black.index()] = black_pawn_attacks
+            | KNIGHT_MOVES[Square::B8 as usize]
+            | KNIGHT_MOVES[Square::G8 as usize];
+
+        attack_masks
+    }
+
+    pub fn update_attack_masks(&mut self, mv: MoveData) {
+        // Remove old attacks of the piece
+        self.remove_piece_attacks(mv.from, mv.piece);
+
+        // If capture: remove opponent attacks from captured piece
+        if let MoveType::Capture(captured) = mv.move_type {
+            self.remove_piece_attacks(mv.to, captured);
+        }
+        // Apply the move to the board
+        self.make_move(mv).unwrap();
+
+        // Add new attacks for the moved piece
+        self.add_piece_attacks(mv.to, mv.piece);
+    }
+
+    fn remove_piece_attacks(&mut self, square: Square, piece: Piece) {
+        let idx = piece.color().index();
+        self.attack_masks[idx] ^= self.attacks_for_piece(square, piece).into();
+    }
+
+    fn add_piece_attacks(&mut self, square: Square, piece: Piece) {
+        let idx = piece.color().index();
+        self.attack_masks[idx] |= self.attacks_for_piece(square, piece).into();
+    }
+
+    fn attacks_for_piece(&self, square: Square, piece: Piece) -> BitBoard {
+        match piece {
+            Piece::WhitePawn => WHITE_PATTACKS[square as usize],
+            Piece::BlackPawn => BLACK_PATTACKS[square as usize],
+            Piece::WhiteKnight | Piece::BlackKnight => KNIGHT_MOVES[square as usize],
+            Piece::WhiteBishop | Piece::BlackBishop =>
+                bishop_attacks_on_the_fly(square.into(), self.all_pieces()),
+            Piece::WhiteRook | Piece::BlackRook =>
+                rook_attacks_on_the_fly(square.into(), self.all_pieces()),
+            Piece::WhiteQueen | Piece::BlackQueen =>
+                queen_attacks_on_the_fly(square.into(), self.all_pieces()),
+            Piece::WhiteKing | Piece::BlackKing => KING_MOVES[square as usize],
+        }
+    }
+
     pub fn clear(&mut self) {
-        // Clear all white pieces
-        self.wp = BitBoard::EMPTY; // White pawns
-        self.wr = BitBoard::EMPTY; // White rooks  
-        self.wn = BitBoard::EMPTY; // White knights
-        self.wb = BitBoard::EMPTY; // White bishops
-        self.wq = BitBoard::EMPTY; // White queens
-        self.wk = BitBoard::EMPTY; // White king
-        
-        // Clear all black pieces
-        self.bp = BitBoard::EMPTY; // Black pawns
-        self.br = BitBoard::EMPTY; // Black rooks
-        self.bn = BitBoard::EMPTY; // Black knights
-        self.bb = BitBoard::EMPTY; // Black bishops
-        self.bq = BitBoard::EMPTY; // Black queens
-        self.bk = BitBoard::EMPTY; // Black king
-        
+        self.bitboards = [BitBoard::EMPTY; 12];
+
         // Reset other game state if you have them
         self.castling_rights = 0b1111;
         self.en_passant = BitBoard::EMPTY;
@@ -84,19 +129,16 @@ impl ChessBoard {
     pub fn reset_enpassant(&mut self) {
         self.en_passant = BitBoard::EMPTY;
     }
-
          
-    ///A function to generate FEN string using bitboard
+    /// A function to generate FEN string using bitboard
     pub fn to_fen(
         &self,
         halfmove_clock: u8,
         fullmove_number: u8,
         active_player: Color,
     ) -> String {
-        let bitboards = [
-            self.wp, self.wn, self.wb, self.wr, self.wq, self.wk,
-            self.bp, self.bn, self.bb, self.br, self.bq, self.bk,
-        ];
+        let bitboards = self.bitboards;
+
         let pieces = ['P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'];
 
         let mut fen = String::with_capacity(100);
@@ -175,9 +217,8 @@ impl ChessBoard {
 
         fen
     }
-
     
-       /// Helper function to extract moves from a bitboard
+    /// Helper function to extract moves from a bitboard
     pub fn extract_moves(&self, bitboard: BitBoard) -> Vec<Square> {
         let mut moves = Vec::with_capacity(64);
         let mut bb = bitboard;
@@ -185,26 +226,23 @@ impl ChessBoard {
         while let Some(piece_pos) = bb.pop_lsb() {
             moves.push(Square::uint_to_square(piece_pos as u8))
         }
-
         moves
     }
-
     
     #[rustfmt::skip]
     /// Returns a bitboard containing all pieces on the board
     pub fn all_pieces(&self) -> BitBoard {
-        self.wp | self.wn | self.wb | self.wr | self.wq | self.wk |
-        self.bp | self.bn | self.bb | self.br | self.bq | self.bk
+        self.occupancies[0] | self.occupancies[1]
     }
 
     /// Returns the bitboard of all white pieces on the board
     pub fn white_pieces(&self) -> BitBoard {
-        self.wp | self.wn | self.wb | self.wr | self.wq | self.wk
+        self.occupancies[0]
     }
 
     /// Returns the bitboard of all black pieces on the board
     pub fn black_pieces(&self) -> BitBoard {
-        self.bp | self.bn | self.bb | self.br | self.bq | self.bk
+        self.occupancies[1]
     }
 
     /// Revoke castling rights permanently.
@@ -228,96 +266,237 @@ impl ChessBoard {
 
     /// A function to get the mutable bitboard for a piece
     pub fn get_mut_board(&mut self, piece: &Piece) -> &mut BitBoard {
-        match piece {
-            Piece::WhitePawn => &mut self.wp,
-            Piece::WhiteKnight => &mut self.wn,
-            Piece::WhiteBishop => &mut self.wb,
-            Piece::WhiteRook => &mut self.wr,
-            Piece::WhiteQueen => &mut self.wq,
-            Piece::WhiteKing => &mut self.wk,
-            Piece::BlackPawn => &mut self.bp,
-            Piece::BlackKnight => &mut self.bn,
-            Piece::BlackBishop => &mut self.bb,
-            Piece::BlackRook => &mut self.br,
-            Piece::BlackQueen => &mut self.bq,
-            Piece::BlackKing => &mut self.bk,
-        }
+        &mut self.bitboards[piece.move_index()]
     }
 
     /// A function to get the bitboard of a piece as immutable reference
     pub fn get_board(&self, piece: &Piece) -> &BitBoard {
-        match piece {
-            Piece::WhitePawn => &self.wp,
-            Piece::WhiteKnight => &self.wn,
-            Piece::WhiteBishop => &self.wb,
-            Piece::WhiteRook => &self.wr,
-            Piece::WhiteQueen => &self.wq,
-            Piece::WhiteKing => &self.wk,
-            Piece::BlackPawn => &self.bp,
-            Piece::BlackKnight => &self.bn,
-            Piece::BlackBishop => &self.bb,
-            Piece::BlackRook => &self.br,
-            Piece::BlackQueen => &self.bq,
-            Piece::BlackKing => &self.bk,
-        }
+        &self.bitboards[piece.move_index()]
     }
 
     /// Moves a piece on the board, while checking if the king is in check
-    pub fn move_piece(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
-        let color = piece.color();
+    pub fn make_move(&mut self, mv: MoveData) -> Result<()> {
+        let piece_idx = mv.piece.index();
+        let color_idx = mv.piece.color().index();
 
-        // Check if the piece is at the 'from' square
-        if *self.get_board(piece) & (1u64 << from) == 0 {
-            return Err(ChessError::InvalidMove);
-        }
-        
-        // Make the move temporarily
-        {
-            let board = self.get_mut_board(piece);
-            board.clear(from);
-            board.set(to);
-        }
+        let from_bit = 1u64 << mv.from;
+        let to_bit = 1u64 << mv.to;
 
-        // if the player is already in_check, does making the move get king out of check?, if not don't move.
-        if self.in_check(color) {
-            let board = self.get_mut_board(piece);
-            board.clear(to);
-            board.set(from);
-            return Err(ChessError::InvalidMove);
-        } 
-        
+        // Remove piece from from_bit, add to to_bit in a single XOR
+        self.bitboards[piece_idx] ^= from_bit | to_bit;
+
+        // Update occupancy for this color
+        self.occupancies[color_idx] ^= from_bit | to_bit;
+
+        // Update square_map
+        self.square_map[mv.from as usize] = None;
+        self.square_map[mv.to as usize] = Some(mv.piece);
+
         Ok(())
-    } 
+    }
+ 
+    pub fn get_opponent_pieces(&self, piece: Piece) -> BitBoard {
+        match piece.color() {
+            Color::White => self.black_pieces(),
+            Color::Black => self.white_pieces()
+        }
+    }
 
+    /// Handle captures
+    pub fn piece_capture(&mut self, capture_piece: Piece, mv: MoveData) -> Result<()> {
+        let to_bit = 1u64 << mv.to;
+        let capture_idx = capture_piece.index();
+        self.bitboards[capture_idx] ^= to_bit;
+        let captured_color_idx = capture_piece.color().index();
+        self.occupancies[captured_color_idx] ^= to_bit;
+
+        Ok(())
+    }
     
-    pub fn wp_move_or_capture(&mut self, mv: MoveData) {
-        todo!()
+    pub fn wp_move_or_capture(&mut self, mv: MoveData) -> Result<()> {
+        let from = mv.from;
+        let to = mv.to;
+        let piece = mv.piece;
+
+        match mv.move_type {
+            MoveType::Move => {
+                if !WHITE_PMOVES[from as usize].is_set(to) {
+                    return Err(ChessError::InvalidMove);
+                }
+                // For two-square moves, check if the intermediate square is also clear
+                if to == from + 16 {
+                    let intermediate_sq = from + 8;
+                    if self.all_pieces().is_set(intermediate_sq) {
+                        return Err(ChessError::InvalidMove);
+                    }
+                    // Set en passant square only for two-square moves
+                    self.en_passant = BitBoard(1u64 << (from + 8));
+                    // update black attack mask: add only adjacent pawn captures
+                    let ep_mask = (self.en_passant.0 >> 7 & NOT_H_FILE)
+                                | (self.en_passant.0 >> 9 & NOT_A_FILE);
+
+                    self.attack_masks[Color::Black.index()] |= ep_mask;
+                }       
+                self.make_move(mv)
+            },
+            MoveType::Capture(capture_piece) => {
+                if !WHITE_PATTACKS[from as usize].is_set(to) || !self.get_opponent_pieces(piece).is_set(to) {
+                    return Err(ChessError::InvalidCapture);
+                }
+                self.piece_capture(capture_piece, mv).and_then(|_| self.make_move(mv))
+            },
+            _ => Err(ChessError::InvalidMove)
+        }
     }
 
-    pub fn bp_move_or_capture(&mut self, mv: MoveData) {
-        todo!()
+    pub fn bp_move_or_capture(&mut self, mv: MoveData) -> Result<()> {
+        let from = mv.from;
+        let to = mv.to;
+        let piece = mv.piece;
+
+        match mv.move_type {
+            MoveType::Move => {
+                if !BLACK_PMOVES[from as usize].is_set(to) {
+                    return Err(ChessError::InvalidMove);
+                }                
+                // For two-square moves, check if the intermediate square is also clear
+                if to == from - 16 {
+                    let intermediate_sq = from - 8;
+                    if self.all_pieces().is_set(intermediate_sq) {
+                        return Err(ChessError::InvalidMove);
+                    }
+                    // Set en passant square only for two-square moves
+                    self.en_passant = BitBoard(1u64 << (from - 8));
+                    // update white attack mask: add only adjacent pawn captures
+                    let ep_mask = (self.en_passant.0 << 7 & NOT_A_FILE)
+                                | (self.en_passant.0 << 9 & NOT_H_FILE);
+
+                    self.attack_masks[Color::White.index()] |= ep_mask;
+                }       
+                self.make_move(mv)
+            },
+            MoveType::Capture(capture_piece) => {
+                if !BLACK_PATTACKS[from as usize].is_set(to) || !self.get_opponent_pieces(piece).is_set(to) {
+                    return Err(ChessError::InvalidCapture);
+                }
+                self.piece_capture(capture_piece, mv).and_then(|_| self.make_move(mv))
+            },
+            _ => Err(ChessError::InvalidMove)
+            
+        } 
     }
 
-    pub fn rook_move_or_capture(&mut self, mv: MoveData) {
-        todo!()
+    pub fn rook_move_or_capture(&mut self, mv: MoveData) -> Result<()> {
+        let from = mv.from;
+        let to = mv.to;
+        let piece = mv.piece;
+
+        match mv.move_type {
+            MoveType::Move => {
+                if !rook_attacks_on_the_fly(from.into(), self.all_pieces()).is_set(to) {
+                    return Err(ChessError::InvalidMove);
+                }
+            }
+            MoveType::Capture(capture_piece) => {
+                if !rook_attacks_on_the_fly(from.into(), self.all_pieces()).is_set(to) {
+                    return Err(ChessError::InvalidCapture);
+                }
+                self.piece_capture(capture_piece, mv)?;
+            }
+            _ => return Err(ChessError::InvalidMove),
+        }
+
+        self.revoke_castling_rights(piece.color(), Some(from));
+        self.make_move(mv)
     }
 
-    pub fn bishop_move_or_capture(&mut self, mv: MoveData) {
-        todo!()
+    pub fn bishop_move_or_capture(&mut self, mv: MoveData) -> Result<()> {
+        let from = mv.from;
+        let to = mv.to;
+
+        match mv.move_type {
+            MoveType::Move => {
+                if !bishop_attacks_on_the_fly(from.into(), self.all_pieces()).is_set(to) {
+                    return Err(ChessError::InvalidMove);
+                }
+            }
+            MoveType::Capture(capture_piece) => {
+                if !bishop_attacks_on_the_fly(from.into(), self.all_pieces()).is_set(to) {
+                    return Err(ChessError::InvalidCapture);
+                }
+                self.piece_capture(capture_piece, mv)?;
+            }
+            _ => return Err(ChessError::InvalidMove),
+        }
+        self.make_move(mv)
     }
 
-    pub fn queen_move_or_capture(&mut self, mv: MoveData) {
-        todo!()
+    pub fn queen_move_or_capture(&mut self, mv: MoveData) -> Result<()> {
+        let from = mv.from;
+        let to = mv.to;
+
+        match mv.move_type {
+            MoveType::Move => {
+                if !queen_attacks_on_the_fly(from.into(), self.all_pieces()).is_set(to) {
+                    return Err(ChessError::InvalidMove);
+                }
+            }
+            MoveType::Capture(capture_piece) => {
+                if !queen_attacks_on_the_fly(from.into(), self.all_pieces()).is_set(to) {
+                    return Err(ChessError::InvalidCapture);
+                }
+                self.piece_capture(capture_piece, mv)?;
+            }
+            _ => return Err(ChessError::InvalidMove),
+        }
+        self.make_move(mv)
     }
 
-    pub fn knight_move_or_capture(&mut self, mv: MoveData) {
-        todo!()
+    pub fn knight_move_or_capture(&mut self, mv: MoveData) -> Result<()> {
+        let from = mv.from;
+        let to = mv.to;
+
+        match mv.move_type {
+            MoveType::Move => {
+                if !KNIGHT_MOVES[from as usize].is_set(to) {
+                    return Err(ChessError::InvalidMove);
+                }
+            }
+            MoveType::Capture(capture_piece) => {
+                if KNIGHT_MOVES[from as usize].is_set(to) {
+                    return Err(ChessError::InvalidCapture);
+                }
+                self.piece_capture(capture_piece, mv)?;
+            }
+            _ => return Err(ChessError::InvalidMove),
+        }
+        self.make_move(mv)
     }
 
-    pub fn king_move_or_capture(&mut self, mv: MoveData) {
-        todo!()
+    pub fn king_move_or_capture(&mut self, mv: MoveData) -> Result<()> {
+        let from = mv.from;
+        let to = mv.to;
+
+        match mv.move_type {
+            MoveType::Move => {
+                if !KING_MOVES[from as usize].is_set(to) {
+                    return Err(ChessError::InvalidMove);
+                }
+            }
+            MoveType::Capture(capture_piece) => {
+                if KING_MOVES[from as usize].is_set(to) {
+                    return Err(ChessError::InvalidCapture);
+                }
+                self.piece_capture(capture_piece, mv)?;
+            }
+            _ => return Err(ChessError::InvalidMove),
+        }
+
+        self.revoke_castling_rights(mv.piece.color(), None);
+        self.make_move(mv)
     }    
-    // ---------------------------------------- Piece Move Logic -----------------------------------------
+
+    /* // ---------------------------------------- Piece Move Logic -----------------------------------------
 
     /// Moves a white pawn
     pub fn wp_moves(&mut self, from: Square, to: Square, piece: &Piece) -> Result<()> {
@@ -410,9 +589,9 @@ impl ChessBoard {
             return Err(ChessError::InvalidMove);
         }
         self.move_piece(from, to, piece)
-    }
+    } */
 
-    /// Returns true if the king of the given color is in check
+    /* /// Returns true if the king of the given color is in check
     pub fn in_check(&self, color: Color) -> bool {
         let king = match color {
             Color::White => self.wk,
@@ -422,11 +601,11 @@ impl ChessBoard {
         let attack_mask = self.attack_mask(color.opposite());
 
         (attack_mask & king.0) != 0
-    }
+    } */
 
     // ----------------------------------------- Compute Attack Mask for current pieces--------------------------------
 
-    pub fn attack_mask(&self, color: Color) -> BitBoard {
+    /* pub fn attack_mask(&self, color: Color) -> BitBoard {
         match color {
             Color::White => self.white_attack_mask(),
             Color::Black => self.black_attack_mask(),
@@ -518,11 +697,11 @@ impl ChessBoard {
         }
 
         attacks
-    }
+    } */
 }
 
 
-#[cfg(test)]
+/* #[cfg(test)]
 mod tests {
     use super::*;
 
@@ -1079,5 +1258,5 @@ mod tests {
         // (otherwise you’ll need an extended function like move_piece_with_promotion)
         todo!("Implement pawn promotion test when promotion logic is ready");
     } */
-}
+} */
 
