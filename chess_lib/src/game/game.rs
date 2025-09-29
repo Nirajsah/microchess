@@ -5,6 +5,7 @@ use crate::{
     ChessError, Result,
     board::{bitboard::BitBoard, chessboard::ChessBoard, piece::Piece},
     moves::move_type::{MoveData, MoveType},
+    pieces::Color,
 };
 
 /// The state of a Chess game.
@@ -12,6 +13,7 @@ use crate::{
 pub struct Game {
     /// The current state of the board.
     pub board: ChessBoard,
+    pub active_player: Color,
     /* /// Moves Table
     pub moves: Vec<Move>,
     /// Captured Pieces Table
@@ -48,6 +50,7 @@ impl Game {
     pub fn new() -> Self {
         Game {
             board: ChessBoard::new(),
+            active_player: Color::White,
             halfmove_clock: 0,
             fullmove_number: 1,
         }
@@ -56,6 +59,7 @@ impl Game {
     pub fn raw() -> Self {
         Game {
             board: ChessBoard::default(),
+            active_player: Color::default(),
             halfmove_clock: 0,
             fullmove_number: 1,
         }
@@ -78,7 +82,10 @@ impl Game {
     pub fn is_capture_valid(&self, capture_piece: Piece, mv: MoveData) -> Result<()> {
         let moving_piece_board = self.board.get_board(&mv.piece);
         let capture_piece_board = self.board.get_board(&capture_piece);
-        if !moving_piece_board.is_set(mv.from) || !capture_piece_board.is_set(mv.to) {
+        if !moving_piece_board.is_set(mv.from)
+            || !capture_piece_board.is_set(mv.to)
+            || mv.piece.color() == capture_piece.color()
+        {
             println!(
                 "piece not present at :{:?}, capture piece not present at :{:?}",
                 mv.from, mv.to
@@ -114,6 +121,7 @@ impl Game {
 
         let parts: Vec<&str> = fen.split_whitespace().collect();
         let piece_placement = parts[0];
+        let active_player = parts[1];
         let castling_rights = parts.get(2).unwrap_or(&"-");
         let en_passant = parts.get(3).unwrap_or(&"-");
         let halfmove_clock: &str = parts.get(4).unwrap_or(&"0");
@@ -175,6 +183,8 @@ impl Game {
                 game.board.en_passant = BitBoard(1u64 << square); // Placing en_passant
             }
         }
+
+        game.active_player = active_player.parse().unwrap();
 
         // build occupancies
         game.board.occupancies[0] = boards[0..6]
@@ -417,57 +427,6 @@ impl Game {
                 }
             }
             _ => Err(ChessError::InvalidPiece),
-        }
-    }
-
-    /// A function to move piece
-    pub fn move_piece(&mut self, from: Square, to: Square, piece: Piece) -> Result<()> {
-        match piece {
-            Piece::WhitePawn => self.board.wP_moves(from, to, &piece),
-            Piece::BlackPawn => self.board.bP_moves(from, to, &piece),
-            Piece::WhiteKnight | Piece::BlackKnight => self.board.knight_moves(from, to, &piece),
-            Piece::WhiteKing | Piece::BlackKing => self.board.king_moves(from, to, &piece),
-            Piece::WhiteBishop | Piece::BlackBishop => self.board.bishop_moves(from, to, &piece),
-            Piece::WhiteRook | Piece::BlackRook => self.board.rook_moves(from, to, &piece),
-            Piece::WhiteQueen | Piece::BlackQueen => self.board.queen_moves(from, to, &piece),
-        }
-    }
-
-    /// a function to capture piece
-    pub fn capture_piece(
-        &mut self,
-        from: Square,
-        to: Square,
-        piece: Piece,
-        captured_piece: Piece,
-    ) -> Result<()> {
-        if piece.color() == captured_piece.color() {
-            return Err(ChessError::InvalidCapture);
-        }
-
-        if self.board.get_piece_at(to).is_none() {
-            return Err(ChessError::InvalidCapture);
-        }
-        match piece {
-            Piece::WhitePawn => self.board.wP_captures(from, to, &piece, &captured_piece),
-            Piece::BlackPawn => self.board.bP_captures(from, to, &piece, &captured_piece),
-            Piece::WhiteKnight | Piece::BlackKnight => {
-                self.board
-                    .knight_captures(from, to, &piece, &captured_piece)
-            }
-            Piece::WhiteKing | Piece::BlackKing => {
-                self.board.king_captures(from, to, &piece, &captured_piece)
-            }
-            Piece::WhiteRook | Piece::BlackRook => {
-                self.board.rook_captures(from, to, &piece, &captured_piece)
-            }
-            Piece::WhiteBishop | Piece::BlackBishop => {
-                self.board
-                    .bishop_captures(from, to, &piece, &captured_piece)
-            }
-            Piece::WhiteQueen | Piece::BlackQueen => {
-                self.board.queen_captures(from, to, &piece, &captured_piece)
-            }
         }
     }
 

@@ -122,6 +122,10 @@ impl Square {
         MIRROR[*self as usize]
     }
 
+    pub const fn index(&self) -> usize {
+        *self as usize
+    }
+
     pub const fn rank(&self) -> u8 {
         ((*self as usize / 8) as u8) + 1
     }

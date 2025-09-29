@@ -1,22 +1,21 @@
 use serde::{Deserialize, Serialize};
 
 use crate::pieces::Color;
-
-#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[repr(u8)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum Piece {
-    WhitePawn,
-    WhiteKnight,
-    WhiteBishop,
-    WhiteRook,
-    WhiteQueen,
-    WhiteKing,
-    BlackPawn,
-    BlackKnight,
-    BlackBishop,
-    BlackRook,
-    BlackQueen,
-    BlackKing,
+    WhitePawn = 0,
+    WhiteKnight = 1,
+    WhiteBishop = 2,
+    WhiteRook = 3,
+    WhiteQueen = 4,
+    WhiteKing = 5,
+    BlackPawn = 6,
+    BlackKnight = 7,
+    BlackBishop = 8,
+    BlackRook = 9,
+    BlackQueen = 10,
+    BlackKing = 11,
 }
 
 impl Piece {
