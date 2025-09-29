@@ -766,6 +766,37 @@ mod tests {
     }
 
     #[test]
+    fn test_get_board_by_index() {
+        let board = ChessBoard::new();
+
+        let pieces = [
+            Piece::WhitePawn,
+            Piece::WhiteKnight,
+            Piece::WhiteBishop,
+            Piece::WhiteRook,
+            Piece::WhiteQueen,
+            Piece::WhiteKing,
+            Piece::BlackPawn,
+            Piece::BlackKnight,
+            Piece::BlackBishop,
+            Piece::BlackRook,
+            Piece::BlackQueen,
+            Piece::BlackKing,
+        ];
+
+        for &piece in &pieces {
+            let piece_board = *board.get_board(&piece);
+            let actual_piece_board = board.bitboards[piece.index()];
+
+            assert_eq!(
+                piece_board, actual_piece_board,
+                "{:?} board mismatch, must be the same",
+                piece
+            );
+        }
+    }
+
+    #[test]
     fn test_get_mut_board_mutable_access() {
         let mut board = create_test_board();
         let white_pawn = Piece::WhitePawn;
