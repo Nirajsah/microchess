@@ -6,16 +6,13 @@ use serde::{Deserialize, Serialize};
 #[repr(u8)]
 pub enum Color {
     #[default]
-    White,
-    Black,
+    White = 0,
+    Black = 1,
 }
 
 impl Color {
     pub fn opposite(self) -> Self {
-        match self {
-            Self::White => Self::Black,
-            Self::Black => Self::White,
-        }
+        unsafe { std::mem::transmute::<u8, Color>((self as u8) ^ 1) }
     }
 
     pub fn index(self) -> usize {

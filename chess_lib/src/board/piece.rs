@@ -43,6 +43,22 @@ impl Piece {
             Piece::WhiteKing | Piece::BlackKing => 6,
         }
     }
+
+    pub fn is_pawn(&self) -> bool {
+        match *self {
+            Self::WhitePawn => true,
+            Self::BlackPawn => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_king(&self) -> bool {
+        match *self {
+            Self::WhiteKing => true,
+            Self::BlackKing => true,
+            _ => false,
+        }
+    }
 }
 
 #[cfg(test)]

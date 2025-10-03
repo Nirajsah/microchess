@@ -31,8 +31,6 @@ pub struct ChessBoard {
     pub occupancies: [BitBoard; 2], // white and black occupancy bitboards(0 White, 1 Black)
     pub square_map: Vec<Option<Piece>>,
     /// Castling rights
-    pub attack_masks: [BitBoard; 2], // [White, Black]
-    pub attack_mask_history: Vec<[BitBoard; 2]>,
     pub castling_rights: u8, // [White, Black](KingSide, QueenSide)
     /// En passant
     pub en_passant: BitBoard,
@@ -44,8 +42,6 @@ impl Default for ChessBoard {
             bitboards: [BitBoard::default(); 12],
             occupancies: [BitBoard::default(), BitBoard::default()],
             square_map: vec![None; 64],
-            attack_masks: [BitBoard::default(), BitBoard::default()],
-            attack_mask_history: Vec::new(),
             castling_rights: 0b1111,
             en_passant: BitBoard::default(),
         }
@@ -75,80 +71,154 @@ impl ChessBoard {
                 BitBoard(0xFFFF_0000_0000_0000),
             ],
             square_map: vec![None; 64],
-            attack_masks: Self::initial_attack_masks(),
-            attack_mask_history: Vec::new(),
             castling_rights: 0b1111,
             en_passant: BitBoard::EMPTY,
         }
     }
 
-    pub fn initial_attack_masks() -> [BitBoard; 2] {
-        let mut attack_masks: [BitBoard; 2] = [BitBoard::EMPTY, BitBoard::EMPTY];
-        // White attack mask initialization
-        let mut white_pawn_attacks = BitBoard(0);
-        for sq in [
-            Square::A2,
-            Square::B2,
-            Square::C2,
-            Square::D2,
-            Square::E2,
-            Square::F2,
-            Square::G2,
-            Square::H2,
-        ] {
-            white_pawn_attacks |= WHITE_PATTACKS[sq as usize].into();
+    pub fn get_piece_at(&self, sq: Square) -> Option<Piece> {
+        self.square_map[sq.index()]
+    }
+
+    pub fn get_king_square(&self, color: Color) -> Square {
+        let king_bb = match color {
+            Color::White => self.bitboards[Piece::WhiteKing.index()],
+            Color::Black => self.bitboards[Piece::BlackKing.index()],
+        };
+
+        // debug_assert!(king_bb.count_ones() == 1, "There must be exactly one king");
+
+        let idx = king_bb.trailing_zeros() as u8;
+        Square::uint_to_square(idx)
+    }
+
+    /// Returns `True` if the given color's king is under attack
+    pub fn king_in_check(&self, color: Color) -> bool {
+        let sq = self.get_king_square(color);
+        self.is_under_attack(sq, color.opposite())
+    }
+
+    // pub fn get_pawn_moves() {}
+
+    pub fn get_knight_moves(&self, from: Square, color: Color) -> BitBoard {
+        let occ_own = self.occupancies[color.index()];
+        KNIGHT_MOVES[from.index()] & !occ_own.as_u64()
+    }
+
+    pub fn get_bishop_moves(&self, from: Square, color: Color) -> BitBoard {
+        let occ_own = self.occupancies[color.index()];
+        bishop_attacks_on_the_fly(from.into(), self.all_pieces()) & !occ_own.as_u64()
+    }
+
+    pub fn get_rook_moves(&self, from: Square, color: Color) -> BitBoard {
+        let occ_own = self.occupancies[color.index()];
+        rook_attacks_on_the_fly(from.into(), self.all_pieces()) & !occ_own.as_u64()
+    }
+
+    pub fn get_queen_moves(&self, from: Square, color: Color) -> BitBoard {
+        self.get_bishop_moves(from, color) | self.get_rook_moves(from, color)
+    }
+
+    pub fn get_king_moves(&self, from: Square, color: Color) -> BitBoard {
+        let occ_own = self.occupancies[color.index()];
+        KING_MOVES[from.index()] & !occ_own.as_u64()
+    }
+
+    pub fn get_moves_for(&self, piece: Piece, from: Square) -> Vec<MoveData> {
+        /* let color = piece.color();
+        let mut moves = Vec::new();
+        let attacks: u64 = match piece {
+            Piece::WhitePawn => self.get_pawn_moves(from, Color::White),
+            Piece::BlackPawn => self.get_pawn_moves(from, Color::Black),
+            Piece::WhiteKnight => self.get_knight_moves(from),
+            Piece::BlackKnight => self.get_knight_moves(from),
+            Piece::WhiteBishop => self.get_bishop_moves(from, self.occupancy()),
+            Piece::BlackBishop => self.get_bishop_moves(from, self.occupancy()),
+            Piece::WhiteRook => self.get_rook_moves(from, self.occupancy()),
+            Piece::BlackRook => self.get_rook_moves(from, self.occupancy()),
+            Piece::WhiteQueen => {
+                self.get_bishop_moves(from, self.occupancy())
+                    | self.get_rook_moves(from, self.occupancy())
+            }
+            Piece::BlackQueen => {
+                self.get_bishop_moves(from, self.occupancy())
+                    | self.get_rook_moves(from, self.occupancy())
+            }
+            Piece::WhiteKing => self.get_king_moves(from),
+            Piece::BlackKing => self.get_king_moves(from),
+        }; */
+
+        todo!()
+    }
+
+    // Returns an attack mask for a given color
+    pub fn attack_mask(&self, color: Color) -> BitBoard {
+        self.recompute_attack_mask(color)
+    }
+
+    /// Responsible for generating a new attack_mask for a color.
+    pub fn recompute_attack_mask(&self, color: Color) -> BitBoard {
+        let mut pieces_board = self.occupancies[color.index()];
+        let all_pieces = &self.all_pieces();
+        let mut attack_mask = BitBoard::EMPTY;
+
+        while let Some(from_idx) = pieces_board.pop_lsb() {
+            if let Some(piece) = self.square_map[from_idx as usize] {
+                let mask = match piece {
+                    Piece::WhitePawn => WHITE_PATTACKS[from_idx as usize],
+                    Piece::BlackPawn => BLACK_PATTACKS[from_idx as usize],
+                    Piece::WhiteKnight | Piece::BlackKnight => KNIGHT_MOVES[from_idx as usize],
+                    Piece::WhiteBishop | Piece::BlackBishop => {
+                        bishop_attacks_on_the_fly(from_idx as u8, *all_pieces)
+                    }
+                    Piece::WhiteRook | Piece::BlackRook => {
+                        rook_attacks_on_the_fly(from_idx as u8, *all_pieces)
+                    }
+                    Piece::WhiteQueen | Piece::BlackQueen => {
+                        queen_attacks_on_the_fly(from_idx as u8, *all_pieces)
+                    }
+                    Piece::WhiteKing | Piece::BlackKing => KING_MOVES[from_idx as usize],
+                };
+                attack_mask |= mask.into();
+            }
         }
-        // Black attack mask initialization
-        let mut black_pawn_attacks = BitBoard(0);
-        for sq in [
-            Square::A7,
-            Square::B7,
-            Square::C7,
-            Square::D7,
-            Square::E7,
-            Square::F7,
-            Square::G7,
-            Square::H7,
-        ] {
-            black_pawn_attacks |= BLACK_PATTACKS[sq as usize].into();
+
+        attack_mask
+    }
+
+    pub fn compute_attack_mask_on_the_fly(
+        &self,
+        square_map: &Vec<Option<Piece>>,
+        occupancy: &BitBoard,
+        opponent_board: &mut BitBoard,
+    ) -> BitBoard {
+        let mut attack_mask = BitBoard::EMPTY;
+
+        while let Some(from_idx) = opponent_board.pop_lsb() {
+            if let Some(piece) = square_map[from_idx as usize] {
+                let mask = match piece {
+                    Piece::WhitePawn => WHITE_PATTACKS[from_idx as usize],
+                    Piece::BlackPawn => BLACK_PATTACKS[from_idx as usize],
+                    Piece::WhiteKnight | Piece::BlackKnight => KNIGHT_MOVES[from_idx as usize],
+                    Piece::WhiteBishop | Piece::BlackBishop => {
+                        bishop_attacks_on_the_fly(from_idx as u8, *occupancy)
+                    }
+                    Piece::WhiteRook | Piece::BlackRook => {
+                        rook_attacks_on_the_fly(from_idx as u8, *occupancy)
+                    }
+                    Piece::WhiteQueen | Piece::BlackQueen => {
+                        queen_attacks_on_the_fly(from_idx as u8, *occupancy)
+                    }
+                    Piece::WhiteKing | Piece::BlackKing => KING_MOVES[from_idx as usize],
+                };
+                attack_mask |= mask.into();
+            }
         }
-        attack_masks[Color::White.index()] = white_pawn_attacks
-            | KNIGHT_MOVES[Square::B1 as usize]
-            | KNIGHT_MOVES[Square::G1 as usize];
 
-        attack_masks[Color::Black.index()] = black_pawn_attacks
-            | KNIGHT_MOVES[Square::B8 as usize]
-            | KNIGHT_MOVES[Square::G8 as usize];
-
-        attack_masks
+        attack_mask
     }
 
-    pub fn attack_mask(&self, col: Color) -> BitBoard {
-        self.attack_masks[col.index()]
-    }
-
-    pub fn update_attack_masks(&mut self, mv: MoveData) {
-        // Remove old attacks of the piece
-        self.remove_piece_attacks(mv.from, mv.piece);
-        // If capture: remove opponent attacks from captured piece
-        if let MoveType::Capture(captured) = mv.move_type {
-            self.remove_piece_attacks(mv.to, captured);
-        }
-        // Add new attacks for the moved piece
-        self.add_piece_attacks(mv.to, mv.piece);
-    }
-
-    fn remove_piece_attacks(&mut self, square: Square, piece: Piece) {
-        let idx = piece.color().index();
-        self.attack_masks[idx] ^= self.attacks_for_piece(square, piece).into();
-    }
-
-    fn add_piece_attacks(&mut self, square: Square, piece: Piece) {
-        let idx = piece.color().index();
-        self.attack_masks[idx] |= self.attacks_for_piece(square, piece).into();
-    }
-
-    fn attacks_for_piece(&self, sq: Square, piece: Piece) -> BitBoard {
+    /* pub fn attacks_for_piece(&self, sq: Square, piece: Piece) -> BitBoard {
         match piece {
             Piece::WhitePawn => WHITE_PATTACKS[sq as usize],
             Piece::BlackPawn => BLACK_PATTACKS[sq as usize],
@@ -164,12 +234,12 @@ impl ChessBoard {
             }
             Piece::WhiteKing | Piece::BlackKing => KING_MOVES[sq as usize],
         }
-    }
+    } */
 
     /// A Method to check if the square is under attack
     /// ```True``` means the square is under attack
     pub fn is_under_attack(&self, sq: Square, by_color: Color) -> bool {
-        self.attack_masks[by_color.index()].is_set(sq)
+        self.attack_mask(by_color).is_set(sq)
     }
 
     pub fn clear(&mut self) {
@@ -335,8 +405,6 @@ impl ChessBoard {
 
     /// Moves a piece on the board, while checking if the king is in check
     pub fn apply_move(&mut self, mv: MoveData) -> Result<()> {
-        self.attack_mask_history.push(self.attack_masks); // save current attack mask useful when undo
-
         let piece_idx = mv.piece.index();
         let color_idx = mv.piece.color().index();
 
@@ -352,16 +420,10 @@ impl ChessBoard {
         self.square_map[mv.from as usize] = None;
         self.square_map[mv.to as usize] = Some(mv.piece);
 
-        self.update_attack_masks(mv);
-
         Ok(())
     }
 
     pub fn undo_move(&mut self, mv: MoveData) -> Result<()> {
-        let last_masks = self.attack_mask_history.pop().expect("No move to undo");
-
-        self.attack_masks = last_masks;
-
         let piece_idx = mv.piece.index();
         let color_idx = mv.piece.color().index();
 
@@ -398,6 +460,25 @@ impl ChessBoard {
         Ok(())
     }
 
+    pub fn is_castling_move(&self, from: Square, to: Square) -> bool {
+        // King moves two squares
+        (from.index() as i8 - to.index() as i8).abs() == 2
+    }
+
+    pub fn en_passant_square(&self, to: Square, color: Color) -> Option<Square> {
+        let offset: i8 = match color {
+            Color::White => -8, // white moves upward → check behind
+            Color::Black => 8,  // black moves downward → check behind
+        };
+
+        let idx = to.index() as i8 + offset;
+        if idx >= 0 && idx < 64 {
+            Some(Square::uint_to_square(idx as u8))
+        } else {
+            None
+        }
+    }
+
     pub fn wp_move_or_capture(&mut self, mv: MoveData) -> Result<()> {
         let from = mv.from;
         let to = mv.to;
@@ -418,11 +499,7 @@ impl ChessBoard {
                     }
                     // Set en passant square only for two-square moves
                     self.en_passant = BitBoard(1u64 << (from + 8));
-                    // update black attack mask: add only adjacent pawn captures
-                    let ep_mask = (self.en_passant.0 >> 7 & NOT_H_FILE)
-                        | (self.en_passant.0 >> 9 & NOT_A_FILE);
-
-                    self.attack_masks[Color::Black.index()] |= ep_mask;
+                    (self.en_passant.0 >> 7 & NOT_H_FILE) | (self.en_passant.0 >> 9 & NOT_A_FILE);
                 }
 
                 self.apply_move(mv)
@@ -458,11 +535,7 @@ impl ChessBoard {
                     }
                     // Set en passant square only for two-square moves
                     self.en_passant = BitBoard(1u64 << (from - 8));
-                    // update white attack mask: add only adjacent pawn captures
-                    let ep_mask = (self.en_passant.0 << 7 & NOT_A_FILE)
-                        | (self.en_passant.0 << 9 & NOT_H_FILE);
-
-                    self.attack_masks[Color::White.index()] |= ep_mask;
+                    (self.en_passant.0 << 7 & NOT_A_FILE) | (self.en_passant.0 << 9 & NOT_H_FILE);
                 }
                 self.apply_move(mv)
             }
@@ -931,12 +1004,6 @@ mod tests {
             board.en_passant.is_set(Square::A3),
             "En passant square should be set"
         );
-        assert!(
-            board.attack_masks[Color::Black.index()]
-                & (board.en_passant.0 >> 7 | board.en_passant.0 >> 9)
-                != 0,
-            "Black attack mask should be updated for en passant"
-        );
     }
 
     #[test]
@@ -1307,38 +1374,6 @@ mod tests {
     }
 
     #[test]
-    fn test_attack_mask_history_preservation() {
-        let mut board = create_test_board();
-        let white_pawn = Piece::WhitePawn;
-
-        board.get_mut_board(&white_pawn).set(Square::A2);
-        board.square_map[8] = Some(white_pawn);
-
-        let original_history_len = board.attack_mask_history.len();
-
-        let mv = create_move(
-            white_pawn,
-            "a2".to_string(),
-            "a3".to_string(),
-            MoveType::Move,
-        );
-        let _ = board.apply_move(mv);
-
-        assert_eq!(
-            board.attack_mask_history.len(),
-            original_history_len + 1,
-            "Attack mask history should be preserved"
-        );
-
-        let _ = board.undo_move(mv);
-        assert_eq!(
-            board.attack_mask_history.len(),
-            original_history_len,
-            "Attack mask history should be restored after undo"
-        );
-    }
-
-    #[test]
     fn test_get_opponent_pieces() {
         let mut board = create_test_board();
         let white_pawn = Piece::WhitePawn;
@@ -1445,5 +1480,55 @@ mod tests {
             "Source should have piece"
         );
         assert_eq!(board.square_map[16], None, "Destination should be empty");
+    }
+
+    #[test]
+    fn test_get_piece_at() {
+        let mut board = create_test_board();
+
+        let pieces = [
+            Piece::WhitePawn,
+            Piece::WhiteKnight,
+            Piece::WhiteBishop,
+            Piece::WhiteRook,
+            Piece::WhiteQueen,
+            Piece::WhiteKing,
+            Piece::BlackPawn,
+            Piece::BlackKnight,
+            Piece::BlackBishop,
+            Piece::BlackRook,
+            Piece::BlackQueen,
+            Piece::BlackKing,
+        ];
+
+        let squares = [
+            Square::A2,
+            Square::B2,
+            Square::C2,
+            Square::D2,
+            Square::E2,
+            Square::F2,
+            Square::A7,
+            Square::B7,
+            Square::C7,
+            Square::D7,
+            Square::E7,
+            Square::F7,
+        ];
+
+        // Place each piece on its test square and validate lookup
+        for (&piece, &square) in pieces.iter().zip(squares.iter()) {
+            board.get_mut_board(&piece).set(square);
+            board.square_map[square.index()] = Some(piece);
+            let found_piece = board.get_piece_at(square).unwrap_or_else(|| {
+                panic!("Piece {:?} not found at square {:?}", piece, square);
+            });
+
+            assert_eq!(
+                found_piece, piece,
+                "Expected {:?} at {:?}, but found {:?}",
+                piece, square, found_piece
+            );
+        }
     }
 }
