@@ -1,5 +1,6 @@
 use async_graphql::Enum;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::hash::Hash;
 use std::ops::{Add, BitAnd, Shl, Shr, Sub};
 use std::str::FromStr;
@@ -16,6 +17,14 @@ pub enum Square {
     A6, B6, C6, D6, E6, F6, G6, H6,
     A7, B7, C7, D7, E7, F7, G7, H7,
     A8, B8, C8, D8, E8, F8, G8, H8,
+}
+
+impl fmt::Display for Square {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let file = (self.index() % 8) as u8 + b'a';
+        let rank = (self.index() / 8) + 1;
+        write!(f, "{}{}", file as char, rank)
+    }
 }
 
 impl From<Square> for u8 {

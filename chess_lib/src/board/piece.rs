@@ -1,3 +1,5 @@
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 use crate::pieces::Color;
@@ -16,6 +18,26 @@ pub enum Piece {
     BlackRook = 9,
     BlackQueen = 10,
     BlackKing = 11,
+}
+
+impl fmt::Display for Piece {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Piece::WhitePawn => "wP",
+            Piece::WhiteKnight => "wN",
+            Piece::WhiteBishop => "wB",
+            Piece::WhiteRook => "wR",
+            Piece::WhiteQueen => "wQ",
+            Piece::WhiteKing => "wK",
+            Piece::BlackPawn => "bP",
+            Piece::BlackKnight => "bN",
+            Piece::BlackBishop => "bB",
+            Piece::BlackRook => "bR",
+            Piece::BlackQueen => "bQ",
+            Piece::BlackKing => "bK",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 impl Piece {
@@ -65,6 +87,25 @@ impl Piece {
             Self::WhiteKing => true,
             Self::BlackKing => true,
             _ => false,
+        }
+    }
+
+    // NOTE: not to used other than fen generation logic
+    pub fn from_char(c: char) -> Option<Self> {
+        match c {
+            'P' => Some(Piece::WhitePawn),
+            'N' => Some(Piece::WhiteKnight),
+            'B' => Some(Piece::WhiteBishop),
+            'R' => Some(Piece::WhiteRook),
+            'Q' => Some(Piece::WhiteQueen),
+            'K' => Some(Piece::WhiteKing),
+            'p' => Some(Piece::BlackPawn),
+            'n' => Some(Piece::BlackKnight),
+            'b' => Some(Piece::BlackBishop),
+            'r' => Some(Piece::BlackRook),
+            'q' => Some(Piece::BlackQueen),
+            'k' => Some(Piece::BlackKing),
+            _ => None,
         }
     }
 
