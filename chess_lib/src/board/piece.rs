@@ -44,6 +44,14 @@ impl Piece {
         }
     }
 
+    pub fn is_white(&self) -> bool {
+        self.color() == Color::White
+    }
+
+    pub fn is_black(&self) -> bool {
+        self.color() == Color::Black
+    }
+
     pub fn is_pawn(&self) -> bool {
         match *self {
             Self::WhitePawn => true,
@@ -57,6 +65,37 @@ impl Piece {
             Self::WhiteKing => true,
             Self::BlackKing => true,
             _ => false,
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        let bytes = s.as_bytes();
+        if bytes.len() != 2 {
+            return None;
+        }
+
+        let color = match bytes[0] {
+            b'w' | b'W' => Color::White,
+            b'b' | b'B' => Color::Black,
+            _ => return None,
+        };
+
+        match (color, bytes[1]) {
+            (Color::White, b'P') => Some(Piece::WhitePawn),
+            (Color::White, b'N') => Some(Piece::WhiteKnight),
+            (Color::White, b'B') => Some(Piece::WhiteBishop),
+            (Color::White, b'R') => Some(Piece::WhiteRook),
+            (Color::White, b'Q') => Some(Piece::WhiteQueen),
+            (Color::White, b'K') => Some(Piece::WhiteKing),
+
+            (Color::Black, b'P') => Some(Piece::BlackPawn),
+            (Color::Black, b'N') => Some(Piece::BlackKnight),
+            (Color::Black, b'B') => Some(Piece::BlackBishop),
+            (Color::Black, b'R') => Some(Piece::BlackRook),
+            (Color::Black, b'Q') => Some(Piece::BlackQueen),
+            (Color::Black, b'K') => Some(Piece::BlackKing),
+
+            _ => None,
         }
     }
 }

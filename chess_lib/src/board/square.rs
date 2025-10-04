@@ -130,6 +130,10 @@ impl Square {
         ((*self as usize / 8) as u8) + 1
     }
 
+    pub const fn file(&self) -> u8 {
+        ((*self as usize % 8) as u8) + 1
+    }
+
     pub const fn uint_to_square(i: u8) -> Self {
         debug_assert!(i < 64, "Square value must be 0-63");
         // SAFETY: `Square` is #[repr(u8)] and contiguous from 0..63

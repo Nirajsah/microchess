@@ -5,9 +5,9 @@ use crate::{
     ChessError, Result,
     moves::{
         generator::{
-            NOT_A_FILE, NOT_H_FILE, bishop_attacks_on_the_fly, computed_king_moves,
-            computed_knight_attacks, computed_pawn_attacks, computed_pawn_moves,
-            queen_attacks_on_the_fly, rook_attacks_on_the_fly,
+            bishop_attacks_on_the_fly, computed_king_moves, computed_knight_attacks,
+            computed_pawn_attacks, computed_pawn_moves, queen_attacks_on_the_fly,
+            rook_attacks_on_the_fly,
         },
         move_type::{MoveData, MoveType},
     },
@@ -76,6 +76,101 @@ impl ChessBoard {
         }
     }
 
+    pub fn can_castle(&self, from: Square, to: Square) -> bool {
+        let (rank, file_from, file_to) = (from.rank(), from.file(), to.file());
+        let opponent = if rank == 1 {
+            Color::Black
+        } else {
+            Color::White
+        };
+        let attack_mask = self.recompute_attack_mask(opponent);
+        let not_attacked = |sqs: &[Square]| sqs.iter().all(|&sq| !attack_mask.is_set(sq));
+        let empty = |sqs: &[Square]| sqs.iter().all(|&sq| self.is_square_empty(sq));
+
+        match (rank, file_from, file_to) {
+            // White King-side (e1 -> g1)
+            (1, 5, 7) => {
+                self.castling_rights & 0b0001 != 0
+                    && empty(&[Square::F1, Square::G1])
+                    && not_attacked(&[Square::F1, Square::G1]) // King cannot cross or end on attacked
+            }
+            // White Queen-side (e1 -> c1)
+            (1, 5, 3) => {
+                self.castling_rights & 0b0010 != 0
+                    && empty(&[Square::B1, Square::C1, Square::D1])
+                    && not_attacked(&[Square::D1, Square::C1])
+            }
+            // Black King-side (e8 -> g8)
+            (8, 5, 7) => {
+                self.castling_rights & 0b0100 != 0
+                    && empty(&[Square::F8, Square::G8])
+                    && not_attacked(&[Square::F8, Square::G8])
+            }
+            // Black Queen-side (e8 -> c8)
+            (8, 5, 3) => {
+                self.castling_rights & 0b1000 != 0
+                    && empty(&[Square::B8, Square::C8, Square::D8])
+                    && not_attacked(&[Square::D8, Square::C8])
+            }
+            _ => false,
+        }
+    }
+
+    pub fn exec_castle(&mut self, mv: MoveData) -> Result<()> {
+        let rank = mv.from.rank() - 1;
+        let file_dest = mv.to.file() - 1;
+
+        let rook_from =
+            Square::uint_to_square((rank * 8 + if file_dest == 6 { 7 } else { 0 }) as u8);
+        let rook_to = Square::uint_to_square((rank * 8 + if file_dest == 6 { 5 } else { 3 }) as u8);
+
+        let rook = if mv.piece.color() == Color::White {
+            Piece::WhiteRook
+        } else {
+            Piece::BlackRook
+        };
+
+        if !self.get_board(&rook).is_set(rook_from) {
+            return Err(ChessError::InvalidCastle);
+        }
+
+        let king_idx = mv.piece.index();
+        let rook_idx = rook.index();
+        let color_idx = mv.piece.color().index();
+
+        let from_bit = 1u64 << (mv.from as usize);
+        let to_bit = 1u64 << (mv.to as usize);
+        let from_rook_bit = 1u64 << (rook_from as usize);
+        let to_rook_bit = 1u64 << (rook_to as usize);
+
+        // Update king bitboards and occupancy (clear old, set new)
+        self.bitboards[king_idx] ^= from_bit | to_bit;
+        self.occupancies[color_idx] ^= from_bit | to_bit;
+
+        // Update rook bitboards and occupancy
+        self.bitboards[rook_idx] ^= from_rook_bit | to_rook_bit;
+        self.occupancies[color_idx] ^= from_rook_bit | to_rook_bit;
+
+        // Update square map for king
+        self.square_map[mv.from as usize] = None;
+        self.square_map[mv.to as usize] = Some(mv.piece);
+
+        // Update square map for rook
+        self.square_map[rook_from as usize] = None;
+        self.square_map[rook_to as usize] = Some(rook);
+
+        // Revoke castling rights for this color
+        self.revoke_castling_rights(mv.piece.color(), None);
+
+        Ok(())
+    }
+
+    // Returns true if piece is not present
+    #[inline(always)]
+    pub fn is_square_empty(&self, sq: Square) -> bool {
+        !self.all_pieces().is_set(sq)
+    }
+
     pub fn get_piece_at(&self, sq: Square) -> Option<Piece> {
         self.square_map[sq.index()]
     }
@@ -124,7 +219,7 @@ impl ChessBoard {
         KING_MOVES[from.index()] & !occ_own.as_u64()
     }
 
-    pub fn get_moves_for(&self, piece: Piece, from: Square) -> Vec<MoveData> {
+    /* pub fn get_moves_for(&self, piece: Piece, from: Square) -> Vec<MoveData> {
         /* let color = piece.color();
         let mut moves = Vec::new();
         let attacks: u64 = match piece {
@@ -149,7 +244,7 @@ impl ChessBoard {
         }; */
 
         todo!()
-    }
+    } */
 
     // Returns an attack mask for a given color
     pub fn attack_mask(&self, color: Color) -> BitBoard {
@@ -217,24 +312,6 @@ impl ChessBoard {
 
         attack_mask
     }
-
-    /* pub fn attacks_for_piece(&self, sq: Square, piece: Piece) -> BitBoard {
-        match piece {
-            Piece::WhitePawn => WHITE_PATTACKS[sq as usize],
-            Piece::BlackPawn => BLACK_PATTACKS[sq as usize],
-            Piece::WhiteKnight | Piece::BlackKnight => KNIGHT_MOVES[sq as usize],
-            Piece::WhiteBishop | Piece::BlackBishop => {
-                bishop_attacks_on_the_fly(sq.into(), self.all_pieces())
-            }
-            Piece::WhiteRook | Piece::BlackRook => {
-                rook_attacks_on_the_fly(sq.into(), self.all_pieces())
-            }
-            Piece::WhiteQueen | Piece::BlackQueen => {
-                queen_attacks_on_the_fly(sq.into(), self.all_pieces())
-            }
-            Piece::WhiteKing | Piece::BlackKing => KING_MOVES[sq as usize],
-        }
-    } */
 
     /// A Method to check if the square is under attack
     /// ```True``` means the square is under attack
@@ -479,6 +556,37 @@ impl ChessBoard {
         }
     }
 
+    pub fn exec_en_passant_capture(&mut self, mv: MoveData) -> Result<()> {
+        let piece_idx = mv.piece.index();
+        let color_idx = mv.piece.color().index();
+
+        let from_bit = 1u64 << mv.from;
+        let to_bit = 1u64 << mv.to;
+
+        self.bitboards[piece_idx] ^= from_bit | to_bit;
+        self.occupancies[color_idx] ^= from_bit | to_bit;
+        self.square_map[mv.from as usize] = Some(mv.piece);
+        self.square_map[mv.to as usize] = None;
+        self.reset_enpassant();
+        Ok(())
+    }
+
+    pub fn exec_pawn_promotion(&mut self, promote_to: Piece, mv: MoveData) -> Result<()> {
+        let piece_idx = mv.piece.index();
+        let color_idx = mv.piece.color().index();
+
+        let from_bit = 1u64 << mv.from;
+        let to_bit = 1u64 << mv.to;
+
+        self.bitboards[piece_idx] ^= from_bit | to_bit;
+        self.occupancies[color_idx] ^= from_bit | to_bit;
+        self.square_map[mv.from as usize] = Some(mv.piece);
+        self.square_map[mv.to as usize] = None;
+
+        self.bitboards[promote_to.index()].set(mv.to);
+        Ok(())
+    }
+
     pub fn wp_move_or_capture(&mut self, mv: MoveData) -> Result<()> {
         let from = mv.from;
         let to = mv.to;
@@ -499,7 +607,6 @@ impl ChessBoard {
                     }
                     // Set en passant square only for two-square moves
                     self.en_passant = BitBoard(1u64 << (from + 8));
-                    (self.en_passant.0 >> 7 & NOT_H_FILE) | (self.en_passant.0 >> 9 & NOT_A_FILE);
                 }
 
                 self.apply_move(mv)
@@ -535,7 +642,6 @@ impl ChessBoard {
                     }
                     // Set en passant square only for two-square moves
                     self.en_passant = BitBoard(1u64 << (from - 8));
-                    (self.en_passant.0 << 7 & NOT_A_FILE) | (self.en_passant.0 << 9 & NOT_H_FILE);
                 }
                 self.apply_move(mv)
             }
