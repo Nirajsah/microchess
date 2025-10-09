@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::pieces::Color;
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub enum Piece {
     WhitePawn = 0,
     WhiteKnight = 1,
@@ -41,6 +41,30 @@ impl fmt::Display for Piece {
 }
 
 impl Piece {
+    pub const ALL: [Piece; 12] = [
+        Piece::WhitePawn,
+        Piece::WhiteKnight,
+        Piece::WhiteBishop,
+        Piece::WhiteRook,
+        Piece::WhiteQueen,
+        Piece::WhiteKing,
+        Piece::BlackPawn,
+        Piece::BlackKnight,
+        Piece::BlackBishop,
+        Piece::BlackRook,
+        Piece::BlackQueen,
+        Piece::BlackKing,
+    ];
+
+    #[inline]
+    pub fn from_index(i: usize) -> Option<Self> {
+        if i < Self::ALL.len() {
+            Some(Self::ALL[i])
+        } else {
+            None
+        }
+    }
+
     #[rustfmt::skip]
     pub fn color(&self) -> Color {
       match self {
@@ -78,6 +102,14 @@ impl Piece {
         match *self {
             Self::WhitePawn => true,
             Self::BlackPawn => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_rook(&self) -> bool {
+        match *self {
+            Self::WhiteRook => true,
+            Self::BlackRook => true,
             _ => false,
         }
     }
