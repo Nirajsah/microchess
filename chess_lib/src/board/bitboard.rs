@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXorAssign, Shl, Shr, Sub};
+use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXorAssign, Not, Shl, Shr, Sub};
 
 use super::square::Square;
 
@@ -12,6 +12,16 @@ impl BitBoard {
     #[inline]
     pub fn empty(&mut self) {
         self.0 = 0xb0000
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+
+    #[inline]
+    pub fn count_bits(&self) -> u32 {
+        self.0.count_ones()
     }
 
     #[inline]
@@ -63,6 +73,14 @@ impl BitBoard {
             self.0 &= self.0 - 1; // remove LSB
             Some(lsb_index)
         }
+    }
+}
+
+impl Not for BitBoard {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        BitBoard(!self.0) // Flip all bits
     }
 }
 

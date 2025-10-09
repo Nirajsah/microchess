@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     ChessError, Result,
     board::{bitboard::BitBoard, chessboard::ChessBoard, piece::Piece, square::Square},
-    moves::move_type::{MoveData, MoveType},
+    moves::move_type::{CompleteMove, MoveData, MoveType},
     pieces::Color,
 };
 
@@ -16,8 +16,9 @@ pub struct Game {
     /// The current state of the board.
     pub board: ChessBoard,
     pub active_player: Color,
-    /* /// Moves Table
-    pub moves: Vec<Move>,
+    /// Moves Table
+    pub moves: Vec<CompleteMove>,
+    /*
     /// Captured Pieces Table
     pub captured_pieces: Vec<Piece>,
     /// Game State
@@ -28,9 +29,9 @@ pub struct Game {
     pub position_count: HashMap<u64, u32>,
     */
     /// 50-Move Rule Counter
-    pub halfmove_clock: u8,
+    pub halfmove_clock: u16,
     // represents full moves(increments when black makes a move)
-    pub fullmove_number: u8,
+    pub fullmove_number: u32,
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,12 +61,16 @@ lazy_static! {
 impl Game {
     /// A function to create a new game using defaults
     pub fn new() -> Self {
-        Game {
+        let mut game = Game {
             board: ChessBoard::new(),
             active_player: Color::White,
             halfmove_clock: 0,
             fullmove_number: 1,
-        }
+            moves: vec![],
+        };
+        game.game_state();
+
+        game
     }
 
     pub fn raw() -> Self {
@@ -74,125 +79,14 @@ impl Game {
             active_player: Color::default(),
             halfmove_clock: 0,
             fullmove_number: 1,
+            moves: vec![],
         }
-    }
-
-    pub fn is_move_valid(&self, mv: &MoveData) -> Result<()> {
-        //piece's bitboard
-        let moving_piece_board = self.board.get_board(&mv.piece);
-        if !moving_piece_board.is_set(mv.from) || self.board.all_pieces().is_set(mv.to) {
-            return Err(ChessError::InvalidMove);
-        }
-
-        Ok(())
-    }
-
-    pub fn is_capture_valid(&self, capture_piece: Piece, mv: &MoveData) -> Result<()> {
-        let moving_piece_board = self.board.get_board(&mv.piece);
-        let capture_piece_board = self.board.get_board(&capture_piece);
-        if !moving_piece_board.is_set(mv.from)
-            || !capture_piece_board.is_set(mv.to)
-            || mv.piece.color() == capture_piece.color()
-        {
-            return Err(ChessError::InvalidCapture);
-        }
-
-        Ok(())
-    }
-
-    pub fn is_castle_valid(&self, mv: &MoveData) -> Result<()> {
-        // Must be king
-        if self.board.king_in_check(mv.piece.color()) && !self.board.can_castle(mv.from, mv.to) {
-            return Err(ChessError::InvalidCastle);
-        };
-
-        Ok(())
-    }
-
-    pub fn is_promotion_valid(&self, mv: &MoveData) -> Result<()> {
-        if mv.piece.is_pawn()
-            && ((mv.piece.is_white() && mv.to.rank() == 8)
-                || (mv.piece.is_black() && mv.to.rank() == 1))
-        {
-            Ok(())
-        } else {
-            Err(ChessError::InvalidPromotion)
-        }
-    }
-
-    pub fn make_move(&mut self, mv: MoveData) -> Result<()> {
-        match mv.move_type {
-            MoveType::Move => self.is_move_valid(&mv).and_then(|_| {
-                let chessboard = &mut self.board;
-                let piece_function = PIECE_FUNCS[mv.piece.move_index()];
-                piece_function(chessboard, mv) // this makes the move on the board
-            }),
-            MoveType::Capture(piece) => self.is_capture_valid(piece, &mv).and_then(|_| {
-                let chessboard = &mut self.board;
-                let piece_function = PIECE_FUNCS[mv.piece.move_index()];
-                piece_function(chessboard, mv)
-            }),
-            MoveType::Castle => self
-                .is_castle_valid(&mv)
-                .and_then(|_| self.board.exec_castle(mv)),
-            MoveType::EnPassant => self.board.exec_en_passant_capture(mv),
-            MoveType::Promotion(promoted_piece) => self
-                .is_promotion_valid(&mv)
-                .and_then(|_| self.board.exec_pawn_promotion(promoted_piece, mv)),
-        }
-    }
-
-    pub fn commit_move(
-        &mut self,
-        from: &str,
-        to: &str,
-        piece: &str,
-        move_type: MoveType,
-    ) -> Result<()> {
-        let from = Square::from_str(from).unwrap();
-        let to = Square::from_str(to).unwrap();
-        let piece = Piece::from_str(piece).unwrap();
-
-        if self.active_player != piece.color() {
-            return Err(ChessError::InvalidMove);
-        }
-        let mut mv = MoveData {
-            from,
-            to,
-            piece,
-            move_type,
-        };
-
-        // This validates and updates the move_type, no further validation needed for en_passant capture
-        if piece.is_pawn() && self.board.is_square_empty(to) {
-            if let Some(sq) = self.board.en_passant_square(to, piece.color()) {
-                if self.board.en_passant.is_set(sq) {
-                    mv.move_type = MoveType::EnPassant;
-                }
-            };
-        }
-
-        // This updates the move_type based on checks, same checks not needed in validation
-        if piece.is_king() && self.board.is_castling_move(mv.from, mv.to) {
-            mv.move_type = MoveType::Castle
-        }
-
-        self.make_move(mv).and_then(|_| {
-            self.turn_change();
-            self.game_state();
-            Ok(())
-        })
-    }
-
-    pub fn turn_change(&mut self) {
-        self.active_player = self.active_player.opposite()
     }
 
     /// Generates a ChessBoard from a FEN string
+    #[inline]
     pub fn with_fen(fen: &str) -> Self {
         let mut game = Game::raw();
-        let mut boards = game.board.bitboards;
-
         let parts: Vec<&str> = fen.split_whitespace().collect();
         let piece_placement = parts[0];
         let active_player = parts[1];
@@ -208,24 +102,30 @@ impl Game {
                 let mask = 1u64 << square;
 
                 match c {
-                    'P' => boards[0] |= mask,
-                    'N' => boards[1] |= mask,
-                    'B' => boards[2] |= mask,
-                    'R' => boards[3] |= mask,
-                    'Q' => boards[4] |= mask,
-                    'K' => boards[5] |= mask,
-                    'p' => boards[6] |= mask,
-                    'n' => boards[7] |= mask,
-                    'b' => boards[8] |= mask,
-                    'r' => boards[9] |= mask,
-                    'q' => boards[10] |= mask,
-                    'k' => boards[11] |= mask,
+                    'P' => game.board.bitboards[0] |= mask,
+                    'N' => game.board.bitboards[1] |= mask,
+                    'B' => game.board.bitboards[2] |= mask,
+                    'R' => game.board.bitboards[3] |= mask,
+                    'Q' => game.board.bitboards[4] |= mask,
+                    'K' => game.board.bitboards[5] |= mask,
+                    'p' => game.board.bitboards[6] |= mask,
+                    'n' => game.board.bitboards[7] |= mask,
+                    'b' => game.board.bitboards[8] |= mask,
+                    'r' => game.board.bitboards[9] |= mask,
+                    'q' => game.board.bitboards[10] |= mask,
+                    'k' => game.board.bitboards[11] |= mask,
                     '1'..='8' => {
                         let empty_squares = c.to_digit(10).unwrap() as usize;
                         file_idx += empty_squares - 1;
                     }
                     _ => {}
+                };
+
+                if let Some(p) = Piece::from_char(c) {
+                    // Update square_map simultaneously
+                    game.board.square_map[square] = Some(p);
                 }
+
                 file_idx += 1;
             }
         }
@@ -234,10 +134,10 @@ impl Game {
         let mut mask = 0;
         for ch in castling_rights.chars() {
             match ch {
-                'K' => mask |= 0b0001,
-                'Q' => mask |= 0b0010,
-                'k' => mask |= 0b0100,
-                'q' => mask |= 0b1000,
+                'K' => mask |= 0b1000,
+                'Q' => mask |= 0b0100,
+                'k' => mask |= 0b0010,
+                'q' => mask |= 0b0001,
                 '-' => {}
                 _ => panic!("Invalid castling char: {}", ch),
             }
@@ -249,29 +149,320 @@ impl Game {
         if en_passant != "-" {
             let en_passant_square = match en_passant.chars().nth(0) {
                 Some(file) => en_passant.chars().nth(1).map(|rank| {
-                    (rank.to_digit(10).unwrap() as u64 - 1) * 8 + (file as u64 - 'a' as u64)
+                    (rank.to_digit(10).unwrap() as u8 - 1) * 8 + (file as u8 - 'a' as u8)
                 }),
                 None => None,
             };
             if let Some(square) = en_passant_square {
-                game.board.en_passant = BitBoard(1u64 << square); // Placing en_passant
+                game.board.en_passant = Some(Square::uint_to_square(square)); // Placing en_passant
             }
         }
 
         game.active_player = active_player.parse().unwrap();
 
         // build occupancies
-        game.board.occupancies[0] = boards[0..6]
+        game.board.occupancies[0] = game.board.bitboards[0..6]
             .iter()
             .fold(BitBoard::EMPTY, |acc, &bb| acc | bb);
-        game.board.occupancies[1] = boards[6..12]
+        game.board.occupancies[1] = game.board.bitboards[6..12]
             .iter()
             .fold(BitBoard::EMPTY, |acc, &bb| acc | bb);
 
         game.halfmove_clock = halfmove_clock.parse().unwrap();
         game.fullmove_number = fullmove_number.parse().unwrap();
 
+        game.game_state();
+
         game
+    }
+
+    /// A function to generate FEN string using bitboard
+    #[inline]
+    pub fn to_fen(&self, halfmove_clock: u8, fullmove_number: u8) -> String {
+        let bitboards = self.board.bitboards;
+
+        let pieces = ['P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'];
+
+        let mut fen = String::with_capacity(100);
+
+        for rank in (0..8).rev() {
+            // Iterate over ranks 7 to 0
+            let mut empty_squares = 0;
+
+            for file in 0..8 {
+                let square = rank * 8 + file;
+
+                let mut piece_found = false;
+
+                for (i, &bitboard) in bitboards.iter().enumerate() {
+                    if (bitboard.as_u64() & (1u64 << square)) != 0 {
+                        if empty_squares > 0 {
+                            fen.push_str(&empty_squares.to_string());
+                            empty_squares = 0;
+                        }
+                        fen.push(pieces[i]);
+                        piece_found = true;
+                        break;
+                    }
+                }
+
+                if !piece_found {
+                    empty_squares += 1;
+                }
+            }
+
+            if empty_squares > 0 {
+                fen.push_str(&empty_squares.to_string());
+            }
+
+            if rank > 0 {
+                fen.push('/');
+            }
+        }
+        fen.push(' '); // just to have a whitespace
+
+        fen.push(self.active_player.into());
+
+        fen.push(' '); // just to have a whitespace
+
+        // Add placeholder values for the rest of the FEN string
+        // castling rights for K(0)Q(1)k(2)q(3)
+        // Castling rights for K (White Kingside), Q (White Queenside),
+        // k (Black Kingside), q (Black Queenside)
+        let mut castling_str = String::with_capacity(4);
+        let mask = self.board.castling_rights;
+
+        if mask & 0b0001 != 0 {
+            castling_str.push('K');
+        }
+        if mask & 0b0010 != 0 {
+            castling_str.push('Q');
+        }
+        if mask & 0b0100 != 0 {
+            castling_str.push('k');
+        }
+        if mask & 0b1000 != 0 {
+            castling_str.push('q');
+        }
+        if castling_str.is_empty() {
+            castling_str.push('-');
+        }
+
+        fen.push_str(&castling_str);
+
+        if self.board.en_passant.is_some() {
+            let en_passant_square = self.board.en_passant.unwrap();
+            fen.push(' '); // just to have a whitespace
+            fen.push_str(&en_passant_square.to_string());
+        } else {
+            fen.push_str(" -");
+        }
+
+        fen.push(' '); // just to have a whitespace
+
+        fen.push_str(&halfmove_clock.to_string());
+
+        fen.push(' '); // just to have a whitespace
+
+        fen.push_str(&fullmove_number.to_string());
+
+        fen
+    }
+
+    #[inline]
+    fn make_move(&mut self, mv: MoveData) -> Result<()> {
+        match mv.move_type {
+            MoveType::Move => {
+                let chessboard = &mut self.board;
+                let piece_function = PIECE_FUNCS[mv.piece.move_index()];
+                piece_function(chessboard, mv) // this makes the move on the board
+            }
+            MoveType::Capture(_) => {
+                let chessboard = &mut self.board;
+                let piece_function = PIECE_FUNCS[mv.piece.move_index()];
+                piece_function(chessboard, mv)
+            }
+            MoveType::Castle => {
+                if self.is_castling_valid(&mv) {
+                    self.board.exec_castle(mv)
+                } else {
+                    return Err(ChessError::InvalidCastle);
+                }
+            }
+            MoveType::EnPassant => self.board.exec_en_passant_capture(mv),
+            MoveType::Promotion(promoted_piece) => {
+                self.board.exec_pawn_promotion(promoted_piece, mv)
+            }
+            MoveType::PromotionCapture(promoted_to, captured_piece) => self
+                .board
+                .exec_pawn_promotion(promoted_to, mv)
+                .and_then(|_| {
+                    self.board.bitboards[captured_piece.index()].clear(mv.to);
+                    self.board.occupancies[captured_piece.color().index()].clear(mv.to);
+
+                    Ok(())
+                }),
+        }
+    }
+
+    /// Check if castling is valid (basic sanity checks only)
+    #[inline]
+    pub fn is_castling_valid(&self, mv: &MoveData) -> bool {
+        let piece = mv.piece;
+        let from = mv.from;
+        let to = mv.to;
+
+        // 1. Piece must be a king
+        if !piece.is_king() {
+            return false;
+        }
+
+        // 2. King must exist at source
+        if self.board.get_piece_at(from) != Some(piece) {
+            return false;
+        }
+
+        // 3. Determine castling type
+        let color = piece.color();
+        let is_kingside = to.file() > from.file();
+
+        // 4. Check castling rights
+        let rights_mask = match (color, is_kingside) {
+            (Color::White, true) => 0b1000,  // White kingside
+            (Color::White, false) => 0b0100, // White queenside
+            (Color::Black, true) => 0b0010,  // Black kingside
+            (Color::Black, false) => 0b0001, // Black queenside
+        };
+
+        if self.board.castling_rights & rights_mask == 0 {
+            return false;
+        }
+
+        // 5. Destination must be empty
+        if self.board.get_piece_at(to).is_some() {
+            return false;
+        }
+
+        true
+    }
+
+    #[inline]
+    pub fn is_promotion(&self, sq: Square, color: Color) -> bool {
+        match color {
+            Color::White => sq.rank() == 8, // 8th rank (index 7)
+            Color::Black => sq.rank() == 1, // 1st rank (index 0)
+        }
+    }
+
+    #[inline]
+    pub fn commit_move(
+        &mut self,
+        from: &str,
+        to: &str,
+        piece: &str,
+        promoted_to: Option<Piece>,
+    ) -> Result<CompleteMove> {
+        let mv = MoveData::new(from, to, piece, promoted_to, &self.board);
+
+        if self.active_player != mv.piece.color() {
+            return Err(ChessError::InvalidMove);
+        }
+
+        if !self.board.get_pseudo_legal_moves(mv.from, mv.piece) {
+            return Err(ChessError::InvalidMove);
+        }
+
+        let previous_castling_rights = self.board.castling_rights;
+        let previous_halfmove_clock = self.halfmove_clock;
+        let previous_en_passant = self.board.en_passant;
+
+        self.board.en_passant = None;
+
+        match self.make_move(mv) {
+            Ok(_) => {
+                let hash = self.compute_hash();
+                let save_mv = CompleteMove {
+                    from: mv.from,
+                    to: mv.to,
+                    piece: mv.piece,
+                    move_type: mv.move_type,
+                    previous_castling_rights,
+                    previous_en_passant,
+                    previous_halfmove_clock,
+                    game_hash: hash,
+                };
+
+                self.turn_change();
+
+                self.moves.push(save_mv);
+                self.game_state();
+
+                Ok(save_mv)
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    pub fn undo_move(&mut self, mv: CompleteMove) -> Result<()> {
+        let move_d = mv.to_move_data();
+
+        // Restore game state
+        self.board.castling_rights = mv.previous_castling_rights;
+        self.halfmove_clock = mv.previous_halfmove_clock;
+        self.board.en_passant = mv.previous_en_passant;
+
+        match mv.move_type {
+            MoveType::Move => self.board.undo_move(move_d)?,
+            MoveType::Capture(cap_piece) => {
+                self.board.undo_piece_capture(cap_piece, move_d)?;
+            }
+            MoveType::Castle => self.board.undo_castle(move_d)?,
+            MoveType::EnPassant => self.board.undo_en_passant_capture(move_d)?,
+            MoveType::Promotion(promoted_p) => {
+                self.board.undo_pawn_promotion(promoted_p, move_d)?;
+            }
+            MoveType::PromotionCapture(promoted_to, captured_piece) => self
+                .board
+                .undo_pawn_promotion(promoted_to, move_d)
+                .and_then(|_| {
+                    self.board.bitboards[captured_piece.index()].set(move_d.to);
+                    self.board.occupancies[captured_piece.color().index()].set(move_d.to);
+                    self.board.square_map[move_d.to.index()] = Some(captured_piece);
+
+                    Ok(())
+                })?,
+        };
+
+        self.turn_change();
+
+        Ok(())
+    }
+
+    #[inline]
+    pub fn turn_change(&mut self) {
+        self.active_player = self.active_player.opposite();
+        if self.active_player == Color::White {
+            self.fullmove_number += 1
+        }
+    }
+
+    pub fn compute_hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+
+        // Hash all piece positions
+        for i in 0..12 {
+            self.board.bitboards[i].0.hash(&mut hasher);
+        }
+
+        // Hash occupancies
+        self.board.occupancies[0].0.hash(&mut hasher);
+        self.board.occupancies[1].0.hash(&mut hasher);
+
+        // Hash game state
+        self.board.castling_rights.hash(&mut hasher);
+        self.board.en_passant.hash(&mut hasher);
+
+        hasher.finish()
     }
 
     /*
@@ -352,11 +543,6 @@ impl Game {
            }
        }
 
-       /// A function to get active player
-       pub fn active_player(&self) -> Color {
-           self.active
-       }
-
        /// A function to switch player turn
        pub fn switch_player_turn(&mut self) {
            self.active = self.active.opposite();
@@ -385,7 +571,8 @@ impl Game {
     */
 
     /// Get all possible moves for a piece
-    pub fn has_legal_moves(&self) -> bool {
+    #[inline]
+    fn has_legal_moves(&mut self) -> bool {
         let player = self.active_player;
 
         let mut pieces = match player {
@@ -397,147 +584,268 @@ impl Game {
             let from = Square::uint_to_square(from_idx as u8);
 
             if let Some(piece) = self.board.get_piece_at(from) {
-                let color = piece.color();
-                let moves: BitBoard = match piece {
-                    Piece::WhitePawn | Piece::BlackPawn => {
-                        // self.board.get_pawn_moves(from, piece.color())
-                        todo!()
-                    }
-                    Piece::WhiteKnight | Piece::BlackKnight => {
-                        self.board.get_knight_moves(from, color)
-                    }
-                    Piece::WhiteBishop | Piece::BlackBishop => {
-                        self.board.get_bishop_moves(from, color)
-                    }
-                    Piece::WhiteRook | Piece::BlackRook => self.board.get_rook_moves(from, color),
-                    Piece::WhiteQueen | Piece::BlackQueen => {
-                        self.board.get_bishop_moves(from, color)
-                            | self.board.get_rook_moves(from, color)
-                    }
-                    Piece::WhiteKing | Piece::BlackKing => self.board.get_king_moves(from, color),
-                };
-
-                let mut targets = moves;
-                while let Some(to_idx) = targets.pop_lsb() {
-                    let to = Square::uint_to_square(to_idx as u8);
-
-                    if self.is_move_legal_simple(from, to, piece) {
-                        return true;
-                    }
+                if self.board.get_pseudo_legal_moves(from, piece) {
+                    return true;
                 }
-            }
-        }
-
-        false
-    }
-
-    pub fn is_move_legal_simple(&self, from: Square, to: Square, piece: Piece) -> bool {
-        let mut new_occupied = self.board.all_pieces();
-        let mut square_map = self.board.square_map.clone();
-        let opponent = piece.color().opposite();
-
-        // Direct legality check:
-        if piece.is_king() {
-            !self.board.is_under_attack(to, opponent)
-        }
-        // En_Passant legality check
-        else if piece.is_pawn() && self.board.en_passant.is_set(to) {
-            let captured_sq = self
-                .board
-                .en_passant_square(to, piece.color())
-                .expect("Square Index is not correct");
-
-            new_occupied.clear(from);
-            new_occupied.clear(captured_sq);
-            new_occupied.set(to);
-
-            square_map[from.index()] = None;
-            square_map[captured_sq.index()] = None;
-            square_map[to.index()] = Some(piece);
-
-            let mut opponent_pieces = self.board.get_opponent_pieces(piece) & new_occupied;
-
-            let king_sq = self.board.get_king_square(piece.color());
-
-            !self.is_king_attacked(king_sq, &square_map, &new_occupied, &mut opponent_pieces)
-        } else if self
-            .is_castle_valid(&MoveData {
-                from,
-                to,
-                piece,
-                move_type: MoveType::Move, // Here it does not matter what the move_type is.
-            })
-            .is_ok()
-        {
-            // Determine rook's source and destination squares
-            let rank = from.rank() - 1; // This is 0 for White and 7 for Black
-            let file_dest = to.file() - 1;
-            let rook_from =
-                Square::uint_to_square((rank * 8 + if file_dest == 6 { 7 } else { 0 }) as u8);
-            let rook_to =
-                Square::uint_to_square((rank * 8 + if file_dest == 6 { 5 } else { 3 }) as u8);
-
-            let rook = if piece.color() == Color::White {
-                Piece::WhiteRook
-            } else {
-                Piece::BlackRook
             };
-
-            // Move king
-            new_occupied.clear(from);
-            new_occupied.set(to);
-            square_map[from.index()] = None;
-            square_map[to.index()] = Some(piece);
-
-            // Move rook
-            new_occupied.clear(rook_from);
-            new_occupied.set(rook_to);
-            square_map[rook_from.index()] = None;
-            square_map[rook_to.index()] = Some(rook);
-
-            let mut opponent_pieces = self.board.get_opponent_pieces(piece) & new_occupied;
-
-            let king_sq = to; // King’s new square
-            !self.is_king_attacked(king_sq, &square_map, &new_occupied, &mut opponent_pieces)
         }
-        // Normal move legality check
-        else {
-            new_occupied.clear(from); // Remove from source
-            new_occupied.set(to); // Add to destination
-            square_map[from.index()] = None;
-            square_map[to.index()] = Some(piece);
-            let mut opponent_pieces = self.board.get_opponent_pieces(piece) & new_occupied;
 
-            let king_sq = self.board.get_king_square(piece.color());
-
-            // Check if king would be safe with this new occupancy
-            !self.is_king_attacked(king_sq, &square_map, &new_occupied, &mut opponent_pieces)
-        }
+        return false;
     }
 
-    pub fn is_king_attacked(
-        &self,
-        king_sq: Square,
-        square_map: &Vec<Option<Piece>>,
-        occupancy: &BitBoard,
-        opponent_board: &mut BitBoard,
-    ) -> bool {
-        self.board
-            .compute_attack_mask_on_the_fly(square_map, occupancy, opponent_board)
-            .is_set(king_sq)
-    }
-
-    pub fn game_state(&self) -> GameState {
+    /// called for active player, after a move succeed and turn is changes we call game_state,
+    /// to know that the active player has moves or maybe its checkmate/stalemate.
+    #[inline]
+    pub fn game_state(&mut self) -> GameState {
         let color = self.active_player;
 
-        if self.has_legal_moves() {
-            if self.board.king_in_check(color) {
-                return GameState::Checkmate;
-            } else {
-                return GameState::Stalemate;
-            }
+        if self.board.king_in_check(color) {
+            return GameState::Checkmate;
+        } else if !self.has_legal_moves() {
+            return GameState::Stalemate;
         }
 
-        GameState::Ongoing
+        return GameState::Ongoing;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::board::piece::Piece;
+    use crate::board::square::Square;
+    use crate::moves::move_type::{MoveData, MoveType};
+    use crate::pieces::Color;
+    use std::str::FromStr;
+
+    // ==================== Game Initialization Tests ====================
+
+    #[test]
+    fn test_new_game_initializes_correctly() {
+        let game = Game::new();
+        assert_eq!(game.active_player, Color::White);
+        assert_eq!(game.halfmove_clock, 0);
+        assert_eq!(game.fullmove_number, 1);
+    }
+
+    #[test]
+    fn test_raw_game_creates_empty_board() {
+        let game = Game::raw();
+        assert_eq!(game.active_player, Color::default());
+        assert_eq!(game.halfmove_clock, 0);
+        assert_eq!(game.fullmove_number, 1);
+    }
+
+    // ==================== FEN Parsing Tests ====================
+
+    #[test]
+    fn test_fen_starting_position() {
+        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let game = Game::with_fen(fen);
+
+        assert_eq!(game.active_player, Color::White);
+        assert_eq!(game.halfmove_clock, 0);
+        assert_eq!(game.fullmove_number, 1);
+        assert_eq!(game.board.castling_rights, 0b1111);
+    }
+
+    #[test]
+    fn test_fen_mid_game_position() {
+        let fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+        let game = Game::with_fen(fen);
+
+        assert_eq!(game.active_player, Color::White);
+        assert_eq!(game.board.castling_rights, 0b1111);
+    }
+
+    #[test]
+    fn test_fen_with_en_passant() {
+        let fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1";
+        let game = Game::with_fen(fen);
+
+        assert_eq!(game.active_player, Color::Black);
+        assert_ne!(game.board.en_passant, None);
+    }
+
+    #[test]
+    fn test_fen_without_castling_rights() {
+        let fen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w - - 0 1";
+        let game = Game::with_fen(fen);
+
+        assert_eq!(game.board.castling_rights, 0);
+    }
+
+    #[test]
+    fn test_fen_black_to_move() {
+        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1";
+        let game = Game::with_fen(fen);
+
+        assert_eq!(game.active_player, Color::Black);
+    }
+
+    // ==================== Make Move Tests ====================
+
+    #[test]
+    fn test_make_move_executes_valid_moves() {
+        let mut game = Game::new();
+
+        let test_moves = vec![
+            ("e2", "e4", Piece::WhitePawn),
+            ("d2", "d4", Piece::WhitePawn),
+            ("g1", "f3", Piece::WhiteKnight),
+        ];
+
+        for (from, to, piece) in test_moves {
+            let mv = MoveData {
+                from: Square::from_str(from).unwrap(),
+                to: Square::from_str(to).unwrap(),
+                piece,
+                move_type: MoveType::Move,
+            };
+
+            assert!(game.make_move(mv).is_ok());
+        }
+    }
+
+    #[test]
+    fn test_make_move_executes_captures() {
+        let fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1";
+        let mut game = Game::with_fen(fen);
+
+        let captures = vec![("e4", "e5", Piece::WhitePawn, Piece::BlackPawn)];
+
+        for (from, to, piece, captured) in captures {
+            let mv = MoveData {
+                from: Square::from_str(from).unwrap(),
+                to: Square::from_str(to).unwrap(),
+                piece,
+                move_type: MoveType::Capture(captured),
+            };
+
+            assert!(game.make_move(mv).is_err());
+        }
+    }
+
+    // ==================== Commit Move Tests ====================
+
+    #[test]
+    fn test_commit_move_validates_turn() {
+        let mut game = Game::new();
+
+        let result = game.commit_move("e7", "e5", "bP", None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_commit_move_changes_turn() {
+        let mut game = Game::new();
+
+        assert_eq!(game.active_player, Color::White);
+        game.commit_move("e2", "e4", "wP", None).unwrap();
+        assert_eq!(game.active_player, Color::Black);
+    }
+
+    #[test]
+    fn test_commit_move_detects_en_passant() {
+        let fen = "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 1";
+        let mut game = Game::with_fen(fen);
+
+        let result = game.commit_move("e5", "d6", "wP", None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_commit_move_detects_castling() {
+        let fen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
+        let mut game = Game::with_fen(fen);
+
+        let result = game.commit_move("e1", "g1", "wK", None);
+        assert!(result.is_ok());
+    }
+
+    // ==================== Turn Change Tests ====================
+
+    #[test]
+    fn test_turn_change_switches_player() {
+        let mut game = Game::new();
+
+        assert_eq!(game.active_player, Color::White);
+        game.turn_change();
+        assert_eq!(game.active_player, Color::Black);
+        game.turn_change();
+        assert_eq!(game.active_player, Color::White);
+    }
+
+    // ==================== Legal Move Tests ====================
+
+    #[test]
+    fn test_has_legal_moves_at_start_position() {
+        let mut game = Game::new();
+        assert!(game.has_legal_moves());
+    }
+
+    #[test]
+    fn test_has_legal_moves_in_checkmate_position() {
+        let fen = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 0 1";
+        let mut game = Game::with_fen(fen);
+        assert!(!game.has_legal_moves());
+    }
+
+    #[test]
+    fn test_has_legal_moves_in_stalemate_position() {
+        let fen = "k7/8/1Q6/8/8/8/8/K7 b - - 0 1";
+        let mut game = Game::with_fen(fen);
+        assert!(!game.has_legal_moves());
+    }
+
+    // ==================== Game State Tests ====================
+
+    #[test]
+    fn test_game_state_ongoing() {
+        let mut game = Game::new();
+        assert_eq!(game.game_state(), GameState::Ongoing);
+    }
+
+    #[test]
+    fn test_game_state_checkmate() {
+        let fen = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 0 1";
+        let mut game = Game::with_fen(fen);
+        assert_eq!(game.game_state(), GameState::Checkmate);
+    }
+
+    #[test]
+    fn test_game_state_stalemate() {
+        let fen = "k7/8/1Q6/8/8/8/8/K7 b - - 0 1";
+        let mut game = Game::with_fen(fen);
+        assert_eq!(game.game_state(), GameState::Stalemate);
+    }
+
+    // ==================== Integration Tests ====================
+
+    #[test]
+    fn test_complete_game_sequence() {
+        let mut game = Game::new();
+
+        let moves = vec![
+            ("e2", "e4", "wP", None),
+            ("e7", "e5", "bP", None),
+            ("g1", "f3", "wN", None),
+            ("b8", "c6", "bN", None),
+        ];
+
+        for (from, to, piece, move_type) in moves {
+            assert!(game.commit_move(from, to, piece, move_type).is_ok());
+        }
+
+        assert_eq!(game.fullmove_number, 3);
+    }
+
+    #[test]
+    fn test_castling_both_sides() {
+        let fen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
+        let mut game = Game::with_fen(fen);
+
+        // White kingside castle
+        assert!(game.commit_move("e1", "g1", "wK", None).is_ok());
     }
 }

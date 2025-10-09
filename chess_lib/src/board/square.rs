@@ -64,6 +64,7 @@ impl Sub<u8> for Square {
         unsafe { std::mem::transmute::<u8, Square>(val) }
     }
 }
+
 impl BitAnd<u8> for Square {
     type Output = Self;
 
@@ -144,7 +145,6 @@ impl Square {
     }
 
     pub const fn uint_to_square(i: u8) -> Self {
-        debug_assert!(i < 64, "Square value must be 0-63");
         // SAFETY: `Square` is #[repr(u8)] and contiguous from 0..63
         unsafe { std::mem::transmute(i) }
     }
