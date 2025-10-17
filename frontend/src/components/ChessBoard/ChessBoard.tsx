@@ -3,8 +3,9 @@ import { BoardType, Piece, Square } from './types'
 import ChessTile from './ChessTile'
 import CustomDragLayer from './CustomDragLayer'
 import { generate_possible_moves } from 'wasm'
-import { useMicroChess } from '../../context/MicroChessProvider'
+import { useMicroChess } from '@/context/MicroChessProvider'
 import { ThemeName, themes } from './theme'
+import { makeMove } from './utils'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
@@ -84,32 +85,13 @@ export default function ChessBoard(props: BoardProps) {
     }
 
     const piece = board[selectedSquare as Square]
-    const targetPiece = board[targetSquare]
 
-    targetPiece !== null || undefined
-      ? makeMove(selectedSquare as Square, targetSquare, piece as Piece, null)
-      : makeMove(
-          selectedSquare as Square,
-          targetSquare as Square,
-          piece as Piece,
-          targetPiece
-        )
+    makeMove(selectedSquare as Square, targetSquare, piece as Piece)
 
     setDraggingPiece(null)
     setSelectedSquare(null)
     setPossMoves([])
     window.removeEventListener('mousemove', handleMouseMove)
-  }
-
-  function makeMove(
-    from: Square,
-    to: Square,
-    piece: Piece,
-    capturePiece: Piece | null
-  ) {
-    if (possMoves.includes(to)) {
-      console.log(from, to, piece, capturePiece)
-    }
   }
 
   const selectedTheme = themes[chessSettings.theme as ThemeName]
@@ -119,11 +101,10 @@ export default function ChessBoard(props: BoardProps) {
       ref={boardRef}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      className={`relative w-full aspect-square max-w-[720px] max-h-[720px] rounded-md shadow-md overflow-hidden ${
-        draggingPiece ? 'cursor-grabbing' : 'cursor-default'
-      }`}
+      className={`relative w-full aspect-square max-w-[720px] max-h-[720px] rounded-md shadow-md overflow-hidden ${draggingPiece ? 'cursor-grabbing' : 'cursor-default'
+        }`}
     >
-      {/* ✅ Custom Drag Layer for smooth piece following */}
+      {/* Custom Drag Layer for smooth piece following */}
       <CustomDragLayer
         dragPosition={dragPosition}
         draggingPiece={draggingPiece}
@@ -143,10 +124,10 @@ export default function ChessBoard(props: BoardProps) {
               selectedSquare === square
                 ? selectedTheme.selectedSquare
                 : possMoves.includes(square as Square) && piece
-                ? 'bg-red-400'
-                : number % 2 === 0
-                ? selectedTheme.dark
-                : selectedTheme.light
+                  ? 'bg-red-400'
+                  : number % 2 === 0
+                    ? selectedTheme.dark
+                    : selectedTheme.light
 
             return (
               <div>

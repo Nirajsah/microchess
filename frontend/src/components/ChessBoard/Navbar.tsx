@@ -20,15 +20,23 @@ export default function Navbar() {
     ],
   }
   return (
-    <div className="w-full h-14 p-3 flex justify-center">
+    <div className="absolute top-0 left-0 w-full h-14 p-3 flex justify-center">
       <div className="w-full max-w-[1280px] flex justify-between items-center">
         <div className="">MicroChess</div>
-        <div className="">
-          <button onClick={() => setShowProfile(!showProfile)}>
-            Show Profile
+        <div className="relative">
+          <button
+            onClick={() => setShowProfile(!showProfile)}
+            className="inline-flex items-center justify-center"
+            aria-label="Toggle profile"
+          >
+            <img
+              src={mockPlayer.avatarUrl}
+              alt="Profile"
+              className="w-8 h-8 rounded-full object-cover ring-2 ring-white/30 hover:ring-white/60 transition"
+            />
           </button>
           {showProfile && (
-            <div className="text-black absolute right-10 top-9 z-50">
+            <div className="absolute right-0 top-10 z-50">
               <PlayerProfileCard player={mockPlayer} />
             </div>
           )}

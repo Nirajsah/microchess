@@ -1,22 +1,24 @@
-import { Piece } from './types'
-import whiteRook from '@/assets/wr.png'
-import whiteKnight from '@/assets/wn.png'
-import whiteBishop from '@/assets/wb.png'
-import whiteQueen from '@/assets/wq.png'
-import blackRook from '@/assets/br.png'
-import blackKnight from '@/assets/bn.png'
-import blackBishop from '@/assets/bb.png'
-import blackQueen from '@/assets/bq.png'
-import { useMutation } from '@apollo/client'
-import { PROMOTE_PIECE } from '../../GraphQL/queries'
+import { Piece, Square } from './types'
+import {
+  whiteRook,
+  whiteKnight,
+  whiteBishop,
+  whiteQueen,
+  blackRook,
+  blackKnight,
+  blackBishop,
+  blackQueen
+} from "@/assets"
+
+import { promotePiece } from './utils'
 
 interface PromotionCardProps {
   color: 'white' | 'black'
-  promoteData: { from: string; to: string; piece: string; show: boolean }
+  promoteData: { from: Square; to: Square; piece: Piece; show: boolean }
   setPromoteData: (value: {
-    from: string
-    to: string
-    piece: string
+    from: Square
+    to: Square
+    piece: Piece
     show: boolean
   }) => void
 }
@@ -52,27 +54,17 @@ export const PromotionCard = ({
   promoteData,
   setPromoteData,
 }: PromotionCardProps) => {
-  const [promoteMutation] = useMutation(PROMOTE_PIECE)
 
   const pieceData = color === 'white' ? whitePieces : blackPieces
 
-  const promotePiece = async (
+  const promotion = async (
     piece: Piece,
-    promoteData: { from: string; to: string; piece: string; show: boolean }
+    promoteData: { from: Square; to: Square; piece: Piece; show: boolean }
   ) => {
     console.log('Promote Piece:', promoteData, piece)
-    await promoteMutation({
-      variables: {
-        from: promoteData.from,
-        to: promoteData.to,
-        piece: promoteData.piece,
-        promotedPiece: piece,
-        endpoint: 'chess',
-      },
-      onError: (error: any) => {
-        console.error('Message:', error.message)
-      },
-    })
+
+    promotePiece(promoteData.from, promoteData.to, promoteData.piece, piece)
+
     setPromoteData({ ...promoteData, show: false })
   }
 
@@ -84,7 +76,7 @@ export const PromotionCard = ({
           key={index}
         >
           <img
-            onClick={() => promotePiece(piece.piece, promoteData)}
+            onClick={() => promotion(piece.piece, promoteData)}
             className="w-full h-full object-contain"
             src={piece.image}
             alt={piece.piece}

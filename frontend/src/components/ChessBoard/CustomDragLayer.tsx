@@ -1,17 +1,19 @@
 import { Piece } from './types'
 
-import whitePawn from '@/assets/wp.png'
-import whiteRook from '@/assets/wr.png'
-import whiteKnight from '@/assets/wn.png'
-import whiteBishop from '@/assets/wb.png'
-import whiteQueen from '@/assets/wq.png'
-import whiteKing from '@/assets/wk.png'
-import blackPawn from '@/assets/bp.png'
-import blackRook from '@/assets/br.png'
-import blackKnight from '@/assets/bn.png'
-import blackBishop from '@/assets/bb.png'
-import blackQueen from '@/assets/bq.png'
-import blackKing from '@/assets/bk.png'
+import {
+  whitePawn,
+  whiteRook,
+  whiteKnight,
+  whiteBishop,
+  whiteQueen,
+  whiteKing,
+  blackPawn,
+  blackRook,
+  blackKnight,
+  blackBishop,
+  blackQueen,
+  blackKing,
+} from '../../assets'
 
 const pieceImages: any = {
   wP: whitePawn,

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMicroChess } from '../context/MicroChessProvider'
 import ThemePreviewGrid from './ChessBoard/ThemeGrid'
+import { ThemeName } from './ChessBoard/theme'
 
 type Menu = 'Themes' | 'Misc'
 
@@ -8,7 +9,7 @@ const Settings = () => {
   const { chessSettings, setChessSettings } = useMicroChess()
   const [settingMenu, setSettingMenu] = useState<Menu>('Themes')
   const themeSelected = chessSettings.theme
-  function changeTheme(themeKey: string) {
+  function changeTheme(themeKey: ThemeName) {
     setChessSettings({
       ...chessSettings,
       theme: themeKey,

@@ -6,7 +6,6 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  LucideProps,
 } from 'lucide-react'
 import CapturedPieces from './CapturedPieces'
 import Timer from './Timer'
@@ -24,7 +23,6 @@ export interface MatchData {
   opponentId: string | null
   whiteTime: number
   blackTime: number
-  startGame: () => void
 }
 
 export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
@@ -46,10 +44,8 @@ const MatchDataUI = (data: MatchData) => {
     moves,
     capturedPieces,
     checkStatus,
-    opponentId,
     whiteTime,
     blackTime,
-    startGame,
   } = data
   return (
     <div className="w-full items-center justify-between flex flex-col gap-4 h-[720px]">

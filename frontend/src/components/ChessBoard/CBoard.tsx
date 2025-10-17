@@ -1,108 +1,28 @@
 import React from 'react'
 import Ranks from './Ranks'
 import Files from './Files'
-import { useLazyQuery, useMutation, useSubscription } from '@apollo/client'
-import {
-  GAME_DATA,
-  GET_CAPTURED_PIECES,
-  NEW_GAME,
-  NOTIFICATIONS,
-  TIME_LEFT,
-} from '../../GraphQL/queries'
-// import Board from './Board'
 import { PromotionCard } from './PromotionCard'
-import { BoardType, Color, Fen, PromoteData } from './types'
+import { BoardType, Color, Fen, Piece, PromoteData, Square } from './types'
 import { RightSideMenu } from './RightSideMenu'
 import { fen_to_board } from 'wasm'
 import ChessBoard from './ChessBoard'
 import Modal from '../Modal'
 import Settings from '../Settings'
 import Navbar from './Navbar'
+import { LeftSideMenu } from '../LeftSideMenu'
 
-// const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-const fen = 'rnbqkbnr/pppppppp/8/BB6/3PPPP1/N2Q3N/PPP4P/R3K2R - KQkq - - 0 1'
+const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 type Player = 'w' | 'b' | '-'
 
 const CBoard = () => {
   const chainId = window.sessionStorage.getItem('chainId') ?? ''
-  const owner = window.sessionStorage.getItem('owner') ?? ''
   const [player, setPlayer] = React.useState<Player>('-')
-  const [boardState, setBoardState] = React.useState<Fen>(fen)
-  const [color, setColor] = React.useState<Color>('w')
-  const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
-  const [opponentId, setOpponentId] = React.useState<string | null>(null)
-  const [play] = useMutation(NEW_GAME)
-  const [whiteTime, setWhiteTime] = React.useState(900) // 15 minutes
-  const [blackTime, setBlackTime] = React.useState(900) // 15 minutes
-
-  const [gameData, { called: callGameData }] = useLazyQuery(GAME_DATA, {
-    variables: {
-      endpoint: 'chess',
-      chainId: chainId,
-      player: owner,
-    },
-    onCompleted: (data) => {
-      setBoardState(data.gameData.board)
-      setPlayer(data.gameData.playerTurn)
-      setColor(data.gameData.player)
-      setMoves(data.gameData.moves)
-      setOpponentId(data.gameData.opponent)
-    },
-    onError: (error) => {
-      console.log('Error: ', error)
-    },
-    fetchPolicy: 'network-only',
-  })
-
-  const [timeQuery] = useLazyQuery(TIME_LEFT, {
-    variables: {
-      endpoint: 'chess',
-      chainId: chainId,
-    },
-    onCompleted: (data) => {
-      setWhiteTime(data.timeLeft.white)
-      setBlackTime(data.timeLeft.black)
-    },
-    fetchPolicy: 'network-only',
-  })
-
-  const [capturedPiecesQuery] = useLazyQuery(GET_CAPTURED_PIECES, {
-    variables: {
-      endpoint: 'chess',
-      chainId: chainId,
-    },
-    onCompleted: (data) => {
-      setCapturedPieces(data.capturedPieces)
-    },
-    fetchPolicy: 'network-only',
-  })
-
-  useSubscription(NOTIFICATIONS, {
-    variables: {
-      chainId: chainId,
-    },
-    onData: () => {
-      gameData()
-      capturedPiecesQuery()
-      timeQuery()
-    },
-  })
-
-  if (!callGameData) {
-    gameData()
-    capturedPiecesQuery()
-    timeQuery()
-  }
-
-  async function startGame() {
-    await play({
-      variables: {
-        player: owner,
-        endpoint: 'chess',
-        chainId: chainId,
-      },
-    })
-  }
+  const [boardState, _setBoardState] = React.useState<Fen>(fen)
+  const [color, _setColor] = React.useState<Color>('w')
+  const [capturedPieces, _setCapturedPieces] = React.useState<string[]>([])
+  const [opponentId, _setOpponentId] = React.useState<string | null>(null)
+  const [whiteTime, _setWhiteTime] = React.useState(900) // 15 minutes
+  const [blackTime, _setBlackTime] = React.useState(900) // 15 minutes
 
   const [board, setBoard] = React.useState<BoardType>(() => {
     let obj = fen_to_board(boardState)
@@ -129,26 +49,18 @@ const CBoard = () => {
     setPlayer(obj.player_turn)
   }, [boardState])
 
-  const [moves, setMoves] = React.useState<
+  const [moves, _setMoves] = React.useState<
     Array<{ white: string; black: string }>
   >([])
 
   const renderSquare = () => {
-    const isBlack = color.toLowerCase() === 'b'
+    // const _isBlack = color.toLowerCase() === 'b'
 
     return (
       <div className="w-full chess-board">
         <div className="h-[12.5%] z-50 absolute text-black">
           <Ranks color={color as Color} />
         </div>
-        {/* <Board
-          boardData={board}
-          isBlack={isBlack}
-          color={color as Color}
-          player={player as Color}
-          setBoard={setBoard}
-          setPromoteData={setPromoteData}
-        /> */}
         <ChessBoard boardData={board} />
         <div className="flex text-black">
           <Files color={color as Color} />
@@ -159,13 +71,13 @@ const CBoard = () => {
 
   const [open, setOpen] = React.useState(false)
   const [promoteData, setPromoteData] = React.useState<PromoteData>({
-    from: '',
-    to: '',
-    piece: '',
+    from: '' as Square,
+    to: '' as Square,
+    piece: '' as Piece,
     show: false,
   })
 
-  const appBackgrounds = {
+  /* const appBackgrounds = {
     classicWood: '#f5f5dc', // Beige
     modernMinimalist: '#e0e0e0', // Light Silver
     forest: '#2e7d3217', // Dark Forest Green
@@ -176,12 +88,15 @@ const CBoard = () => {
     softViolet: '#f8bbd0', // Light Pink
     default: '#ffebe84a',
     dark: '#151515',
-  }
+  } */
 
   return (
-    <div className="w-full min-h-full relative">
+    <div className="w-full min-h-full relative bg-[#0a0a0a]">
+      <div className="w-full h-full absolute">
+        <LeftSideMenu />
+      </div>
       <Navbar />
-      <div className="flex flex-col items-center justify-center p-3">
+      <div className="flex flex-col items-center justify-center p-3 h-full">
         <Modal select={open} unselect={() => setOpen(!open)}>
           <Settings />
         </Modal>
@@ -210,7 +125,7 @@ const CBoard = () => {
             </div> */}
           </div>
 
-          <div className="w-full lg:w-[30%]">
+          <div className="w-full lg:w-[20%]">
             <RightSideMenu
               checkStatus={board.KingInCheck}
               player={player}
@@ -220,7 +135,6 @@ const CBoard = () => {
               moves={moves}
               whiteTime={whiteTime}
               blackTime={blackTime}
-              startGame={startGame}
               key={chainId}
             />
           </div>
