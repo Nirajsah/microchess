@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./src/**/*.{html,tsx}'],
+  content: ['./index.html', './src/**/*.{ts,tsx,html}'],
   theme: {
     extend: {
       fontFamily: {
@@ -15,8 +15,12 @@ export default {
       },
       colors: {
         background: {
+          DEFAULT: 'hsl(var(--background))',
           primary: '#0a0a0a',
         },
+        foreground: 'hsl(var(--foreground))',
+        muted: 'hsl(var(--muted))',
+        border: 'hsl(var(--border))',
       },
       animation: {
         'pulse-and-move-inward': 'pulseAndMoveInward 3s infinite',
@@ -25,8 +29,18 @@ export default {
         'train-right-to-center': 'trainRightToCenter 8s linear forwards',
         'train-bottom-to-center': 'trainBottomToCenter 8s linear forwards',
         'train-left-to-center': 'trainLeftToCenter 8s linear forwards',
+        'star-movement-bottom': 'star-movement-bottom linear infinite alternate',
+        'star-movement-top': 'star-movement-top linear infinite alternate',
       },
       keyframes: {
+        'star-movement-bottom': {
+          '0%': { transform: 'translate(0%, 0%)', opacity: '1' },
+          '100%': { transform: 'translate(-100%, 0%)', opacity: '0' },
+        },
+        'star-movement-top': {
+          '0%': { transform: 'translate(0%, 0%)', opacity: '1' },
+          '100%': { transform: 'translate(100%, 0%)', opacity: '0' },
+        },
         pulseAndMoveInward: {
           '0%': { transform: 'scale(1)', opacity: '0.8' },
           '50%': { transform: 'scale(0.85)', opacity: '0.5' },
