@@ -4,24 +4,21 @@ mod state;
 
 use std::{collections::BTreeSet, sync::Arc};
 
-use self::state::Chess;
-use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
-use chess::{
-    piece::{Color, Piece},
-    Clock, GameChain, GameState, Move, Operation, PlayerTime,
+use async_graphql::{
+    ComplexObject, EmptySubscription, Object, Request, Response, Schema, SimpleObject,
 };
-
+use chess::{GameChain, Operation};
 use linera_sdk::{
-    base::{Owner, PublicKey, WithServiceAbi},
-    graphql::GraphQLMutationRoot,
-    views::View,
-    Service, ServiceRuntime,
+    abi::WithServiceAbi, graphql::GraphQLMutationRoot, views::View, Service, ServiceRuntime,
 };
 use serde::{Deserialize, Serialize};
 
+use crate::state::ChessState;
+
 #[derive(Clone)]
 pub struct ChessService {
-    state: Arc<Chess>,
+    state: Arc<ChessState>,
+    runtime: Arc<ServiceRuntime<ChessService>>,
 }
 
 linera_sdk::service!(ChessService);
@@ -34,22 +31,27 @@ impl Service for ChessService {
     type Parameters = ();
 
     async fn new(runtime: ServiceRuntime<Self>) -> Self {
-        let state = Chess::load(runtime.root_view_storage_context())
+        let state = ChessState::load(runtime.root_view_storage_context())
             .await
             .expect("Failed to load state");
         ChessService {
             state: Arc::new(state),
+            runtime: Arc::new(runtime),
         }
     }
 
     async fn handle_query(&self, query: Request) -> Response {
-        let schema =
-            Schema::build(self.clone(), Operation::mutation_root(), EmptySubscription).finish();
+        let schema = Schema::build(
+            self.clone(),
+            Operation::mutation_root(self.runtime.clone()),
+            EmptySubscription,
+        )
+        .finish();
         schema.execute(query).await
     }
 }
 
-#[derive(Deserialize, Serialize, SimpleObject)]
+/* #[derive(Deserialize, Serialize, SimpleObject)]
 struct GameData {
     board: String,         // ChessBoard
     player_turn: Color,    // player's color to move
@@ -57,11 +59,19 @@ struct GameData {
     moves: Vec<Move>,      // moves made till now
     opponent: Owner,       // opponent player id(Owner)
     game_state: GameState, // State of the Game, Play, StaleMate or CheckMate
-}
+} */
 
 #[Object]
 impl ChessService {
-    async fn game_data(&self, player: Owner) -> GameData {
+    async fn fen(&self) -> String {
+        self.state.board.get().to_fen(1, 2)
+    }
+
+    async fn game_chain(&self) -> &GameChain {
+        self.state.game_chain.get()
+    }
+
+    /* async fn game_data(&self, player: Owner) -> GameData {
         let game = self.state.board.get();
         GameData {
             board: game.board.to_fen(
@@ -76,9 +86,7 @@ impl ChessService {
             game_state: game.state,
         }
     }
-    async fn owners(&self) -> Vec<Owner> {
-        self.state.players.get().to_vec()
-    }
+
     async fn captured_pieces(&self) -> &Vec<Piece> {
         &self.state.board.get().captured_pieces
     }
@@ -98,5 +106,5 @@ impl ChessService {
             .await
             .expect("pub_key is not present")
             .expect("error getting the game_chains")
-    }
+    } */
 }
