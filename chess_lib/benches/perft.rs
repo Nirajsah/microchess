@@ -1,8 +1,4 @@
-use chess_lib::{
-    board::{piece::Piece, square::Square},
-    game::game::Game,
-    moves::move_type::MoveType,
-};
+use chess_lib::{board::square::Square, game::game::Game};
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 
 // Standard perft test positions
@@ -58,12 +54,7 @@ fn perft(game: &mut Game, depth: usize) -> u64 {
     let moves = generate_all_legal_moves(game);
 
     for mv in moves {
-        let result = game.commit_move(
-            &mv.from.to_string(),
-            &mv.to.to_string(),
-            &mv.piece.to_string(),
-            mv.move_type,
-        );
+        let result = game.commit_move(mv.from, mv.to, mv.piece, mv.move_type);
 
         match result {
             Ok(move_data) => {
@@ -72,7 +63,7 @@ fn perft(game: &mut Game, depth: usize) -> u64 {
             }
 
             Err(e) => {
-                println!("move failed: {:?}, {e} FEN: {:?}", mv, game.to_fen(1, 1));
+                println!("move failed:, {e} FEN: {:?}", game.to_fen(1, 1));
             }
         };
     }
@@ -83,10 +74,10 @@ fn perft(game: &mut Game, depth: usize) -> u64 {
 // Helper structure for move data
 #[derive(Clone, Debug)]
 struct MoveInfo {
-    from: Square,
-    to: Square,
-    piece: Piece,
-    move_type: Option<Piece>,
+    from: String,
+    to: String,
+    piece: String,
+    move_type: Option<String>,
 }
 
 /// Generate all legal moves for the current position
@@ -111,35 +102,25 @@ fn generate_all_legal_moves(game: &Game) -> Vec<MoveInfo> {
                     if piece.is_pawn() && game.is_promotion(target, piece.color()) {
                         // Generate all 4 promotion types
                         let promotion_pieces = if piece.is_white() {
-                            [
-                                Piece::WhiteQueen,
-                                Piece::WhiteRook,
-                                Piece::WhiteBishop,
-                                Piece::WhiteKnight,
-                            ]
+                            ["wQ", "wR", "wB", "wK"]
                         } else {
-                            [
-                                Piece::BlackQueen,
-                                Piece::BlackRook,
-                                Piece::BlackBishop,
-                                Piece::BlackKnight,
-                            ]
+                            ["bQ", "bR", "bB", "bK"]
                         };
 
                         for promo_piece in promotion_pieces {
                             legal_moves.push(MoveInfo {
-                                from,
-                                to: target,
-                                piece,
-                                move_type: Some(promo_piece), // or promoted_to: Some(promo_piece) if that's your field name
+                                from: from.to_string(),
+                                to: target.to_string(),
+                                piece: piece.to_string(),
+                                move_type: Some(promo_piece.to_string()), // or promoted_to: Some(promo_piece) if that's your field name
                             });
                         }
                     } else {
                         // Not a promotion - just a regular move
                         legal_moves.push(MoveInfo {
-                            from,
-                            to: target,
-                            piece,
+                            from: from.to_string(),
+                            to: target.to_string(),
+                            piece: piece.to_string(),
                             move_type: None, // or promoted_to: None
                         });
                     }

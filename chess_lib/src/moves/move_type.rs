@@ -27,18 +27,19 @@ impl MoveData {
     /// Create a new MoveData by analyzing the board state
     /// Requires a reference to the board to determine move type
     pub fn new(
-        from: &str,
-        to: &str,
-        p: &str,
-        promoted_to: Option<Piece>,
+        from: String,
+        to: String,
+        p: String,
+        promoted_to: Option<String>,
         board: &ChessBoard,
     ) -> Self {
-        let from = Square::from_str(from).unwrap();
-        let to = Square::from_str(to).unwrap();
-        let piece = Piece::from_str(p).unwrap();
+        let from = Square::from_str(&from).unwrap();
+        let to = Square::from_str(&to).unwrap();
+        let piece = Piece::from_str(&p).unwrap();
 
         // Determine move type
-        let move_type = if let Some(promo_piece) = promoted_to {
+        let move_type = if let Some(promo) = promoted_to {
+            let promo_piece = Piece::from_str(&promo).unwrap();
             // Promotion move
             if let Some(captured) = board.get_piece_at(to) {
                 MoveType::PromotionCapture(promo_piece, captured)

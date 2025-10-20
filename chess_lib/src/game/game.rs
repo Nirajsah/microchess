@@ -177,6 +177,7 @@ impl Game {
     }
 
     /// A function to generate FEN string using bitboard
+    /// `TODO`(Should use halfmove_clock and fullmove_number from self)
     #[inline]
     pub fn to_fen(&self, halfmove_clock: u8, fullmove_number: u8) -> String {
         let bitboards = self.board.bitboards;
@@ -357,10 +358,10 @@ impl Game {
     #[inline]
     pub fn commit_move(
         &mut self,
-        from: &str,
-        to: &str,
-        piece: &str,
-        promoted_to: Option<Piece>,
+        from: String,
+        to: String,
+        piece: String,
+        promoted_to: Option<String>,
     ) -> Result<CompleteMove> {
         let mv = MoveData::new(from, to, piece, promoted_to, &self.board);
 
@@ -732,7 +733,7 @@ mod tests {
     fn test_commit_move_validates_turn() {
         let mut game = Game::new();
 
-        let result = game.commit_move("e7", "e5", "bP", None);
+        let result = game.commit_move("e7".to_string(), "e5".to_string(), "bP".to_string(), None);
         assert!(result.is_err());
     }
 
@@ -741,7 +742,8 @@ mod tests {
         let mut game = Game::new();
 
         assert_eq!(game.active_player, Color::White);
-        game.commit_move("e2", "e4", "wP", None).unwrap();
+        game.commit_move("e2".to_string(), "e4".to_string(), "wP".to_string(), None)
+            .unwrap();
         assert_eq!(game.active_player, Color::Black);
     }
 
@@ -750,7 +752,7 @@ mod tests {
         let fen = "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 1";
         let mut game = Game::with_fen(fen);
 
-        let result = game.commit_move("e5", "d6", "wP", None);
+        let result = game.commit_move("e5".to_string(), "d6".to_string(), "wP".to_string(), None);
         assert!(result.is_ok());
     }
 
@@ -759,7 +761,7 @@ mod tests {
         let fen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
         let mut game = Game::with_fen(fen);
 
-        let result = game.commit_move("e1", "g1", "wK", None);
+        let result = game.commit_move("e1".to_string(), "g1".to_string(), "wK".to_string(), None);
         assert!(result.is_ok());
     }
 
@@ -834,7 +836,15 @@ mod tests {
         ];
 
         for (from, to, piece, move_type) in moves {
-            assert!(game.commit_move(from, to, piece, move_type).is_ok());
+            assert!(
+                game.commit_move(
+                    from.to_string(),
+                    to.to_string(),
+                    piece.to_string(),
+                    move_type
+                )
+                .is_ok()
+            );
         }
 
         assert_eq!(game.fullmove_number, 3);
@@ -846,6 +856,9 @@ mod tests {
         let mut game = Game::with_fen(fen);
 
         // White kingside castle
-        assert!(game.commit_move("e1", "g1", "wK", None).is_ok());
+        assert!(
+            game.commit_move("e1".to_string(), "g1".to_string(), "wK".to_string(), None)
+                .is_ok()
+        );
     }
 }
