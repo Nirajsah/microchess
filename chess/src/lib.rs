@@ -99,23 +99,23 @@ pub enum Operation {
     /// Start the game on a temporary chain
     StartGame {
         /// The `Owner` controlling player 1 and 2, respectively.
-        players: [PublicKey; 2],
+        players: [AccountOwner; 2],
         /// A small amount to cover the fees for the game, on the new chain
         amount: Amount,
         /// Game's total time (~15 mins)
         match_time: TimeDelta,
     },
     RequestGame {
-        player: PublicKey,
+        player: AccountOwner,
         timer: TimeDelta,
         rank: Rank,
     },
     FriendlyGame {
-        player: PublicKey,
+        player: AccountOwner,
         timer: TimeDelta,
     },
     StartFriendlyGame {
-        player: PublicKey,
+        player: AccountOwner,
         hash: FriendId,
     }, */
 }
@@ -128,6 +128,7 @@ pub enum Operation {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Message {
     Start {
+        players: [AccountOwner; 2],
         players: [AccountOwner; 2],
         timer: TimeDelta,
     },
@@ -149,7 +150,7 @@ pub enum Message {
     Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 pub struct PlayerRequest {
-    pub player: PublicKey,
+    pub player: AccountOwner,
     pub timer: TimeDelta,
     pub rank: Rank,
 } */
@@ -222,7 +223,7 @@ impl Clock {
             time_left: [timer, timer],
             // increment: arg.increment, // todo!(increment is not required at the moment)
             current_turn_start: block_time,
-            block_delay: TimeDelta::from_micros(100000000),
+            block_delay: TimeDelta::from_secs(5),
         }
     }
 

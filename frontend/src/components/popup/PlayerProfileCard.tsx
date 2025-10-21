@@ -1,149 +1,91 @@
 import React from 'react'
 
-// Define type for game history item
 interface GameHistoryItem {
   opponent: string
   result: 'Win' | 'Loss' | 'Draw'
   date: string
 }
 
-// Define type for player data
 export interface PlayerProfile {
   username: string
   avatarUrl: string
   title: string
   rating: number
-  gamesPlayed: number
-  wins: number
-  losses: number
-  draws: number
-  winPercentage: number
   bestRating: number
   country: string
-  bio: string
   recentGames: GameHistoryItem[]
-  // You can add additional fields (e.g., preferred openings) as needed
 }
 
 export const PlayerProfileCard: React.FC<{ player: PlayerProfile }> = ({
   player,
 }) => {
   return (
-    <div style={styles.card}>
-      {/* Header Section */}
-      <div style={styles.header}>
-        <img src={player.avatarUrl} alt="Avatar" style={styles.avatar} />
-        <div>
-          <h2 style={styles.username}>{player.username}</h2>
-          <p style={styles.title}>{player.title}</p>
+    <div className="w-[360px] text-white rounded-xl overflow-hidden shadow-2xl border border-white/10 bg-[#0b0b0c]/90 backdrop-blur-md">
+      {/* Cover */}
+      <div className="h-20 w-full bg-gradient-to-r from-purple-600/60 via-blue-600/60 to-cyan-500/60" />
+
+      {/* Header */}
+      <div className="px-5 -mt-8 flex items-end gap-3">
+        <img
+          src={player.avatarUrl}
+          alt="Avatar"
+          className="w-16 h-16 rounded-full object-cover ring-4 ring-[#0b0b0c]"
+        />
+        <div className="pb-1">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold m-0">{player.username}</h2>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 border border-white/10">
+              {player.title}
+            </span>
+          </div>
+          <p className="text-xs text-white/60 mt-0.5">{player.country}</p>
         </div>
       </div>
 
-      {/* Rating and Stats */}
-      <div style={styles.stats}>
-        <div style={styles.statItem}>
-          <strong>Rating:</strong> {player.rating}
+      {/* Stats */}
+      <div className="px-5 py-4 grid grid-cols-3 gap-3">
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5 text-center">
+          <div className="text-[10px] uppercase tracking-wide text-white/60">Rating</div>
+          <div className="text-lg font-semibold">{player.rating}</div>
         </div>
-        <div style={styles.statItem}>
-          <strong>Best Rating:</strong> {player.bestRating}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5 text-center">
+          <div className="text-[10px] uppercase tracking-wide text-white/60">Best</div>
+          <div className="text-lg font-semibold">{player.bestRating}</div>
         </div>
-        <div style={styles.statItem}>
-          <strong>Games Played:</strong> {player.gamesPlayed}
+        <div className="bg-white/5 rounded-lg p-3 border border-white/5 text-center">
+          <div className="text-[10px] uppercase tracking-wide text-white/60">Games</div>
+          <div className="text-lg font-semibold">{player.recentGames.length}</div>
         </div>
-        <div style={styles.statItem}>
-          <strong>Record:</strong> {player.wins}W / {player.losses}L /{' '}
-          {player.draws}D
-        </div>
-        <div style={styles.statItem}>
-          <strong>Win %:</strong> {player.winPercentage}%
-        </div>
-      </div>
-
-      {/* Additional Info */}
-      <div style={styles.additional}>
-        <p>
-          <strong>Country:</strong> {player.country}
-        </p>
-        <p>
-          <strong>Bio:</strong> {player.bio}
-        </p>
       </div>
 
       {/* Recent Games */}
-      <div style={styles.games}>
-        <h3>Recent Games</h3>
-        {player.recentGames.map((game, index) => (
-          <div key={index} style={styles.gameItem}>
-            <span style={styles.gameDate}>{game.date}</span>
-            <span style={styles.gameDetail}>
-              vs {game.opponent} - {game.result}
-            </span>
-          </div>
-        ))}
+      <div className="px-5 pb-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold text-sm">Recent Games</h3>
+          <span className="text-[10px] text-white/50">Last {player.recentGames.length}</span>
+        </div>
+        <div className="space-y-1.5">
+          {player.recentGames.map((game, index) => (
+            <div
+              key={index}
+              className="flex items-center justify-between text-xs px-2 py-2 rounded-md bg-white/5 border border-white/5"
+            >
+              <span className="text-white/70">{game.date}</span>
+              <span
+                className={
+                  game.result === 'Win'
+                    ? 'text-green-400'
+                    : game.result === 'Loss'
+                    ? 'text-red-400'
+                    : 'text-yellow-300'
+                }
+              >
+                vs {game.opponent} — {game.result}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
-}
-
-// Inline CSS styles (Feel free to move them to a CSS/SCSS file)
-const styles: { [key: string]: React.CSSProperties } = {
-  card: {
-    maxWidth: '400px',
-    margin: '20px auto',
-    padding: '15px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    borderRadius: '8px',
-    fontFamily: 'Arial, sans-serif',
-    backgroundColor: '#fff',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    marginBottom: '15px',
-  },
-  avatar: {
-    width: '80px',
-    height: '80px',
-    borderRadius: '50%',
-    marginRight: '15px',
-    objectFit: 'cover',
-  },
-  username: {
-    margin: '0',
-    fontSize: '1.5rem',
-  },
-  title: {
-    margin: '0',
-    color: '#777',
-  },
-  stats: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: '15px',
-  },
-  statItem: {
-    width: '48%',
-    marginBottom: '8px',
-  },
-  additional: {
-    marginBottom: '15px',
-  },
-  games: {
-    borderTop: '1px solid #eee',
-    paddingTop: '10px',
-  },
-  gameItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '5px 0',
-    borderBottom: '1px solid #f4f4f4',
-  },
-  gameDate: {
-    fontSize: '0.9rem',
-    color: '#555',
-  },
-  gameDetail: {
-    fontSize: '0.9rem',
-  },
 }

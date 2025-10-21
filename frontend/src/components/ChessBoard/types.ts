@@ -1,8 +1,8 @@
 // types.ts
 export type PromoteData = {
-  from: string
-  to: string
-  piece: string
+  from: Square
+  to: Square
+  piece: Piece
   show: boolean
 }
 

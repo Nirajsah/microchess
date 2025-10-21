@@ -94,6 +94,10 @@ impl Contract for ChessContract {
                 {
                     Ok(_) => {
                         clock.make_move(block_time, active_player);
+
+                        let clock = self.state.clock.get_mut();
+
+                        log::info!("clock: {:?}, block_time: {:?}", clock, block_time);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
 
@@ -227,7 +231,7 @@ impl ChessContract {
     /// (game hash, and public_key)
     pub async fn start_friendly_match(
         &mut self,
-        player: PublicKey,
+        player: AccountOwner,
         hash: FriendId,
     ) -> ChessResponse {
         assert_ne!(self.runtime.chain_id(), self.main_chain_id());
@@ -248,7 +252,7 @@ impl ChessContract {
     }
 
     /// A method to send a request to the main chain to start a new chain with player's public_key
-    pub fn request_game_chain(&mut self, player: PublicKey, timer: TimeDelta, rank: Rank) {
+    pub fn request_game_chain(&mut self, player: AccountOwner, timer: TimeDelta, rank: Rank) {
         assert_ne!(self.runtime.chain_id(), self.main_chain_id());
         let main_chain_id = self.main_chain_id();
         self.runtime.send_message(
@@ -265,7 +269,7 @@ impl ChessContract {
     /// (Todo!) Add the ability to bet on the game, requires optional betting amount
     pub async fn start_game(
         &mut self,
-        players: [PublicKey; 2],
+        players: [AccountOwner; 2],
         amount: Amount,
         match_time: TimeDelta,
     ) -> ChessResponse {
@@ -277,17 +281,14 @@ impl ChessContract {
         );
         let app_id = self.runtime.application_id();
         let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
-        let (message_id, chain_id) = self.runtime.open_chain(ownership, permissions, amount);
+        let chain_id = self.runtime.open_chain(ownership, permissions, amount);
         for public_key in &players {
             self.state
                 .game_chains
                 .get_mut_or_default(public_key)
                 .await
                 .unwrap()
-                .insert(GameChain {
-                    message_id,
-                    chain_id,
-                });
+                .insert(GameChain { chain_id });
         }
         self.runtime.send_message(
             chain_id,

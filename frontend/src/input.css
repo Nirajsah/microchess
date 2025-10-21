@@ -2,13 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --background: 0 0% 0%; /* black */
+    --foreground: 0 0% 100%; /* white */
+    --muted: 240 4.8% 95.9%;
+    --border: 240 5.9% 90%;
+  }
+
+  .dark {
+    --background: #09090b;
+    --foreground: 0 0% 98%;
+    --muted: #18181b;
+    --border: #27272a;
+  }
+}
+
+/* html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+} */
 html,
 body,
 #root {
-  /* height: 100%; */
+  background-color: black;
+  height: 100%;
   margin: 0;
   padding: 0;
-  /* background-color: #ffffff; */
+}
+
+@media (width: 1024px) {
+  .exact-1024 {
+    width: 300px;
+    height: 200px;
+  }
 }
 
 .chess-board {
@@ -219,4 +249,56 @@ body,
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+}
+
+@keyframes movingLineForward {
+  0% {
+    stroke-dashoffset: 600;
+  }
+  100% {
+    stroke-dashoffset: -600;
+  }
+}
+
+@keyframes movingLineReverse {
+  0% {
+    stroke-dashoffset: -600;
+  }
+  100% {
+    stroke-dashoffset: 600;
+  }
+}
+
+/* Base styles for all paths */
+.animated-path {
+  stroke-width: 2;
+  stroke-dasharray: 200, 400;
+}
+
+/* Blue path - irregular fast-slow-fast pattern */
+.stroke-blue-500 {
+  stroke: #3b82f6;
+  animation: movingLineForward 5s cubic-bezier(0.3, 0, 0.7, 1) infinite;
+  animation-delay: -2s;
+}
+
+/* Green path - different irregular pattern */
+.stroke-green-500 {
+  stroke: #10b981;
+  animation: movingLineReverse 6.5s cubic-bezier(0.1, 0.8, 0.9, 0.2) infinite;
+  animation-delay: -1.2s;
+}
+
+/* Yellow path - another timing pattern */
+.stroke-yellow-500 {
+  stroke: #eab308;
+  animation: movingLineReverse 7s cubic-bezier(0.4, 0.1, 0.6, 0.9) infinite;
+  animation-delay: -3.5s;
+}
+
+/* Purple path - different easing for more randomness */
+.stroke-purple-500 {
+  stroke: #8b5cf6;
+  animation: movingLineForward 4.8s cubic-bezier(0.2, 0.5, 0.8, 0.3) infinite;
+  animation-delay: -0.7s;
 }

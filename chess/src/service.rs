@@ -37,10 +37,17 @@ impl Service for ChessService {
         ChessService {
             state: Arc::new(state),
             runtime: Arc::new(runtime),
+            runtime: Arc::new(runtime),
         }
     }
 
     async fn handle_query(&self, query: Request) -> Response {
+        let schema = Schema::build(
+            self.clone(),
+            Operation::mutation_root(self.runtime.clone()),
+            EmptySubscription,
+        )
+        .finish();
         let schema = Schema::build(
             self.clone(),
             Operation::mutation_root(self.runtime.clone()),
@@ -99,7 +106,7 @@ impl ChessService {
     //async fn get_leaderboard(&self) -> Vec<PlayerStats> {
     //    self.state.get_leaderboard()
     //}
-    async fn get_game_chain(&self, pub_key: PublicKey) -> BTreeSet<GameChain> {
+    async fn get_game_chain(&self, pub_key: AccountOwner) -> BTreeSet<GameChain> {
         self.state
             .game_chains
             .get(&pub_key)
