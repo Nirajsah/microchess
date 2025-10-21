@@ -2,16 +2,13 @@
 
 mod state;
 
-use std::{collections::BTreeSet, sync::Arc};
+use std::sync::Arc;
 
-use async_graphql::{
-    ComplexObject, EmptySubscription, Object, Request, Response, Schema, SimpleObject,
-};
+use async_graphql::{EmptySubscription, Object, Request, Response, Schema};
 use chess::{GameChain, Operation};
 use linera_sdk::{
     abi::WithServiceAbi, graphql::GraphQLMutationRoot, views::View, Service, ServiceRuntime,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::state::ChessState;
 
@@ -37,17 +34,10 @@ impl Service for ChessService {
         ChessService {
             state: Arc::new(state),
             runtime: Arc::new(runtime),
-            runtime: Arc::new(runtime),
         }
     }
 
     async fn handle_query(&self, query: Request) -> Response {
-        let schema = Schema::build(
-            self.clone(),
-            Operation::mutation_root(self.runtime.clone()),
-            EmptySubscription,
-        )
-        .finish();
         let schema = Schema::build(
             self.clone(),
             Operation::mutation_root(self.runtime.clone()),
@@ -70,10 +60,9 @@ struct GameData {
 
 #[Object]
 impl ChessService {
-    async fn fen(&self) -> String {
+    async fn get_fen(&self) -> String {
         self.state.board.get().to_fen(1, 2)
     }
-
     async fn game_chain(&self) -> &GameChain {
         self.state.game_chain.get()
     }

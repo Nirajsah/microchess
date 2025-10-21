@@ -1,6 +1,9 @@
 #![allow(non_snake_case)]
 
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    str::FromStr,
+};
 
 use async_graphql::{ComplexObject, InputObject, Object, Request, Response, SimpleObject};
 use chess_lib::{game::game::Game, pieces::Color, ChessError, Result};
@@ -80,10 +83,9 @@ pub enum ChessResponse {
 #[derive(Debug, Deserialize, Serialize, Clone, GraphQLMutationRoot)]
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
-    /* NewGame {
+    NewGame {
         player: AccountOwner,
-    }, */
-    NewGame,
+    },
     MakeMove {
         from: String,
         to: String,
@@ -125,12 +127,14 @@ pub enum Operation {
 //     pub start_time: TimeDelta,
 //
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum Message {
     Start {
         players: [AccountOwner; 2],
-        players: [AccountOwner; 2],
         timer: TimeDelta,
+    },
+    NewGameReq {
+        player: Player,
     },
     GameChainData {
         game_chain_data: GameChain,
@@ -155,7 +159,7 @@ pub struct PlayerRequest {
     pub rank: Rank,
 } */
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
 pub struct Player {
     pub owner: AccountOwner,
     pub chain_id: ChainId,
@@ -192,6 +196,8 @@ impl DerefMut for GameWrapper {
 }
 
 /// The ID and timestamp of a temporary chain for a single game.
+///
+/// Register View needs this struct to impl Default trait. but ChainId does not, we use Option<ChainId<ChainId>
 #[derive(
     Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject,
 )]
@@ -199,7 +205,7 @@ pub struct GameChain {
     /// The Timestamp of the `OpenChain` message that created the chain.
     pub timestamp: Timestamp,
     /// The ID of the temporary game chain itself.
-    pub chain_id: ChainId,
+    pub chain_id: Option<ChainId>,
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]

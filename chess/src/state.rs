@@ -1,6 +1,7 @@
 use async_graphql::{ComplexObject, SimpleObject};
-use chess::{Clock, GameChain, GameWrapper};
+use chess::{Clock, GameChain, GameWrapper, Player};
 use linera_sdk::{
+    linera_base_types::AccountOwner,
     views::{
         linera_views::{self},
         RegisterView, RootView,
@@ -17,22 +18,23 @@ pub struct ChessState {
     /// The current game clock
     pub clock: RegisterView<Clock>,
     /// Holds Newly created game chain
-    pub game_chain: RegisterView<GameChain>, // Player Request, requesting a game
-                                             //pub lobby: MapView<Rank, PlayerRequest>,
-                                             /*
-                                             /// The current game players
-                                             pub players: RegisterView<Vec<Owner>>,
-                                             /// Player Requesting to play with a Friend(need a hash)
-                                             pub friend_lobby: MapView<FriendId, PlayerRequest>,
-                                             /// LeaderBoard (max 10)
-                                             pub leaderboard: RegisterView<Vec<PlayerProfile>>,
-                                             /// Player Stats
-                                             pub stats: RegisterView<PlayerProfile>,
-                                             // Temporary chains for individual games, by player.
-                                             // pub game_chains: MapView<PublicKey, BTreeSet<GameChain>>,
-                                             // store the betting amount on temp chain.
-                                             // pub bet_amount: RegisterView<Amount>,
-                                             */
+    pub game_chain: RegisterView<GameChain>,
+    /// Lobby to hold players for potential match
+    pub lobby: RegisterView<Vec<Player>>,
+    /// The current game players
+    pub players: RegisterView<Vec<AccountOwner>>,
+    /*
+    /// Player Requesting to play with a Friend(need a hash)
+    pub friend_lobby: MapView<FriendId, PlayerRequest>,
+    /// LeaderBoard (max 10)
+    pub leaderboard: RegisterView<Vec<PlayerProfile>>,
+    /// Player Stats
+    pub stats: RegisterView<PlayerProfile>,
+    // Temporary chains for individual games, by player.
+    // pub game_chains: MapView<PublicKey, BTreeSet<GameChain>>,
+    // store the betting amount on temp chain.
+    // pub bet_amount: RegisterView<Amount>,
+    */
 }
 
 #[ComplexObject]
