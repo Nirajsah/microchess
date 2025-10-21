@@ -54,28 +54,15 @@ impl Contract for ChessContract {
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
         match operation {
-            Operation::NewGame => {
-                /* log::info!("{player} has arrived");
-                let players = self.state.get_players();
-                if players.len() == 2 {
-                    return ChessResponse::Err(ChessError::InvalidRequest);
-                }
-                if players.len() == 1 {
-                    if player == players[0] {
-                        return ChessResponse::Err(ChessError::InvalidRequest);
-                    }
-                    let game = self.state.board.get().new();
-                    // let game = self.state.board.get().with_fen("8/7P/7P/8/8/8/8/7r w - - 0 1");
-                    self.state.add_player(player);
-                    self.state.board.set(game);
-                    ChessResponse::Ok
-                } else {
-                    self.state.add_player(player);
-                    ChessResponse::Ok
-                } */
-                let game = self.state.board.get().new();
-
-                self.state.board.set(game);
+            // A player makes a new game request to its own chain
+            Operation::NewGame { player } => {
+                let player = Player {
+                    chain_id: self.runtime.chain_id(),
+                    owner: player,
+                };
+                let app_chain = self.app_chain();
+                self.runtime
+                    .send_message(app_chain, Message::NewGameReq { player });
 
                 ChessResponse::Ok
             }
@@ -138,10 +125,11 @@ impl Contract for ChessContract {
 
     async fn execute_message(&mut self, message: Self::Message) {
         match message {
-            Message::Start { players, timer } => todo!(),
+            Message::Start { players, timer } => self.start_new_game(players, timer),
             Message::GameChainData { game_chain_data } => {
                 self.state.game_chain.set(game_chain_data)
             }
+            Message::NewGameReq { player } => self.new_match(player),
         }
     }
 
@@ -151,6 +139,43 @@ impl Contract for ChessContract {
 }
 
 impl ChessContract {
+    pub fn app_chain(&mut self) -> ChainId {
+        self.runtime.application_creator_chain_id()
+    }
+
+    /// Starting a game on a chain
+    pub fn start_new_game(&mut self, players: [AccountOwner; 2], timer: TimeDelta) {
+        for p in players {
+            self.state.players.get_mut().push(p);
+        }
+
+        todo!()
+    }
+
+    /// Only App chain has the right to create a new game.
+    pub fn new_match(&mut self, player: Player) {
+        assert_eq!(self.runtime.chain_id(), self.app_chain());
+
+        if let Some(lobby_player) = self.state.lobby.get_mut().pop() {
+            // here we start a new game for incoming player and player sitting in the lobby
+            log::info!("players present starting a new game");
+            let players = [player.owner, lobby_player.owner];
+            match self.create_game_chain(
+                Amount::from_str("1000.").unwrap(),
+                TimeDelta::from_secs(600),
+                players,
+            ) {
+                Ok(game_d) => self
+                    .send_game_chain_data_2players(game_d, &[player, lobby_player])
+                    .unwrap(), // unwrap for testing
+                Err(_) => todo!(),
+            }
+        } else {
+            // we put the player in lobby.
+            self.state.lobby.get_mut().push(player);
+        }
+    }
+
     /// Method to start a new multi-owner chain for game
     /// Sends a message to newly created chain to start a game with both players
     ///
@@ -178,8 +203,9 @@ impl ChessContract {
                 timer: match_time,
             },
         );
+
         let game_chain = GameChain {
-            chain_id,
+            chain_id: Some(chain_id),
             timestamp,
         };
 
@@ -193,6 +219,7 @@ impl ChessContract {
         game_chain_data: GameChain,
         players: &[Player],
     ) -> Result<()> {
+        log::info!("sending necessary data to the players");
         for p in players.iter() {
             self.runtime.send_message(
                 p.chain_id,
