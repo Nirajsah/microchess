@@ -16,9 +16,9 @@ use chess::{
     InstantiationArgument, Message, MoveType, Operation, PlayerRequest,
 };
 use linera_sdk::{
-    base::{
-        Account, Amount, ApplicationId, ApplicationPermissions, ChainId, ChainOwnership,
-        Destination, Owner, PublicKey, TimeDelta, TimeoutConfig, WithContractAbi,
+    linera_base_types::{
+        Account, AccountOwner, Amount, ApplicationId, ApplicationPermissions, ChainId,
+        ChainOwnership, TimeDelta, TimeoutConfig, WithContractAbi,
     },
     util::BlockingWait,
     views::{RootView, View},
@@ -41,6 +41,7 @@ impl Contract for ChessContract {
     type Message = Message;
     type Parameters = ();
     type InstantiationArgument = InstantiationArgument;
+    type EventValue = ();
 
     async fn load(runtime: ContractRuntime<Self>) -> Self {
         let state = Chess::load(runtime.root_view_storage_context())
@@ -51,9 +52,10 @@ impl Contract for ChessContract {
 
     async fn instantiate(&mut self, argument: Self::InstantiationArgument) {
         self.runtime.application_parameters();
-        //self.state
-        //    .clock
-        //    .set(Clock::new(self.runtime.system_time(), &argument));
+        let timer = argument.start_time;
+        self.state
+            .clock
+            .set(Clock::new(self.runtime.system_time(), timer));
 
         let players_colors = vec![
             (argument.players[0], Color::White),
@@ -102,7 +104,7 @@ impl Contract for ChessContract {
                 let clock = self.state.clock.get_mut();
                 let owner = self.runtime.authenticated_signer().unwrap();
                 let active_player = self.state.board.get().active;
-                let active = self
+                /* let active = self
                     .state
                     .owners
                     .get(&owner)
@@ -115,7 +117,7 @@ impl Contract for ChessContract {
                         active_player, active,
                         "Only the active player can make a move."
                     );
-                }
+                } */
 
                 if piece.starts_with("w")
                     && active_player != Color::White
@@ -146,11 +148,14 @@ impl Contract for ChessContract {
                     Ok(_) => {
                         self.state.board.get_mut().switch_player_turn();
                         let moves = ChessBoard::create_capture_string(&from, &to);
-                        self.state.board.get_mut().create_move_string(active, moves);
+                        self.state
+                            .board
+                            .get_mut()
+                            .create_move_string(Color::White, moves); // need to get the current player who made the move
 
+                        clock.make_move(block_time, active_player);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
-                        clock.make_move(block_time, active_player);
 
                         // check for threefold repetition and 50 Move rule, update the game state
                         if self.state.board.get_mut().check_threefold_repetition()
@@ -176,8 +181,9 @@ impl Contract for ChessContract {
                 self.is_game_over();
 
                 let owner = self.runtime.authenticated_signer().unwrap();
+
                 let active_player = self.state.board.get().active;
-                let active = self
+                /* let active = self
                     .state
                     .owners
                     .get(&owner)
@@ -190,7 +196,7 @@ impl Contract for ChessContract {
                         active_player, active,
                         "Only the active player can make a move."
                     );
-                }
+                } */
 
                 // Early return if the piece is not owned by the active player
                 if piece.starts_with("w") && active_player != Color::White {
@@ -249,9 +255,16 @@ impl Contract for ChessContract {
                 match success {
                     Ok(_) => {
                         self.state.board.get_mut().switch_player_turn();
-                        self.state.board.get_mut().create_move_string(active, to);
+                        self.state
+                            .board
+                            .get_mut()
+                            .create_move_string(Color::White, to); // need to get current player, who made the move
 
                         clock.make_move(block_time, active_player);
+
+                        let clock = self.state.clock.get_mut();
+
+                        log::info!("clock: {:?}, block_time: {:?}", clock, block_time);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
 
@@ -302,7 +315,7 @@ impl Contract for ChessContract {
                 let clock = self.state.clock.get_mut();
                 let owner = self.runtime.authenticated_signer().unwrap();
                 let active_player = self.state.board.get().active;
-                let active = self
+                /* let active = self
                     .state
                     .owners
                     .get(&owner)
@@ -312,7 +325,7 @@ impl Contract for ChessContract {
                 assert_eq!(
                     active_player, active,
                     "Only the active player can make a move."
-                );
+                ); */
 
                 let to_sq = Square::from_str(&to).expect("Invalid square");
                 let promoting_to = Piece::from_str(&promoted_piece).expect("Invalid piece");
@@ -327,7 +340,10 @@ impl Contract for ChessContract {
                 match success {
                     Ok(_) => {
                         self.state.board.get_mut().switch_player_turn();
-                        self.state.board.get_mut().create_move_string(active, to);
+                        self.state
+                            .board
+                            .get_mut()
+                            .create_move_string(Color::White, to);
 
                         clock.make_move(block_time, active_player);
                         self.runtime
@@ -359,7 +375,7 @@ impl Contract for ChessContract {
                 self.is_game_over();
                 let owner = self.runtime.authenticated_signer().unwrap();
                 let active_player = self.state.board.get().active;
-                let active = self
+                /* let active = self
                     .state
                     .owners
                     .get(&owner)
@@ -372,7 +388,7 @@ impl Contract for ChessContract {
                         active_player, active,
                         "Only the active player can make a move."
                     );
-                }
+                } */
 
                 self.handle_winner().await;
 
@@ -509,7 +525,7 @@ impl Contract for ChessContract {
                 }
 
                 // Create the owners and their associated colors
-                let owners = [Owner::from(&players[0]), Owner::from(&players[1])];
+                let owners = [players[0], players[1]];
                 let players_colors = vec![(owners[0], Color::White), (owners[1], Color::Black)];
 
                 // Add players and assign colors
@@ -557,7 +573,11 @@ impl ChessContract {
 
     /// This method is used to send a cross-chain message to the main-chain with playerRequest and
     /// generated hash
-    pub fn request_friendly_match(&mut self, player: PublicKey, timer: TimeDelta) -> ChessResponse {
+    pub fn request_friendly_match(
+        &mut self,
+        player: AccountOwner,
+        timer: TimeDelta,
+    ) -> ChessResponse {
         assert_ne!(self.runtime.chain_id(), self.main_chain_id());
         let points = self.state.stats.get().points;
         let id = FriendId::create_token_id(&player.to_string(), &points)
@@ -582,7 +602,7 @@ impl ChessContract {
     /// (game hash, and public_key)
     pub async fn start_friendly_match(
         &mut self,
-        player: PublicKey,
+        player: AccountOwner,
         hash: FriendId,
     ) -> ChessResponse {
         assert_ne!(self.runtime.chain_id(), self.main_chain_id());
@@ -603,7 +623,7 @@ impl ChessContract {
     }
 
     /// A method to send a request to the main chain to start a new chain with player's public_key
-    pub fn request_game_chain(&mut self, player: PublicKey, timer: TimeDelta, rank: Rank) {
+    pub fn request_game_chain(&mut self, player: AccountOwner, timer: TimeDelta, rank: Rank) {
         assert_ne!(self.runtime.chain_id(), self.main_chain_id());
         let main_chain_id = self.main_chain_id();
         self.runtime.send_message(
@@ -620,7 +640,7 @@ impl ChessContract {
     /// (Todo!) Add the ability to bet on the game, requires optional betting amount
     pub async fn start_game(
         &mut self,
-        players: [PublicKey; 2],
+        players: [AccountOwner; 2],
         amount: Amount,
         match_time: TimeDelta,
     ) -> ChessResponse {
@@ -632,17 +652,14 @@ impl ChessContract {
         );
         let app_id = self.runtime.application_id();
         let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
-        let (message_id, chain_id) = self.runtime.open_chain(ownership, permissions, amount);
+        let chain_id = self.runtime.open_chain(ownership, permissions, amount);
         for public_key in &players {
             self.state
                 .game_chains
                 .get_mut_or_default(public_key)
                 .await
                 .unwrap()
-                .insert(GameChain {
-                    message_id,
-                    chain_id,
-                });
+                .insert(GameChain { chain_id });
         }
         self.runtime.send_message(
             chain_id,
@@ -690,14 +707,14 @@ mod tests {
     use base64::engine::{general_purpose::STANDARD_NO_PAD, Engine as _};
     use chess::{
         piece::{Color, Piece},
-        ChessError, ChessResponse, FriendId, InstantiationArgument, Operation,
+        ChessError, ChessResponse, FriendId, GameState, InstantiationArgument, Operation,
     };
     use env_logger;
     use futures::FutureExt as _;
 
     use linera_sdk::{
-        base::Owner,
         contract::MockContractRuntime,
+        linera_base_types::AccountOwner,
         util::BlockingWait,
         views::{View, ViewStorageContext},
         Contract, ContractRuntime,
@@ -714,12 +731,14 @@ mod tests {
     fn new_game() {
         env_logger::builder().filter_level(LevelFilter::Info).init();
 
-        let owner1 =
-            Owner::from_str("df44403a282330a8b086603516277c014c844a4b418835873aced1132a3adcd5")
-                .unwrap();
-        let owner2 =
-            Owner::from_str("43c319a4eab3747afcd608d32b73a2472fcaee390ec6bed3e694b4908f55772d")
-                .unwrap();
+        let owner1 = AccountOwner::from_str(
+            "0xdf44403a282330a8b086603516277c014c844a4b418835873aced1132a3adcd5",
+        )
+        .unwrap();
+        let owner2 = AccountOwner::from_str(
+            "0x43c319a4eab3747afcd608d32b73a2472fcaee390ec6bed3e694b4908f55772d",
+        )
+        .unwrap();
 
         // Setting Players through InstantiationArgument
         let initial_value = InstantiationArgument {
@@ -957,13 +976,6 @@ mod tests {
             )
         );
 
-        response = resign(&mut app);
-        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::White,
-            "Active player is now White"
-        );
         // black bishop needs to make a capture to get its king out of check(g8 to f6 wbK)
         // Black captures a piece (from f8 bB captures wP a3)
         response = capture_piece(&mut app, "g8", "f6", "bN", "wN");
@@ -975,7 +987,6 @@ mod tests {
         );
 
         let game_data = app.state.board.get();
-
         log::info!(
             "black moved and king is out of check now {:?}",
             app.state.board.get().board.to_fen(
@@ -983,6 +994,14 @@ mod tests {
                 &game_data.halfmove_clock,
                 &game_data.fullmove_count
             )
+        );
+
+        response = resign(&mut app);
+        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
+        assert_eq!(app.state.board.get().state, GameState::Resign);
+        log::info!(
+            "what is the game state after resign: {:?}",
+            app.is_game_over()
         );
     }
 
@@ -1030,7 +1049,7 @@ mod tests {
 
     fn create_and_instantiate_app(
         initial_value: InstantiationArgument,
-        authentic_signer: Owner,
+        authentic_signer: AccountOwner,
     ) -> ChessContract {
         let friend_hash = FriendId::create_token_id(&authentic_signer.to_string(), &100).unwrap();
 

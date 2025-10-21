@@ -6,8 +6,8 @@ use async_graphql::{Enum, InputObject, Request, Response, SimpleObject};
 use chessboard::ChessBoard;
 use lazy_static::lazy_static;
 use linera_sdk::{
-    base::{
-        Amount, ChainId, ContractAbi, MessageId, Owner, PublicKey, ServiceAbi, TimeDelta, Timestamp,
+    linera_base_types::{
+        AccountOwner, Amount, ChainId, ContractAbi, ServiceAbi, TimeDelta, Timestamp,
     },
     ToBcsBytes,
 };
@@ -46,7 +46,7 @@ impl ServiceAbi for ChessAbi {
 #[serde(rename_all = "camelCase")]
 pub struct InstantiationArgument {
     /// The `Owner` controlling player 1 and 2, respectively.
-    pub players: [Owner; 2],
+    pub players: [AccountOwner; 2],
     /// The initial time each player has to think about their turns.
     pub start_time: TimeDelta,
     /// The duration that is added to the clock after each turn.
@@ -102,7 +102,7 @@ pub enum ChessResponse {
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
     NewGame {
-        player: Owner,
+        player: AccountOwner,
     },
     MakeMove {
         from: String,
@@ -129,23 +129,23 @@ pub enum Operation {
     /// Start the game on a temporary chain
     StartGame {
         /// The `Owner` controlling player 1 and 2, respectively.
-        players: [PublicKey; 2],
+        players: [AccountOwner; 2],
         /// A small amount to cover the fees for the game, on the new chain
         amount: Amount,
         /// Game's total time (~15 mins)
         match_time: TimeDelta,
     },
     RequestGame {
-        player: PublicKey,
+        player: AccountOwner,
         timer: TimeDelta,
         rank: Rank,
     },
     FriendlyGame {
-        player: PublicKey,
+        player: AccountOwner,
         timer: TimeDelta,
     },
     StartFriendlyGame {
-        player: PublicKey,
+        player: AccountOwner,
         hash: FriendId,
     },
 }
@@ -158,11 +158,11 @@ pub enum Operation {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Message {
     Start {
-        players: [PublicKey; 2],
+        players: [AccountOwner; 2],
         timer: TimeDelta,
     },
     StartGame {
-        player: PublicKey,
+        player: AccountOwner,
         timer: TimeDelta,
         rank: Rank,
     },
@@ -176,7 +176,7 @@ pub enum Message {
     Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 pub struct PlayerRequest {
-    pub player: PublicKey,
+    pub player: AccountOwner,
     pub timer: TimeDelta,
     pub rank: Rank,
 }
@@ -185,7 +185,7 @@ pub struct PlayerRequest {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject)]
 pub struct GameChain {
     /// The ID of the `OpenChain` message that created the chain.
-    pub message_id: MessageId,
+    // pub message_id: MessageId, // Not needed anymore.
     /// The ID of the temporary game chain itself.
     pub chain_id: ChainId,
 }
@@ -255,7 +255,7 @@ impl Clock {
             time_left: [timer, timer],
             // increment: arg.increment, // todo!(increment is not required at the moment)
             current_turn_start: block_time,
-            block_delay: TimeDelta::from_micros(100000000),
+            block_delay: TimeDelta::from_secs(5),
         }
     }
 
