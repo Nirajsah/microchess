@@ -7,7 +7,7 @@ import { RightSideMenu } from './RightSideMenu'
 import { fen_to_board } from 'wasm'
 import ChessBoard from './ChessBoard'
 import Modal from '../Modal'
-import Settings from '../Settings'
+import Settings from '../Themes'
 import Navbar from './Navbar'
 import { LeftSideMenu } from '../LeftSideMenu'
 
@@ -128,7 +128,7 @@ const CBoard = () => {
           <div className="w-full lg:w-[20%]">
             <RightSideMenu
               checkStatus={board.KingInCheck}
-              player={player}
+              player={null}
               color={color}
               opponentId={opponentId}
               capturedPieces={capturedPieces}

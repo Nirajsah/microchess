@@ -13,6 +13,7 @@ import { Color } from './types'
 import { UserPlus, Shuffle, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { startGame } from './utils'
 
 export interface MatchData {
   player: string | null
@@ -277,9 +278,11 @@ type MatchMakingButtonType = {
 
 const MatchButton = (props: MatchMakingButtonType) => {
   const [pressed, setPressed] = useState(false)
+  const player = ""
 
   function handleClick() {
     setPressed(true)
+    startGame(player)
     setTimeout(() => setPressed(false), 120) // revert after 120ms
   }
 

@@ -101,8 +101,9 @@ export default function ChessBoard(props: BoardProps) {
       ref={boardRef}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      className={`relative w-full aspect-square max-w-[720px] max-h-[720px] rounded-md shadow-md overflow-hidden ${draggingPiece ? 'cursor-grabbing' : 'cursor-default'
-        }`}
+      className={`relative w-full aspect-square max-w-[720px] max-h-[720px] rounded-md shadow-md overflow-hidden ${
+        draggingPiece ? 'cursor-grabbing' : 'cursor-default'
+      }`}
     >
       {/* Custom Drag Layer for smooth piece following */}
       <CustomDragLayer
@@ -124,10 +125,10 @@ export default function ChessBoard(props: BoardProps) {
               selectedSquare === square
                 ? selectedTheme.selectedSquare
                 : possMoves.includes(square as Square) && piece
-                  ? 'bg-red-400'
-                  : number % 2 === 0
-                    ? selectedTheme.dark
-                    : selectedTheme.light
+                ? 'bg-red-400'
+                : number % 2 === 0
+                ? selectedTheme.dark
+                : selectedTheme.light
 
             return (
               <div>

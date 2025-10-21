@@ -19,7 +19,8 @@ const ThemePreviewGrid: React.FC<ThemePreviewProps> = ({
   )
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+    // <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+    <div className="flex flex-wrap gap-4">
       {Object.entries(themes).map(([name, { light, dark }]) => (
         <button
           key={name}
