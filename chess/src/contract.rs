@@ -7,7 +7,9 @@ use std::str::FromStr;
 
 use crate::state::ChessState;
 
-use chess::{ChessResponse, Clock, GameChain, InstantiationArgument, Message, Operation, Player};
+use chess::{
+    ChessResponse, Clock, GameChain, GameWrapper, InstantiationArgument, Message, Operation, Player,
+};
 use chess_lib::{game::game::GameState, Result};
 use linera_sdk::{
     abi::WithContractAbi,
@@ -68,10 +70,21 @@ impl Contract for ChessContract {
             }
 
             Operation::MakeMove { from, to, piece } => {
+                assert_ne!(self.runtime.chain_id(), self.app_chain());
                 let active_player = self.state.board.get().active_player;
-
                 let clock = self.state.clock.get_mut();
                 let block_time = self.runtime.system_time();
+
+                assert_eq!(
+                    self.runtime.authenticated_signer(),
+                    Some(self.state.board.get().players[active_player.index()].unwrap()),
+                    "Only active player can make a move"
+                );
+
+                assert!(
+                    !clock.timed_out(block_time, active_player),
+                    "Player ran out of time."
+                );
 
                 match self
                     .state
@@ -81,10 +94,6 @@ impl Contract for ChessContract {
                 {
                     Ok(_) => {
                         clock.make_move(block_time, active_player);
-
-                        let clock = self.state.clock.get_mut();
-
-                        log::info!("clock: {:?}, block_time: {:?}", clock, block_time);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
 
@@ -99,10 +108,21 @@ impl Contract for ChessContract {
                 piece,
                 promoted_piece,
             } => {
-                let block_time = self.runtime.system_time();
-
-                let clock = self.state.clock.get_mut();
+                assert_ne!(self.runtime.chain_id(), self.app_chain());
                 let active_player = self.state.board.get().active_player;
+                let block_time = self.runtime.system_time();
+                let clock = self.state.clock.get_mut();
+
+                assert_eq!(
+                    self.runtime.authenticated_signer(),
+                    Some(self.state.board.get().players[active_player.index()].unwrap()),
+                    "Only active player can make a move"
+                );
+
+                assert!(
+                    !clock.timed_out(block_time, active_player),
+                    "Player ran out of time."
+                );
 
                 match self
                     .state
@@ -145,11 +165,13 @@ impl ChessContract {
 
     /// Starting a game on a chain
     pub fn start_new_game(&mut self, players: [AccountOwner; 2], timer: TimeDelta) {
-        for p in players {
-            self.state.players.get_mut().push(p);
-        }
+        self.state
+            .clock
+            .set(Clock::new(self.runtime.system_time(), timer));
 
-        todo!()
+        let game = self.state.board.get().new(players[0], players[1]);
+
+        self.state.board.set(game);
     }
 
     /// Only App chain has the right to create a new game.
@@ -161,7 +183,7 @@ impl ChessContract {
             log::info!("players present starting a new game");
             let players = [player.owner, lobby_player.owner];
             match self.create_game_chain(
-                Amount::from_str("1000.").unwrap(),
+                Amount::from_str("10.").unwrap(),
                 TimeDelta::from_secs(600),
                 players,
             ) {
@@ -291,49 +313,7 @@ impl ChessContract {
             },
         );
     }
-
-    /// Start a new game on new chain, requires two players and the amount to cover the chain fees
-    /// (Todo!) Add the ability to bet on the game, requires optional betting amount
-    pub async fn start_game(
-        &mut self,
-        players: [AccountOwner; 2],
-        amount: Amount,
-        match_time: TimeDelta,
-    ) -> ChessResponse {
-        assert_eq!(self.runtime.chain_id(), self.main_chain_id());
-        let ownership = ChainOwnership::multiple(
-            [(players[0], 100), (players[1], 100)],
-            100,
-            TimeoutConfig::default(),
-        );
-        let app_id = self.runtime.application_id();
-        let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
-        let chain_id = self.runtime.open_chain(ownership, permissions, amount);
-        for public_key in &players {
-            self.state
-                .game_chains
-                .get_mut_or_default(public_key)
-                .await
-                .unwrap()
-                .insert(GameChain { chain_id });
-        }
-        self.runtime.send_message(
-            chain_id,
-            Message::Start {
-                players,
-                timer: match_time,
-            },
-        );
-
-        log::info!("Game chain_id: {:?}", chain_id);
-
-        ChessResponse::Ok
     } */
-
-    /// Returns creator chain_id
-    pub fn main_chain_id(&mut self) -> ChainId {
-        self.runtime.application_creator_chain_id()
-    }
 
     // Handles the winner stats, when a match is over, this function is called to update the
     // leaderboard.
@@ -347,10 +327,9 @@ impl ChessContract {
     //    self.state.add_player_leaderboard(winner);
     //}
 
-    /// Handles the winner of the game, when a match is over
-    pub async fn handle_winner(&mut self) {
-        // self.send_reward_nft().await;
-        // if players were betting on the game. send the amount to the winner(Todo!)
-        // it will require punk records
+    /// Handles the winner of the game
+    pub fn handle_winner(&mut self) {
+        let winner = self.state.board.get().winner;
+        self.state.board.get_mut().winner = winner;
     }
 }
