@@ -1,0 +1,6 @@
+[target.wasm32-unknown-unknown]
+rustflags = [
+    "-C", "opt-level=3",
+    "-C", "lto=fat",
+    "-C", "embed-bitcode=yes",
+]
