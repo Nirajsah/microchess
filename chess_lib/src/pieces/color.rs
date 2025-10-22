@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
@@ -8,6 +8,16 @@ pub enum Color {
     #[default]
     White = 0,
     Black = 1,
+}
+
+impl Display for Color {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let c = match self {
+            Color::White => "White",
+            Color::Black => "Black",
+        };
+        write!(f, "{}", c)
+    }
 }
 
 impl Color {

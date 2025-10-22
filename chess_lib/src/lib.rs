@@ -33,6 +33,8 @@ pub enum ChessError {
     Checkmate,
     #[error("Stalemate")]
     Stalemate,
+    #[error("Game is over")]
+    GameOver,
 }
 
 pub type Result<T> = std::result::Result<T, ChessError>;

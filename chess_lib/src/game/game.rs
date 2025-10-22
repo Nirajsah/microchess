@@ -1,4 +1,7 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::{
+    fmt::Display,
+    hash::{DefaultHasher, Hash, Hasher},
+};
 
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -18,11 +21,12 @@ pub struct Game {
     pub active_player: Color,
     /// Moves Table
     pub moves: Vec<CompleteMove>,
+    /// Game State
+    pub state: GameState,
+    pub winner: Option<Color>,
     /*
     /// Captured Pieces Table
     pub captured_pieces: Vec<Piece>,
-    /// Game State
-    pub state: GameState,
     /// current zobrist hashing
     pub current_hash: u64,
     /// position_count
@@ -42,6 +46,18 @@ pub enum GameState {
     Checkmate,
     Stalemate,
     Resign,
+}
+
+impl Display for GameState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let g = match self {
+            GameState::Ongoing => "OnGoing",
+            GameState::Checkmate => "Checkmate",
+            GameState::Stalemate => "Stalemate",
+            GameState::Resign => "Resign",
+        };
+        write!(f, "{}", g)
+    }
 }
 
 type PieceFn = fn(&mut ChessBoard, MoveData) -> Result<()>;
@@ -64,9 +80,11 @@ impl Game {
         let mut game = Game {
             board: ChessBoard::new(),
             active_player: Color::White,
+            state: GameState::Ongoing,
             halfmove_clock: 0,
             fullmove_number: 1,
             moves: vec![],
+            winner: None,
         };
         game.game_state();
 
@@ -77,9 +95,11 @@ impl Game {
         Game {
             board: ChessBoard::default(),
             active_player: Color::default(),
+            state: GameState::Ongoing,
             halfmove_clock: 0,
             fullmove_number: 1,
             moves: vec![],
+            winner: None,
         }
     }
 
@@ -179,7 +199,7 @@ impl Game {
     /// A function to generate FEN string using bitboard
     /// `TODO`(Should use halfmove_clock and fullmove_number from self)
     #[inline]
-    pub fn to_fen(&self, halfmove_clock: u8, fullmove_number: u8) -> String {
+    pub fn to_fen(&self) -> String {
         let bitboards = self.board.bitboards;
 
         let pieces = ['P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'];
@@ -261,11 +281,11 @@ impl Game {
 
         fen.push(' '); // just to have a whitespace
 
-        fen.push_str(&halfmove_clock.to_string());
+        fen.push_str(&self.halfmove_clock.to_string());
 
         fen.push(' '); // just to have a whitespace
 
-        fen.push_str(&fullmove_number.to_string());
+        fen.push_str(&self.fullmove_number.to_string());
 
         fen
     }
@@ -363,6 +383,10 @@ impl Game {
         piece: String,
         promoted_to: Option<String>,
     ) -> Result<CompleteMove> {
+        if self.state != GameState::Ongoing {
+            return Err(ChessError::GameOver);
+        }
+
         let mv = MoveData::new(from, to, piece, promoted_to, &self.board);
 
         if self.active_player != mv.piece.color() {
@@ -396,7 +420,7 @@ impl Game {
                 self.turn_change();
 
                 self.moves.push(save_mv);
-                self.game_state();
+                self.state = self.game_state();
 
                 Ok(save_mv)
             }
@@ -601,6 +625,7 @@ impl Game {
         let color = self.active_player;
 
         if self.board.king_in_check(color) {
+            self.winner = Some(color.opposite());
             return GameState::Checkmate;
         } else if !self.has_legal_moves() {
             return GameState::Stalemate;

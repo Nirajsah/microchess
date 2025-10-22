@@ -6,12 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:wasm": "cd wasm && bash build.bash --release",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "compile": "graphql-codegen",
     "watch": "graphql-codegen -w",
-    "tailwind": "bunx tailwindcss -i ./src/input.css -o ./src/index.css --watch",
-    "build:wasm": "wasm-pack build wasm"
+    "tailwind": "pnpm tailwindcss -i ./src/input.css -o ./src/index.css --watch"
   },
   "dependencies": {
     "@apollo/client": "^3.10.5",
