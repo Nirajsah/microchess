@@ -1,5 +1,5 @@
 use async_graphql::{ComplexObject, SimpleObject};
-use chess::{Clock, GameChain, GameWrapper, Player};
+use chess::{Clock, GameChain, GameWrapper, Player, Players};
 use linera_sdk::{
     linera_base_types::AccountOwner,
     views::{
@@ -20,9 +20,11 @@ pub struct ChessState {
     /// Holds Newly created game chain
     pub game_chain: RegisterView<GameChain>,
     /// Lobby to hold players for potential match
-    pub lobby: RegisterView<Vec<Player>>,
-    /// The current game players
-    pub players: RegisterView<Vec<AccountOwner>>,
+    pub lobby: RegisterView<Vec<Player>>, // will be updated to include ranks.
+    // The current game players
+    // pub players: RegisterView<Option<Players>>,
+    /// Flag
+    pub game_flag: RegisterView<bool>,
     /*
     /// Player Requesting to play with a Friend(need a hash)
     pub friend_lobby: MapView<FriendId, PlayerRequest>,

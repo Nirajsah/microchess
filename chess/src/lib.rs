@@ -1,18 +1,15 @@
 #![allow(non_snake_case)]
 
-use std::{
-    ops::{Deref, DerefMut},
-    str::FromStr,
-};
+use std::ops::{Deref, DerefMut};
 
-use async_graphql::{ComplexObject, InputObject, Object, Request, Response, SimpleObject};
+use async_graphql::{Enum, InputObject, Request, Response, SimpleObject};
 use chess_lib::{game::game::Game, pieces::Color, ChessError, Result};
 use serde::{Deserialize, Serialize};
 pub struct ChessAbi;
 use linera_sdk::{
     abi::{ContractAbi, ServiceAbi},
     graphql::GraphQLMutationRoot,
-    linera_base_types::{AccountOwner, ChainDescription, ChainId, TimeDelta, Timestamp},
+    linera_base_types::{AccountOwner, ChainId, TimeDelta, Timestamp},
     ToBcsBytes,
 };
 
@@ -165,19 +162,35 @@ pub struct Player {
     pub chain_id: ChainId,
 }
 
+/* #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
+pub struct Players {
+
+}; */
+
 #[derive(Clone, Default, Serialize, Deserialize, SimpleObject)]
 pub struct GameWrapper {
     pub initalized: bool,
     #[graphql(skip)]
     inner: Game,
+    pub players: [Option<AccountOwner>; 2],
+    pub winner: Option<AccountOwner>,
 }
 
 impl GameWrapper {
-    pub fn new(&self) -> Self {
+    pub fn new(&self, white: AccountOwner, black: AccountOwner) -> Self {
         Self {
             inner: Game::new(),
             initalized: true,
+            players: [Some(white), Some(black)],
+            winner: None,
         }
+    }
+
+    pub fn get_color_by_account(&self, account: &AccountOwner) -> Option<Color> {
+        self.players
+            .iter()
+            .position(|p| p.as_ref() == Some(account))
+            .map(|i| if i == 0 { Color::White } else { Color::Black })
     }
 }
 
@@ -209,7 +222,7 @@ pub struct GameChain {
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
-pub struct PlayerTime {
+pub struct PlayersTime {
     pub white: TimeDelta,
     pub black: TimeDelta,
 }
@@ -242,15 +255,18 @@ impl Clock {
     }
 
     /// Returns the time left for a given player.
-    pub fn time_left_for_player(&self) -> PlayerTime {
-        PlayerTime {
+    pub fn time_left_for_players(&self) -> PlayersTime {
+        PlayersTime {
             white: self.time_left[Color::White.index()],
             black: self.time_left[Color::Black.index()],
         }
     }
 
     /// Returns whether the given player has timed out.
+    #[inline]
     pub fn timed_out(&self, block_time: Timestamp, player: Color) -> bool {
-        self.time_left[player.index()] < block_time.delta_since(self.current_turn_start)
+        let elapsed = block_time.delta_since(self.current_turn_start);
+        let t = self.time_left[player.index()].saturating_sub(elapsed);
+        t.eq(&TimeDelta::ZERO)
     }
 }
