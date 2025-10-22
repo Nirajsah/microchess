@@ -2,10 +2,10 @@ import React, { useRef, useState } from 'react'
 import { BoardType, Piece, Square } from './types'
 import ChessTile from './ChessTile'
 import CustomDragLayer from './CustomDragLayer'
-import { generate_possible_moves } from 'wasm'
 import { useMicroChess } from '@/context/MicroChessProvider'
 import { ThemeName, themes } from './theme'
 import { makeMove } from './utils'
+import { useChessWasm } from '@/hooks/useWasm'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
@@ -24,6 +24,8 @@ export default function ChessBoard(props: BoardProps) {
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null)
   const [possMoves, setPossMoves] = React.useState<Square[]>([])
 
+  const { generateMoves } = useChessWasm()
+
   const isBlack = false
 
   function handleMouseDown(_e: React.MouseEvent, piece: Piece, square: Square) {
@@ -33,14 +35,7 @@ export default function ChessBoard(props: BoardProps) {
 
     window.addEventListener('mousemove', handleMouseMove)
 
-    const mv = generate_possible_moves(
-      piece,
-      square,
-      board,
-      true,
-      true,
-      'd5' as Piece
-    )
+    const mv = generateMoves(square)
     setPossMoves(mv as Square[])
   }
 
@@ -131,9 +126,8 @@ export default function ChessBoard(props: BoardProps) {
                 : selectedTheme.light
 
             return (
-              <div>
+              <div key={square}>
                 <ChessTile
-                  key={square}
                   background={bg}
                   piece={piece}
                   isDragging={square === selectedSquare}

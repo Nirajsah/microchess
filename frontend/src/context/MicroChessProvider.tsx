@@ -48,7 +48,6 @@ export default function MicroChessProvider({
 // exportiong a hook to use the context
 export const useMicroChess = (): MicroChessContextType => {
   const microChessContext = React.useContext(MicroChessContext)
-  console.log('getting', microChessContext)
   if (!microChessContext) {
     throw new Error('useMicroChess must be used within a MicroChessProvider')
   }

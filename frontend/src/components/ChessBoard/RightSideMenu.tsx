@@ -9,18 +9,18 @@ import {
 } from 'lucide-react'
 import CapturedPieces from './CapturedPieces'
 import Timer from './Timer'
-import { Color } from './types'
+import { Color, PieceColor } from './types'
 import { UserPlus, Shuffle, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { startGame } from './utils'
 
 export interface MatchData {
-  player: string | null
+  player: PieceColor | '-'
   color: Color
   moves: { white: string; black: string }[]
   capturedPieces: string[]
-  checkStatus: string | null
+  checkStatus: string
   opponentId: string | null
   whiteTime: number
   blackTime: number
@@ -97,13 +97,13 @@ const MatchDataUI = (data: MatchData) => {
           />
         </div>
       </div>
-      {checkStatus !== null && checkStatus === 'wK' && (
+      {checkStatus && player === 'w' && (
         <div className="flex items-center p-2 rounded-md bg-yellow-100 text-yellow-800">
           <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
           <span className="text-sm">White King In Check</span>
         </div>
       )}
-      {checkStatus !== null && checkStatus === 'bK' && (
+      {checkStatus && player === 'b' && (
         <div className="flex items-center p-2 rounded-md bg-yellow-100 text-yellow-800">
           <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
           <span className="text-sm">Black King In Check</span>
@@ -278,7 +278,7 @@ type MatchMakingButtonType = {
 
 const MatchButton = (props: MatchMakingButtonType) => {
   const [pressed, setPressed] = useState(false)
-  const player = ""
+  const player = '0xCE749ceb398453f4c37F99c8fCdd8A79C871E992'
 
   function handleClick() {
     setPressed(true)
