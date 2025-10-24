@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use chess::{GameChain, Operation};
-use chess_lib::{game::game::GameState, pieces::Color};
 use linera_sdk::{
     abi::WithServiceAbi, graphql::GraphQLMutationRoot, linera_base_types::AccountOwner,
     views::View, Service, ServiceRuntime,
@@ -83,6 +82,9 @@ impl ChessService {
         self.state.game_chain.get()
     }
 
+    async fn is_game_chain(&self) -> bool {
+        *self.state.game_flag.get()
+    }
     /*
     async fn captured_pieces(&self) -> &Vec<Piece> {
         &self.state.board.get().captured_pieces

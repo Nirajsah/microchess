@@ -1,7 +1,6 @@
 use async_graphql::{ComplexObject, SimpleObject};
-use chess::{Clock, GameChain, GameWrapper, Player, Players};
+use chess::{Clock, GameChain, GameWrapper, Player};
 use linera_sdk::{
-    linera_base_types::AccountOwner,
     views::{
         linera_views::{self},
         RegisterView, RootView,
@@ -40,11 +39,7 @@ pub struct ChessState {
 }
 
 #[ComplexObject]
-impl ChessState {
-    async fn get_fen(&self) -> String {
-        todo!()
-    }
-}
+impl ChessState {}
 /* impl Chess {
 /// A function to get all the players
 pub fn get_players(&self) -> &Vec<Owner> {

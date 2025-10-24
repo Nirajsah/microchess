@@ -16,6 +16,7 @@ sha3 = "0.10.8"
 bcs = "0.1.6"
 base64 = "0.22.1"
 chess_lib = { path = "../chess_lib" }
+tracing = "0.1.40"
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

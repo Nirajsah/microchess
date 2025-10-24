@@ -170,6 +170,7 @@ impl ChessContract {
             .set(Clock::new(self.runtime.system_time(), timer));
 
         let game = self.state.board.get().new(players[0], players[1]);
+        self.state.game_flag.set(true);
 
         self.state.board.set(game);
     }
@@ -184,7 +185,7 @@ impl ChessContract {
             let players = [player.owner, lobby_player.owner];
             match self.create_game_chain(
                 Amount::from_str("10.").unwrap(),
-                TimeDelta::from_secs(600),
+                TimeDelta::from_secs(1800),
                 players,
             ) {
                 Ok(game_d) => self
