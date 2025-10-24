@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import Ranks from './Ranks'
 import Files from './Files'
 import { PromotionCard } from './PromotionCard'
@@ -19,21 +19,27 @@ import Navbar from './Navbar'
 import { LeftSideMenu } from '../LeftSideMenu'
 import { useWalletNotifications } from '@/hooks/useWalletNotification'
 import { useChessWasm } from '@/hooks/useWasm'
-import { gameData } from './utils'
+import { gameData, getGameChainInfo, isGameChain } from './utils'
+import { useMicroChess } from '@/context/MicroChessProvider'
 
 const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 // const fen = 'bnrqnbkr/pppppppp/5K2/8/8/8/PPPPPPPP/BNRQNB1R w - - 0 1'
 
 const CBoard = () => {
   const [boardState, _setBoardState] = React.useState<Fen>(fen)
-  const [color, _setColor] = React.useState<Color>('w')
   const [capturedPieces, _setCapturedPieces] = React.useState<string[]>([])
   const [opponentId, _setOpponentId] = React.useState<string | null>(null)
   const [whiteTime, _setWhiteTime] = React.useState(900) // 15 minutes
   const [blackTime, _setBlackTime] = React.useState(900) // 15 minutes
 
-  const { initBoard, isInitialized } = useChessWasm()
+  const [_isGameChain, _setIsGameChain] = React.useState<boolean | null>(null) // null = not checked yet
+  const [_assign, setAssign] = React.useState<{
+    chainId: string
+    timestamp: number
+  } | null>(null)
 
+  const { initBoard, isInitialized } = useChessWasm()
+  const { userKey } = useMicroChess()
   const notification = useWalletNotifications()
 
   const [board, setBoard] = React.useState<BoardType>({
@@ -44,21 +50,79 @@ const CBoard = () => {
     color: '',
     game_state: '',
     opponent: '',
-    winner: null
+    winner: null,
   })
 
-  // Separate function to fetch and update board state
+  // Step 1: Check if it's a game chain on mount
+  useEffect(() => {
+    const checkGameChain = async () => {
+      try {
+        const res = await isGameChain()
+        const check = JSON.parse(res.result).data.isGameChain
+        _setIsGameChain(check)
+      } catch (err) {
+        console.error('Error checking game chain:', err)
+      }
+    }
+
+    checkGameChain()
+  }, []) // Only run once on mount
+
+  // Step 2: If not a game chain, fetch chain info
+  useEffect(() => {
+    const fetchChainInfo = async () => {
+      try {
+        const res = await getGameChainInfo()
+        const gameChain = JSON.parse(res.result).data.gameChain
+        console.log('Got chain info:', gameChain)
+        setAssign(gameChain)
+      } catch (err) {
+        console.error('Error fetching chain info:', err)
+      }
+    }
+
+    // Only fetch if we know it's NOT a game chain
+    if (_isGameChain === false && !_assign) {
+      fetchChainInfo()
+    }
+  }, [_isGameChain, _assign])
+
+  // Step 3: After chain is assigned, re-check if it's now a game chain
+  useEffect(() => {
+    const recheckGameChain = async () => {
+      try {
+        const res = await isGameChain()
+        const check = JSON.parse(res.result).data.isGameChain
+        console.log('Rechecking game chain after assignment:', check)
+        _setIsGameChain(check)
+      } catch (err) {
+        console.error('Error rechecking game chain:', err)
+      }
+    }
+
+    // After assignment, recheck the chain status
+    if (_assign && _isGameChain === false) {
+      recheckGameChain()
+    }
+  }, []) // Run when assign changes
+
+  // Step 4: Fetch game data function
   const fetchAndUpdateBoard = React.useCallback(async () => {
-    if (!isInitialized) return
+    if (!isInitialized || _isGameChain !== true) {
+      console.log('Conditions not met for fetch:', {
+        isInitialized,
+        isGameChain,
+      })
+      return
+    }
 
     try {
-      const res = await gameData()
-      const data = JSON.parse(res.result).data.getFen
-      console.log('Fetched data from chain:', data)
+      const res = await gameData(userKey)
+      if (!res || !res.result) {
+        throw new Error('No response from API')
+      }
 
-      // Parse the game data (fen, color, opponent, game_state, winner)
-      _setBoardState(data.fen)
-
+      const data = JSON.parse(res.result).data.gameData
       const boardData = initBoard(data.fen)
 
       if (boardData) {
@@ -68,61 +132,63 @@ const CBoard = () => {
           en_passant: boardData.en_passant,
           player_turn: boardData.player_turn as PieceColor,
           color: data.color,
-          game_state: data.game_state,
+          game_state: data.gameState,
           opponent: data.opponent,
-          winner: data.winner
+          winner: data.winner,
         })
-      } else {
-        // If boardData is null/undefined, use defaults from initial state
-        console.log('Using default board state')
       }
     } catch (error) {
       console.error('Error fetching game ', error)
-      // On error, keep using default/current state
-      // Optionally initialize with default board if needed
-      const defaultBoardData = initBoard(boardState)
-      if (defaultBoardData) {
-        setBoard(prev => ({
-          ...prev,
-          position: defaultBoardData.position,
-          KingInCheck: defaultBoardData.king_in_check,
-          en_passant: defaultBoardData.en_passant,
-          player_turn: defaultBoardData.player_turn as PieceColor,
-        }))
-      }
     }
-  }, [isInitialized, initBoard, _setBoardState])
+  }, [isInitialized, _isGameChain, userKey, initBoard])
 
-  // Initial fetch on mount
+  // Step 5: Initialize with default board and fetch when conditions are met
   React.useEffect(() => {
-    fetchAndUpdateBoard()
-  }, [fetchAndUpdateBoard])
+    // Always set default board on mount
+    const defaultFen =
+      'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    const defaultBoardData = initBoard(defaultFen)
 
-  // Listen for notifications and refetch
+    if (defaultBoardData) {
+      setBoard({
+        position: defaultBoardData.position,
+        KingInCheck: defaultBoardData.king_in_check,
+        en_passant: defaultBoardData.en_passant,
+        player_turn: defaultBoardData.player_turn as PieceColor,
+        color: 'white',
+        game_state: 'active',
+        opponent: '',
+        winner: null,
+      })
+    }
 
-  React.useEffect(() => {
-    if (notification) {
-      console.log('New notification received:', notification)
-      // Refetch game data when notification arrives
+    // Fetch actual data only when initialized AND confirmed game chain
+    if (isInitialized && _isGameChain === true) {
       fetchAndUpdateBoard()
     }
-  }, [notification, fetchAndUpdateBoard])
+  }, [isInitialized, _isGameChain, fetchAndUpdateBoard])
+
+  // Step 6: Handle notifications
+  React.useEffect(() => {
+    if (notification && _isGameChain === true) {
+      console.log('New notification received:', notification)
+      fetchAndUpdateBoard()
+    }
+  }, [notification, _isGameChain, fetchAndUpdateBoard])
 
   const [moves, _setMoves] = React.useState<
     Array<{ white: string; black: string }>
   >([])
 
   const renderSquare = () => {
-    // const _isBlack = color.toLowerCase() === 'b'
-
     return (
       <div className="w-full chess-board">
         <div className="h-[12.5%] z-50 absolute text-black">
-          <Ranks color={color as Color} />
+          <Ranks color={board.color as Color} />
         </div>
         <ChessBoard boardData={board} />
         <div className="flex text-black">
-          <Files color={color as Color} />
+          <Files color={board.color as Color} />
         </div>
       </div>
     )
@@ -135,19 +201,6 @@ const CBoard = () => {
     piece: '' as Piece,
     show: false,
   })
-
-  /* const appBackgrounds = {
-    classicWood: '#f5f5dc', // Beige
-    modernMinimalist: '#e0e0e0', // Light Silver
-    forest: '#2e7d3217', // Dark Forest Green
-    oceanBreeze: '#e0f7fa', // Light Cyan
-    mutedPastel: '#fce4ec', // Soft Pink
-    nightMode: '#121212', // Deep Charcoal
-    desertSand: '#f4a460', // Sandy Brown
-    softViolet: '#f8bbd0', // Light Pink
-    default: '#ffebe84a',
-    dark: '#151515',
-  } */
 
   return (
     <div className="w-full min-h-full relative bg-[#0a0a0a]">
@@ -188,12 +241,13 @@ const CBoard = () => {
             <RightSideMenu
               checkStatus={board.KingInCheck}
               player={board.player_turn || '-'} // Pass player info
-              color={color}
+              color={board.color as Color}
               opponentId={opponentId}
               capturedPieces={capturedPieces}
               moves={moves}
               whiteTime={whiteTime}
               blackTime={blackTime}
+              assign={_assign}
             />
           </div>
         </div>
