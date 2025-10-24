@@ -2,7 +2,8 @@ import { Piece, Square } from './types'
 
 function request(query: string): Promise<any> {
   let APP_ID =
-    'f8b151c115ec1f363ebf2d607fd2b1842906f23de2948ae8fcfb81fdef9c078e'
+    'eacf2c6dac6ed8a3a0b00dbc471119b1b18fe30bebd8671800e305ce24316272'
+
   if (!window.linera) throw new Error('Linera extension not found.')
 
   return window.linera.request({
@@ -12,19 +13,38 @@ function request(query: string): Promise<any> {
   })
 }
 
-export function makeMove(from: Square, to: Square, piece: Piece) {
-  let query = `{ "query": "mutation { makeMove(from: ${from}, to: ${to}, piece: ${piece}) }" }`
-  request(query).then((res) => res)
+export function gameData(player: string): Promise<any> {
+  const escapedPlayer = player.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+
+  const query = `query {
+    gameData(player: "${escapedPlayer}") {
+      fen
+      color
+      opponent
+      gameState
+      winner
+    }
+  }`
+  const gqlQuery = buildGraphQLQuery(query)
+  return request(gqlQuery)
+}
+
+export function makeMove(from: string, to: string, piece: string) {
+  console.log(from, to, piece)
+  const mutation = `mutation { makeMove(from: "${from}", to: "${to}", piece: "${piece}") }`
+  const gqlQuery = JSON.stringify({ query: mutation })
+  request(gqlQuery).then((res) => console.log(res))
 }
 
 export function promotePiece(
-  from: Square,
-  to: Square,
-  piece: Piece,
-  promoted_to: Piece
+  from: Square | string,
+  to: Square | string,
+  piece: Piece | string,
+  promoted_to: Piece | string
 ) {
-  let query = `{ "query": "mutation { promotePiece(from: ${from}, to: ${to}, piece: ${piece}, promoted_to: ${promoted_to}) }" }`
-  request(query)
+  const mutation = `mutation { promotePiece(from: "${from}", to: "${to}", piece: "${piece}", promoted_to: "${promoted_to}") }`
+  const query = buildGraphQLQuery(mutation)
+  request(query).then((res) => console.log(res))
 }
 
 function buildGraphQLQuery(queryBody: string): string {
@@ -39,14 +59,13 @@ function buildGraphQLQuery(queryBody: string): string {
 // Start a new game
 export function startGame(player: string) {
   const escapedPlayer = player.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-  storage.setPublicKey(player)
   const mutation = `mutation { newGame(player: "${escapedPlayer}") }`
   let query = buildGraphQLQuery(mutation)
-  request(query)
+  request(query).then((res) => console.log(res))
 }
 
 // Ask the wallet to assign the wallet with new chain
-export function assign(chainId: string, timestamp: string) {
+export function assignChain(chainId: string, timestamp: number) {
   ;(async () => {
     await window.linera?.request({
       type: 'ASSIGNMENT',
@@ -56,23 +75,21 @@ export function assign(chainId: string, timestamp: string) {
   })()
 }
 
+export function isGameChain() {
+  return request(`{ "query": "query { isGameChain }" }`)
+}
+
 export function getGameChainInfo() {
   return request(`{ "query": "query { gameChain { chainId timestamp } }" }`)
 }
 
-export function gameData() {
-  return request(`{ "query": "query { getFen }" }`)
-}
-
-
-
 export const storage = {
-  getTheme: () => localStorage.getItem("chess.theme"),
-  setTheme: (id: string) => localStorage.setItem("chess.theme", id),
+  getTheme: () => localStorage.getItem('chess.theme'),
+  setTheme: (id: string) => localStorage.setItem('chess.theme', id),
 
-  getPublicKey: () => localStorage.getItem("chess.public_key"),
-  setPublicKey: (key: string) => localStorage.setItem("chess.public_key", key),
+  getPublicKey: () => localStorage.getItem('chess.public_key'),
+  setPublicKey: (key: string) => localStorage.setItem('chess.public_key', key),
 
-  getSessionId: () => sessionStorage.getItem("chess.session_id"),
-  setSessionId: (id: string) => sessionStorage.setItem("chess.session_id", id),
-};
+  getSessionId: () => sessionStorage.getItem('chess.session_id'),
+  setSessionId: (id: string) => sessionStorage.setItem('chess.session_id', id),
+}

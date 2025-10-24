@@ -6,7 +6,6 @@ export type PromoteData = {
   show: boolean
 }
 
-
 // #[derive(Deserialize, Serialize, SimpleObject)]
 // struct GameData {
 //     fen: String,            // FEN
@@ -15,15 +14,15 @@ export type PromoteData = {
 //     game_state: String,     // State of the Game, Play, StaleMate or CheckMate
 //     winner: Option<AccountOwner>,
 // }
- 
+
 export type BoardType = {
   position: SquareToPieceMap
   KingInCheck: string
   en_passant: string | null
   player_turn?: PieceColor
-  color: string,
-  opponent: string,
-  game_state: string,
+  color: string
+  opponent: string
+  game_state: string
   winner: string | null
 }
 
@@ -67,7 +66,7 @@ export type Piece =
   | 'bQ'
   | 'bK'
 
-export type Color = 'w' | 'b'
+export type Color = 'w' | 'b' | 'White' | 'Black'
 
 export type Square =
   | 'a1'

@@ -1,5 +1,6 @@
 import React from 'react'
 import { ThemeName } from '../components/ChessBoard/theme'
+import { storage } from '@/components/ChessBoard/utils'
 
 type MicroChessSettings = {
   enableDrag: boolean
@@ -9,6 +10,8 @@ type MicroChessSettings = {
 type MicroChessContextType = {
   chessSettings: MicroChessSettings
   setChessSettings: React.Dispatch<React.SetStateAction<MicroChessSettings>>
+  userKey: string
+  setUserKey: React.Dispatch<React.SetStateAction<string>>
 }
 
 export const MicroChessContext =
@@ -26,6 +29,7 @@ export default function MicroChessProvider({
 }) {
   const [chessSettings, setChessSettings] =
     React.useState<MicroChessSettings>(defaultSettings)
+  const [userKey, setUserKey] = React.useState<string>('')
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -36,10 +40,13 @@ export default function MicroChessProvider({
         enableDrag: Boolean(isDragNdrop),
       })
     }
+    setUserKey(() => storage.getPublicKey() || '')
   }, [])
 
   return (
-    <MicroChessContext.Provider value={{ chessSettings, setChessSettings }}>
+    <MicroChessContext.Provider
+      value={{ chessSettings, setChessSettings, userKey, setUserKey }}
+    >
       {children}
     </MicroChessContext.Provider>
   )
