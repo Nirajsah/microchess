@@ -2,7 +2,7 @@ import { Color } from './types'
 
 export default function Ranks({ color }: { color: Color }) {
   const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
-  const ranks_ = color.toLowerCase() === 'b' ? ranks.reverse() : ranks
+  const ranks_ = color.toLowerCase() === 'black' ? ranks.reverse() : ranks
 
   return (
     <div className="absolute h-full">

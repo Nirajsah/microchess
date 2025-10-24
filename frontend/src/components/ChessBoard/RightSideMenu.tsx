@@ -13,26 +13,31 @@ import { Color, PieceColor } from './types'
 import { UserPlus, Shuffle, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { startGame } from './utils'
+import { assignChain, startGame } from './utils'
+import { useMicroChess } from '@/context/MicroChessProvider'
 
 export interface MatchData {
   player: PieceColor | '-'
-  color: Color
+  color?: Color
   moves: { white: string; black: string }[]
   capturedPieces: string[]
   checkStatus: string
   opponentId: string | null
   whiteTime: number
   blackTime: number
+  assign: {
+    chainId: string
+    timestamp: number
+  } | null
 }
 
 export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
   return (
     <div className="h-full w-full">
-      {matchData.player === 'w' || matchData.player === 'b' ? (
+      {matchData.color === 'White' || matchData.color === 'Black' ? (
         <MatchDataUI {...matchData} />
       ) : (
-        <MatchSelect />
+        <MatchSelect assign={matchData.assign} />
       )}
     </div>
   )
@@ -123,7 +128,9 @@ const MatchDataUI = (data: MatchData) => {
   )
 }
 
-const MatchSelect = () => {
+const MatchSelect = (assign: any) => {
+  const { chainId, timestamp } = assign.assign || {}
+
   const generateHash = () =>
     Math.random().toString(36).substring(2, 14).toUpperCase() // e.g., "K3J9WL48HTZQ"
   const [step, setStep] = useState<
@@ -154,7 +161,15 @@ const MatchSelect = () => {
     setTimeout(() => setCopied(false), 1200)
   }
   return (
-    <div className="font-fira h-full w-full px-6 py-8 border border-[#ffffff24] bg-[#0a0a0a] rounded-2xl shadow-xl">
+    <div className="h-full w-full px-6 py-8 border border-[#ffffff24] bg-[#0a0a0a] rounded-2xl shadow-xl">
+      {chainId && chainId && (
+        <AssignButton
+          chainId={String(chainId)}
+          timestamp={timestamp}
+          name="Assign"
+          icon={<Shuffle className="w-6 h-6" />}
+        />
+      )}
       {step === 'idle' && (
         <>
           <h2 className="text-2xl font-bold text-white mb-2 text-center">
@@ -276,13 +291,54 @@ type MatchMakingButtonType = {
   icon: any
 }
 
-const MatchButton = (props: MatchMakingButtonType) => {
+interface AssignButtonProps {
+  name: string
+  icon: JSX.Element
+  chainId: string
+  timestamp: number
+}
+
+const AssignButton: React.FC<AssignButtonProps> = ({
+  name,
+  icon,
+  chainId,
+  timestamp,
+}) => {
   const [pressed, setPressed] = useState(false)
-  const player = '0xCE749ceb398453f4c37F99c8fCdd8A79C871E992'
 
   function handleClick() {
     setPressed(true)
-    startGame(player)
+    assignChain(chainId, timestamp)
+    setTimeout(() => setPressed(false), 120) // revert after 120ms
+  }
+
+  return (
+    <div className="relative w-full h-[80px]">
+      <div className="w-full h-full bg-[#ffffff24] shadow-inner"></div>
+      <button
+        onClick={handleClick}
+        style={{
+          top: pressed ? '0px' : '-4px',
+          left: pressed ? '0px' : '-4px',
+        }}
+        className="absolute bg-[#0a0a0a] border border-[#ffffff24] w-full h-full transition-all flex justify-center items-center gap-3 px-6 py-4"
+      >
+        {icon}
+        <div className="text-left">
+          <div className="font-semibold text-lg">{name}</div>
+        </div>
+      </button>
+    </div>
+  )
+}
+
+const MatchButton = (props: MatchMakingButtonType) => {
+  const [pressed, setPressed] = useState(false)
+  const { userKey } = useMicroChess()
+
+  function handleClick() {
+    setPressed(true)
+    startGame(userKey)
     setTimeout(() => setPressed(false), 120) // revert after 120ms
   }
 

@@ -26,7 +26,7 @@ export default function ChessBoard(props: BoardProps) {
 
   const { generateMoves } = useChessWasm()
 
-  const isBlack = false
+  const isBlack = props.boardData.color === 'Black'
 
   function handleMouseDown(_e: React.MouseEvent, piece: Piece, square: Square) {
     if (!piece) return
@@ -55,33 +55,19 @@ export default function ChessBoard(props: BoardProps) {
     const boardR = boardRef.current
     if (!boardR) return
 
-    const boardRect = boardR.getBoundingClientRect()
-    const tileSize = 100
+    // Find the closest child that has a `data-square` attribute
+    const targetEl = (e.target as HTMLElement).closest(
+      '[data-square]'
+    ) as HTMLElement | null
 
-    // Calculate which square was clicked
-    const boardX = e.clientX - boardRect.left
-    const boardY = e.clientY - boardRect.top
-
-    // Calculate file (0-7) and rank (0-7)
-    const fileIndex = Math.floor(boardX / tileSize)
-    const rankIndex = Math.floor(boardY / tileSize)
-
-    let targetSquare
-    if (isBlack) {
-      //For black perspective
-      const file = String.fromCharCode(97 + (7 - fileIndex))
-      const rank = rankIndex + 1
-      targetSquare = `${file}${rank}` as Square
-    } else {
-      // For white perspective
-      const file = String.fromCharCode(97 + fileIndex)
-      const rank = 8 - rankIndex
-      targetSquare = `${file}${rank}` as Square
-    }
-
+    if (!targetEl || !boardR.contains(targetEl)) return
+    const targetSquare = targetEl.dataset.square
     const piece = board[selectedSquare as Square]
 
-    makeMove(selectedSquare as Square, targetSquare, piece as Piece)
+    // need to check if possMoves has the target square as possible moves.
+    if (!possMoves.includes(targetSquare as Square)) return
+
+    makeMove(selectedSquare as Square, targetSquare as Square, piece as Piece)
 
     setDraggingPiece(null)
     setSelectedSquare(null)
