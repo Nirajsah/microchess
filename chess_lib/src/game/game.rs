@@ -410,6 +410,7 @@ impl Game {
         let previous_en_passant = self.board.en_passant;
 
         self.board.en_passant = None;
+        let previous_state = self.state;
 
         match self.make_move(mv) {
             Ok(_) => {
@@ -424,6 +425,7 @@ impl Game {
                     previous_halfmove_clock,
                     game_hash: hash,
                     san: None,
+                    game_state: previous_state,
                 };
 
                 save_mv.san = Some(save_mv.to_san());
@@ -468,6 +470,7 @@ impl Game {
         };
 
         self.turn_change();
+        self.state = mv.game_state; // restore previous game state 
 
         Ok(())
     }
@@ -477,7 +480,7 @@ impl Game {
         self.active_player = self.active_player.opposite();
         if self.active_player == Color::White {
             self.fullmove_number += 1
-        }
+        } 
     }
 
     pub fn compute_hash(&self) -> u64 {
@@ -632,15 +635,18 @@ impl Game {
     #[inline]
     pub fn game_state(&mut self) -> GameState {
         let color = self.active_player;
+        let in_check = self.board.king_in_check(color);
+        let has_moves = self.has_legal_moves();
 
-        if self.board.king_in_check(color) {
-            self.winner = Some(color.opposite());
-            return GameState::Checkmate;
-        } else if !self.has_legal_moves() {
-            return GameState::Stalemate;
+        if !has_moves {
+            if in_check {
+                self.winner = Some(color.opposite());
+                return GameState::Checkmate;
+            } else {
+                return GameState::Stalemate;
+            }
         }
-
-        return GameState::Ongoing;
+        GameState::Ongoing
     }
 }
 

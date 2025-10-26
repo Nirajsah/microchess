@@ -6,6 +6,7 @@ use crate::{
     ChessError,
     board::{chessboard::ChessBoard, piece::Piece, square::Square},
 };
+ use crate::game::game::GameState;
 
 #[derive(Clone, Copy, Default, Debug, Serialize, Deserialize, PartialEq)]
 pub enum MoveType {
@@ -86,6 +87,7 @@ pub struct CompleteMove {
     pub previous_halfmove_clock: u16,
     pub game_hash: u64,
     pub san: Option<String>,
+    pub game_state: GameState,
 }
 
 impl CompleteMove {

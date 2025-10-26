@@ -56,6 +56,8 @@ fn perft(game: &mut Game, depth: usize) -> u64 {
     for mv in moves {
         let result = game.commit_move(mv.from, mv.to, mv.piece, mv.move_type);
 
+        // panic!("paniced at move here:  {:?}", game.to_fen());
+
         match result {
             Ok(move_data) => {
                 nodes += perft(game, depth - 1);
@@ -102,9 +104,9 @@ fn generate_all_legal_moves(game: &Game) -> Vec<MoveInfo> {
                     if piece.is_pawn() && game.is_promotion(target, piece.color()) {
                         // Generate all 4 promotion types
                         let promotion_pieces = if piece.is_white() {
-                            ["wQ", "wR", "wB", "wK"]
+                            ["wQ", "wR", "wB", "wN"]
                         } else {
-                            ["bQ", "bR", "bB", "bK"]
+                            ["bQ", "bR", "bB", "bN"]
                         };
 
                         for promo_piece in promotion_pieces {
