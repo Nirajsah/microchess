@@ -63,7 +63,7 @@ fn perft(game: &mut Game, depth: usize) -> u64 {
             }
 
             Err(e) => {
-                println!("move failed:, {e} FEN: {:?}", game.to_fen(1, 1));
+                println!("move failed:, {e} FEN: {:?}", game.to_fen());
             }
         };
     }

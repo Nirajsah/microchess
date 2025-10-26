@@ -2,7 +2,10 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-use crate::board::{bitboard::BitBoard, chessboard::ChessBoard, piece::Piece, square::Square};
+use crate::{
+    ChessError,
+    board::{chessboard::ChessBoard, piece::Piece, square::Square},
+};
 
 #[derive(Clone, Copy, Default, Debug, Serialize, Deserialize, PartialEq)]
 pub enum MoveType {
@@ -32,7 +35,7 @@ impl MoveData {
         p: String,
         promoted_to: Option<String>,
         board: &ChessBoard,
-    ) -> Self {
+    ) -> MoveData {
         let from = Square::from_str(&from).unwrap();
         let to = Square::from_str(&to).unwrap();
         let piece = Piece::from_str(&p).unwrap();
@@ -72,7 +75,7 @@ impl MoveData {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CompleteMove {
     pub from: Square,
     pub to: Square,
@@ -82,6 +85,7 @@ pub struct CompleteMove {
     pub previous_en_passant: Option<Square>,
     pub previous_halfmove_clock: u16,
     pub game_hash: u64,
+    pub san: Option<String>,
 }
 
 impl CompleteMove {
@@ -91,6 +95,67 @@ impl CompleteMove {
             to: self.to,
             piece: self.piece,
             move_type: self.move_type,
+        }
+    }
+
+    pub fn to_san(&self) -> String {
+        match self.move_type {
+            MoveType::Castle => {
+                // Kingside or queenside
+                if self.to.file() == 6 {
+                    "O-O".to_string()
+                } else {
+                    "O-O-O".to_string()
+                }
+            }
+            MoveType::Move
+            | MoveType::Capture(_)
+            | MoveType::Promotion(_)
+            | MoveType::PromotionCapture(_, _) => {
+                let mut notation = String::new();
+
+                let piece_char = match self.piece {
+                    Piece::WhitePawn | Piece::BlackPawn => None,
+                    Piece::WhiteKnight | Piece::BlackKnight => Some('N'),
+                    Piece::WhiteBishop | Piece::BlackBishop => Some('B'),
+                    Piece::WhiteRook | Piece::BlackRook => Some('R'),
+                    Piece::WhiteQueen | Piece::BlackQueen => Some('Q'),
+                    Piece::WhiteKing | Piece::BlackKing => Some('K'),
+                };
+
+                // If not a pawn move, prepend the piece letter
+                if let Some(c) = piece_char {
+                    notation.push(c);
+                }
+
+                // Add capture indicator if needed
+                if let MoveType::Capture(_)
+                | MoveType::PromotionCapture(_, _)
+                | MoveType::EnPassant = self.move_type
+                {
+                    // For pawns, we show file of origin (e.g., "exd5")
+                    if self.piece.is_pawn() && piece_char.is_none() {
+                        notation.push(self.from.to_string().chars().next().unwrap());
+                    }
+                    notation.push('x');
+                }
+
+                // Destination square
+                notation.push_str(&self.to.to_string());
+
+                // Add promotion notation
+                if let MoveType::Promotion(promoted) | MoveType::PromotionCapture(promoted, _) =
+                    self.move_type
+                {
+                    notation.push('=');
+                    notation.push(promoted.to_char());
+                }
+
+                notation
+            }
+            MoveType::EnPassant => {
+                format!("{}x{}", self.from.to_string(), self.to.to_string())
+            }
         }
     }
 }

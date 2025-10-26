@@ -141,6 +141,17 @@ impl Piece {
         }
     }
 
+    pub fn to_char(&self) -> char {
+        match self {
+            Piece::WhitePawn | Piece::BlackPawn => 'P',
+            Piece::WhiteKnight | Piece::BlackKnight => 'N',
+            Piece::WhiteBishop | Piece::BlackBishop => 'B',
+            Piece::WhiteRook | Piece::BlackRook => 'R',
+            Piece::WhiteQueen | Piece::BlackQueen => 'Q',
+            Piece::WhiteKing | Piece::BlackKing => 'K',
+        }
+    }
+
     pub fn from_str(s: &str) -> Option<Self> {
         let bytes = s.as_bytes();
         if bytes.len() != 2 {

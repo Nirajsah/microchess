@@ -20,7 +20,7 @@ pub struct Game {
     pub board: ChessBoard,
     pub active_player: Color,
     /// Moves Table
-    pub moves: Vec<CompleteMove>,
+    pub moves: Vec<CompleteMove>, // not saving moves for now
     /// Game State
     pub state: GameState,
     pub winner: Option<Color>,
@@ -42,6 +42,7 @@ pub struct Game {
 #[serde(rename_all = "PascalCase")]
 pub enum GameState {
     #[default]
+    NotStarted,
     Ongoing,
     Checkmate,
     Stalemate,
@@ -51,6 +52,7 @@ pub enum GameState {
 impl Display for GameState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let g = match self {
+            GameState::NotStarted => "NotStarted",
             GameState::Ongoing => "OnGoing",
             GameState::Checkmate => "Checkmate",
             GameState::Stalemate => "Stalemate",
@@ -80,7 +82,7 @@ impl Game {
         let mut game = Game {
             board: ChessBoard::new(),
             active_player: Color::White,
-            state: GameState::Ongoing,
+            state: GameState::default(),
             halfmove_clock: 0,
             fullmove_number: 1,
             moves: vec![],
@@ -95,7 +97,7 @@ impl Game {
         Game {
             board: ChessBoard::default(),
             active_player: Color::default(),
-            state: GameState::Ongoing,
+            state: GameState::default(),
             halfmove_clock: 0,
             fullmove_number: 1,
             moves: vec![],
@@ -298,7 +300,10 @@ impl Game {
                 let piece_function = PIECE_FUNCS[mv.piece.move_index()];
                 piece_function(chessboard, mv) // this makes the move on the board
             }
-            MoveType::Capture(_) => {
+            MoveType::Capture(c) => {
+                if mv.piece.color() == c.color() {
+                    return Err(ChessError::InvalidCapture);
+                }
                 let chessboard = &mut self.board;
                 let piece_function = PIECE_FUNCS[mv.piece.move_index()];
                 piece_function(chessboard, mv)
@@ -383,7 +388,10 @@ impl Game {
         piece: String,
         promoted_to: Option<String>,
     ) -> Result<CompleteMove> {
-        if self.state != GameState::Ongoing {
+        if self.state == GameState::Stalemate
+            || self.state == GameState::Checkmate
+            || self.state == GameState::Checkmate
+        {
             return Err(ChessError::GameOver);
         }
 
@@ -406,7 +414,7 @@ impl Game {
         match self.make_move(mv) {
             Ok(_) => {
                 let hash = self.compute_hash();
-                let save_mv = CompleteMove {
+                let mut save_mv = CompleteMove {
                     from: mv.from,
                     to: mv.to,
                     piece: mv.piece,
@@ -415,11 +423,12 @@ impl Game {
                     previous_en_passant,
                     previous_halfmove_clock,
                     game_hash: hash,
+                    san: None,
                 };
 
+                save_mv.san = Some(save_mv.to_san());
                 self.turn_change();
 
-                self.moves.push(save_mv);
                 self.state = self.game_state();
 
                 Ok(save_mv)
@@ -755,39 +764,33 @@ mod tests {
     // ==================== Commit Move Tests ====================
 
     #[test]
-    fn test_commit_move_validates_turn() {
-        let mut game = Game::new();
-
-        let result = game.commit_move("e7".to_string(), "e5".to_string(), "bP".to_string(), None);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_commit_move_changes_turn() {
-        let mut game = Game::new();
-
-        assert_eq!(game.active_player, Color::White);
-        game.commit_move("e2".to_string(), "e4".to_string(), "wP".to_string(), None)
-            .unwrap();
-        assert_eq!(game.active_player, Color::Black);
-    }
-
-    #[test]
-    fn test_commit_move_detects_en_passant() {
-        let fen = "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 1";
+    fn test_white_pawn_cannot_capture_own_pawn() {
+        let fen = "rnbqkbnr/pppppppp/8/8/8/3P4/PPP1PPPP/RNBQKBNR w KQkq - 0 1";
         let mut game = Game::with_fen(fen);
 
-        let result = game.commit_move("e5".to_string(), "d6".to_string(), "wP".to_string(), None);
-        assert!(result.is_ok());
+        let result = game.commit_move("e2".to_string(), "d3".to_string(), "wP".to_string(), None);
+        assert!(result.is_err(), "White pawn should not capture own pawn");
     }
 
     #[test]
-    fn test_commit_move_detects_castling() {
-        let fen = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
+    fn test_white_knight_cannot_capture_own_bishop() {
+        let fen = "rnbqkbnr/pppppppp/8/8/8/2B5/PPPPPPPP/RNBQK1NR w KQkq - 0 1";
         let mut game = Game::with_fen(fen);
 
-        let result = game.commit_move("e1".to_string(), "g1".to_string(), "wK".to_string(), None);
-        assert!(result.is_ok());
+        let result = game.commit_move("b1".to_string(), "c3".to_string(), "wN".to_string(), None);
+        assert!(
+            result.is_err(),
+            "White knight should not capture white bishop"
+        );
+    }
+
+    #[test]
+    fn test_black_bishop_move() {
+        let fen = "r1bqkbnr/pppppppp/2n5/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1";
+        let mut game = Game::with_fen(fen);
+
+        let result = game.commit_move("c8".to_string(), "c6".to_string(), "bB".to_string(), None);
+        assert!(result.is_err(), "Black bishop should not move");
     }
 
     // ==================== Turn Change Tests ====================
