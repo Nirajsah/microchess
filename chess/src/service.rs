@@ -5,7 +5,7 @@ mod state;
 use std::sync::Arc;
 
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
-use chess::{GameChain, Operation};
+use chess::{GameChain, Operation, PlayersTime};
 use linera_sdk::{
     abi::WithServiceAbi, graphql::GraphQLMutationRoot, linera_base_types::AccountOwner,
     views::View, Service, ServiceRuntime,
@@ -55,7 +55,7 @@ struct GameData {
     fen: String,            // FEN
     color: String,          // players color
     opponent: AccountOwner, // opponent player id
-    game_state: String,     // State of the Game, Play, StaleMate or CheckMate
+    game_state: String,     // State of the Game, NotStarted, OnGoing, StaleMate or CheckMate
     winner: Option<AccountOwner>,
 }
 
@@ -85,18 +85,29 @@ impl ChessService {
     async fn is_game_chain(&self) -> bool {
         *self.state.game_flag.get()
     }
-    /*
-    async fn captured_pieces(&self) -> &Vec<Piece> {
-        &self.state.board.get().captured_pieces
+
+    async fn mv_string(&self) -> &Vec<String> {
+        &self.state.board.get().moves_string
     }
-    async fn timer(&self) -> &Clock {
-        &self.state.clock.get()
-    }
-    async fn time_left(&self) -> PlayerTime {
-        self.state.clock.get().time_left_for_player()
-    }
-    async fn get_leaderboard(&self) -> Vec<PlayerStats> {
-        self.state.get_leaderboard()
-    }
-    */
+
+    async fn timer(&self) -> PlayersTime {
+        let time = self.state.clock.get().time_left;
+        PlayersTime {
+            white: time[0],
+            black: time[1],
+        }
+    } /*
+      async fn captured_pieces(&self) -> &Vec<Piece> {
+          &self.state.board.get().captured_pieces
+      }
+      async fn timer(&self) -> &Clock {
+          &self.state.clock.get()
+      }
+      async fn time_left(&self) -> PlayerTime {
+          self.state.clock.get().time_left_for_player()
+      }
+      async fn get_leaderboard(&self) -> Vec<PlayerStats> {
+          self.state.get_leaderboard()
+      }
+      */
 }

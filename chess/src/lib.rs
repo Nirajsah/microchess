@@ -2,7 +2,7 @@
 
 use std::ops::{Deref, DerefMut};
 
-use async_graphql::{Enum, InputObject, Request, Response, SimpleObject};
+use async_graphql::{InputObject, Request, Response, SimpleObject};
 use chess_lib::{game::game::Game, pieces::Color, ChessError, Result};
 use serde::{Deserialize, Serialize};
 pub struct ChessAbi;
@@ -174,6 +174,7 @@ pub struct GameWrapper {
     inner: Game,
     pub players: [Option<AccountOwner>; 2],
     pub winner: Option<AccountOwner>,
+    pub moves_string: Vec<String>,
 }
 
 impl GameWrapper {
@@ -183,6 +184,7 @@ impl GameWrapper {
             initalized: true,
             players: [Some(white), Some(black)],
             winner: None,
+            moves_string: Vec::with_capacity(256),
         }
     }
 
@@ -231,27 +233,34 @@ pub struct PlayersTime {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
 pub struct Clock {
     pub time_left: [TimeDelta; 2],
-    pub current_turn_start: Timestamp,
+    pub current_turn_start: Option<Timestamp>,
     pub block_delay: TimeDelta,
 }
 
 impl Clock {
     /// Initializes the clock.
-    pub fn new(block_time: Timestamp, timer: TimeDelta) -> Self {
+    pub fn new(timer: TimeDelta) -> Self {
         Self {
             time_left: [timer, timer],
             // increment: arg.increment, // todo!(increment is not required at the moment)
-            current_turn_start: block_time,
+            current_turn_start: None, // clock starts after a player make a move
             block_delay: TimeDelta::from_secs(5),
         }
     }
 
     /// Records a player making a move in the current block.
     pub fn make_move(&mut self, block_time: Timestamp, player: Color) {
-        let duration = block_time.delta_since(self.current_turn_start);
+        if self.current_turn_start.is_none() {
+            self.current_turn_start = Some(block_time);
+            return;
+        }
+
+        let duration = block_time.delta_since(
+            self.current_turn_start
+                .expect("failed to get timestamp at make move(clock)"),
+        );
         let i = player.index();
         self.time_left[i] = self.time_left[i].saturating_sub(duration);
-        self.current_turn_start = block_time;
     }
 
     /// Returns the time left for a given player.
@@ -265,7 +274,11 @@ impl Clock {
     /// Returns whether the given player has timed out.
     #[inline]
     pub fn timed_out(&self, block_time: Timestamp, player: Color) -> bool {
-        let elapsed = block_time.delta_since(self.current_turn_start);
+        let Some(start) = self.current_turn_start else {
+            return false;
+        };
+
+        let elapsed = block_time.delta_since(start);
         let t = self.time_left[player.index()].saturating_sub(elapsed);
         t.eq(&TimeDelta::ZERO)
     }

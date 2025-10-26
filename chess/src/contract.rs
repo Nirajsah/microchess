@@ -92,10 +92,13 @@ impl Contract for ChessContract {
                     .get_mut()
                     .commit_move(from, to, piece, None)
                 {
-                    Ok(_) => {
+                    Ok(mv) => {
                         clock.make_move(block_time, active_player);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
+                        if let Some(san) = mv.san {
+                            self.state.board.get_mut().moves_string.push(san);
+                        }
 
                         ChessResponse::Ok
                     }
@@ -130,11 +133,14 @@ impl Contract for ChessContract {
                     .get_mut()
                     .commit_move(from, to, piece, Some(promoted_piece))
                 {
-                    Ok(_) => {
+                    Ok(mv) => {
                         clock.make_move(block_time, active_player);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
 
+                        if let Some(san) = mv.san {
+                            self.state.board.get_mut().moves_string.push(san);
+                        }
                         ChessResponse::Ok
                     }
                     Err(e) => ChessResponse::Err(e),
@@ -165,9 +171,7 @@ impl ChessContract {
 
     /// Starting a game on a chain
     pub fn start_new_game(&mut self, players: [AccountOwner; 2], timer: TimeDelta) {
-        self.state
-            .clock
-            .set(Clock::new(self.runtime.system_time(), timer));
+        self.state.clock.set(Clock::new(timer));
 
         let game = self.state.board.get().new(players[0], players[1]);
         self.state.game_flag.set(true);
