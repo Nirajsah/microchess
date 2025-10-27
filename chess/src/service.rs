@@ -2,26 +2,24 @@
 
 mod state;
 
-use std::{collections::BTreeSet, sync::Arc};
+use std::sync::Arc;
 
-use self::state::Chess;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
-use chess::{
-    piece::{Color, Piece},
-    Clock, GameChain, GameState, Move, Operation, PlayerTime,
-};
-
+use chess::{GameChain, Operation, PlayersTime};
 use linera_sdk::{
+    abi::WithServiceAbi,
     graphql::GraphQLMutationRoot,
-    linera_base_types::{AccountOwner, WithServiceAbi},
+    linera_base_types::{AccountOwner, TimeDelta},
     views::View,
     Service, ServiceRuntime,
 };
 use serde::{Deserialize, Serialize};
 
+use crate::state::ChessState;
+
 #[derive(Clone)]
 pub struct ChessService {
-    state: Arc<Chess>,
+    state: Arc<ChessState>,
     runtime: Arc<ServiceRuntime<ChessService>>,
 }
 
@@ -35,7 +33,7 @@ impl Service for ChessService {
     type Parameters = ();
 
     async fn new(runtime: ServiceRuntime<Self>) -> Self {
-        let state = Chess::load(runtime.root_view_storage_context())
+        let state = ChessState::load(runtime.root_view_storage_context())
             .await
             .expect("Failed to load state");
         ChessService {
@@ -57,52 +55,74 @@ impl Service for ChessService {
 
 #[derive(Deserialize, Serialize, SimpleObject)]
 struct GameData {
-    board: String,          // ChessBoard
-    player_turn: Color,     // player's color to move
-    player: Color,          // players color
-    moves: Vec<Move>,       // moves made till now
-    opponent: AccountOwner, // opponent player id(Owner)
-    game_state: GameState,  // State of the Game, Play, StaleMate or CheckMate
+    fen: String,            // FEN
+    color: String,          // players color
+    opponent: AccountOwner, // opponent player id
+    game_state: String,     // State of the Game, NotStarted, OnGoing, StaleMate or CheckMate
+    winner: Option<AccountOwner>,
 }
 
 #[Object]
 impl ChessService {
     async fn game_data(&self, player: AccountOwner) -> GameData {
         let game = self.state.board.get();
+        let color = game.get_color_by_account(&player).unwrap();
+        let fen = game.to_fen();
+        let opponent = game.players[color.opposite().index()].unwrap();
+        let game_state = game.state.to_string();
+        let winner = game.winner;
+
         GameData {
-            board: game.board.to_fen(
-                &game.active_player(),
-                &game.halfmove_clock,
-                &game.fullmove_count,
-            ),
-            player_turn: game.active, // (todo!, to be removed)
-            player: self.state.owners.get(&player).await.unwrap().unwrap(),
-            moves: game.moves.clone(),
-            opponent: self.state.opponent(player).unwrap(),
-            game_state: game.state,
+            fen,
+            color: color.to_string(),
+            opponent,
+            game_state,
+            winner,
         }
     }
-    async fn owners(&self) -> Vec<AccountOwner> {
-        self.state.players.get().to_vec()
+
+    async fn game_chain(&self) -> Option<GameChain> {
+        let game_data = self.state.game_chain.get();
+
+        let now = self.runtime.system_time();
+        let expiry = game_data
+            .created_at
+            .saturating_add(TimeDelta::from_secs(300));
+
+        // If expired → return None
+        if now > expiry {
+            None
+        } else {
+            Some(game_data.clone())
+        }
     }
-    async fn captured_pieces(&self) -> &Vec<Piece> {
-        &self.state.board.get().captured_pieces
+
+    async fn is_game_chain(&self) -> bool {
+        *self.state.game_flag.get()
     }
-    async fn timer(&self) -> &Clock {
-        &self.state.clock.get()
+
+    async fn mv_string(&self) -> &Vec<String> {
+        &self.state.board.get().moves_string
     }
-    async fn time_left(&self) -> PlayerTime {
-        self.state.clock.get().time_left_for_player()
-    }
-    //async fn get_leaderboard(&self) -> Vec<PlayerStats> {
-    //    self.state.get_leaderboard()
-    //}
-    async fn get_game_chain(&self, pub_key: AccountOwner) -> BTreeSet<GameChain> {
-        self.state
-            .game_chains
-            .get(&pub_key)
-            .await
-            .expect("pub_key is not present")
-            .expect("error getting the game_chains")
-    }
+
+    async fn timer(&self) -> PlayersTime {
+        let time = self.state.clock.get().time_left;
+        PlayersTime {
+            white: time[0],
+            black: time[1],
+        }
+    } /*
+      async fn captured_pieces(&self) -> &Vec<Piece> {
+          &self.state.board.get().captured_pieces
+      }
+      async fn timer(&self) -> &Clock {
+          &self.state.clock.get()
+      }
+      async fn time_left(&self) -> PlayerTime {
+          self.state.clock.get().time_left_for_player()
+      }
+      async fn get_leaderboard(&self) -> Vec<PlayerStats> {
+          self.state.get_leaderboard()
+      }
+      */
 }

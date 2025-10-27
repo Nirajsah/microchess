@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { StarBorder } from '../components/ui/star-border'
 import ShortBoard from '/public/short_chess_board.svg'
+import { BackgroundBeamsDemo } from '@/components/ui/background-beam-demo'
 
 const BorderAnimation = () => {
   return (
@@ -118,32 +119,50 @@ export default function HomePage() {
               />
               <div className="absolute inset-0 bg-gradient-to-tr from-red-400 to-purple-400 opacity-30 rounded-[26px] pointer-events-none"></div>
             </div>
-            <div className="font-semibold text-[40px]">
-              Guide
-              <div className="text-white p-2 text-sm font-semibold">
-                <div className="list-disc list-inside">
-                  <div>
-                    MicroChess is a fast-paced, minimalist chess experience.
+            <div className="font-semibold">
+              <h2 className="text-[40px] absolute top-[176px]">Guide</h2>
+
+              <div className="mt-10">
+                {[
+                  'Download Croissant from github',
+                  'Install Croissant Wallet Extension',
+                  'Create a new Wallet on Croissant',
+                  'Press "Connect" and approve the request',
+                  'Click on "Play Now"',
+                  'Select "Random" or "Friendly Match"',
+                  'Click "Assign" and approve the request',
+                  'Enjoy the game!',
+                ].map((text, index) => (
+                  <div key={index} className="flex items-center ml-3 my-2">
+                    <div className="flex justify-center items-center gap-3">
+                      <div className="flex-shrink-0 w-4 h-4 rounded-full bg-white">
+                        <svg
+                          className="w-4 h-4 text-black"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={3}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
+                      <div className="text-white font-normal text-sm">
+                        {text}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    Enjoy quick matches against friends or AI opponents.
-                  </div>
-                  <div>
-                    Focus on core chess strategy with a clean interface.
-                  </div>
-                  <div>
-                    Perfect for both new players and seasoned enthusiasts.
-                  </div>
-                  <div>
-                    Learn the basics of chess or hone your advanced tactics.
-                  </div>
-                  <div>Optimized for smooth performance across devices.</div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
 
-          <div className="hidden lg:block border max-h-[650px] lg:w-[320px] border-[#ffffff24] bg-[#0a0a0a] rounded-[18px] h-full min-w-0 flex-[0_1_320px]"></div>
+          <div className="hidden lg:block border max-h-[650px] lg:w-[320px] border-[#ffffff24] rounded-[18px] h-full min-w-0 flex-[0_1_320px]">
+            <BackgroundBeamsDemo />
+          </div>
         </div>
 
         <div className="flex gap-3 w-full md:h-[250px] max-h-[200px] min-w-0 overflow-hidden">
@@ -155,7 +174,15 @@ export default function HomePage() {
               10000000
             </div>
           </div>
-          <div className="hidden lg:block relative border border-[#ffffff24] w-1/3 bg-gradient-to-r from-[#2148ed] to-[#3768f1] rounded-[30px] h-full"></div>
+          <div className="hidden lg:flex relative w-1/3 bg-gradient-to-r from-[#2146ed6e] to-[#3769f1fc] rounded-[30px] h-full">
+            <a
+              href="https://github.com/Nirajsah/croissant"
+              target="_blank"
+              className="w-full h-full cursor-pointer flex justify-center items-center"
+            >
+              <span className="text-[40px]">Croissant 🥐</span>
+            </a>
+          </div>
 
           <Link
             to="/chess"

@@ -1,14 +1,16 @@
 import React from 'react'
 import { ThemeName } from '../components/ChessBoard/theme'
+import { storage } from '@/components/ChessBoard/utils'
 
 type MicroChessSettings = {
-  enableDrag: boolean
   theme: ThemeName
 }
 
 type MicroChessContextType = {
   chessSettings: MicroChessSettings
   setChessSettings: React.Dispatch<React.SetStateAction<MicroChessSettings>>
+  userKey: string
+  setUserKey: React.Dispatch<React.SetStateAction<string>>
 }
 
 export const MicroChessContext =
@@ -16,7 +18,6 @@ export const MicroChessContext =
 
 const defaultSettings: MicroChessSettings = {
   theme: 'forest',
-  enableDrag: true,
 }
 
 export default function MicroChessProvider({
@@ -26,20 +27,33 @@ export default function MicroChessProvider({
 }) {
   const [chessSettings, setChessSettings] =
     React.useState<MicroChessSettings>(defaultSettings)
+  const [userKey, setUserKey] = React.useState<string>('')
 
   React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const dragNdrop = window.sessionStorage.getItem('enableDrag') ?? ''
-      const isDragNdrop = parseInt(dragNdrop, 10)
-      setChessSettings({
-        ...chessSettings,
-        enableDrag: Boolean(isDragNdrop),
-      })
+    const theme = storage.getTheme()
+    const publicKey = storage.getPublicKey()
+
+    setChessSettings((prev: MicroChessSettings) => ({
+      ...prev,
+      theme: (theme as ThemeName) ?? ('forest' as ThemeName),
+    }))
+
+    if (publicKey) {
+      setUserKey(publicKey)
     }
   }, [])
 
+  // 🔹 Sync theme changes back to storage
+  React.useEffect(() => {
+    if (chessSettings?.theme) {
+      storage.setTheme(chessSettings.theme)
+    }
+  }, [chessSettings.theme])
+
   return (
-    <MicroChessContext.Provider value={{ chessSettings, setChessSettings }}>
+    <MicroChessContext.Provider
+      value={{ chessSettings, setChessSettings, userKey, setUserKey }}
+    >
       {children}
     </MicroChessContext.Provider>
   )
@@ -48,7 +62,6 @@ export default function MicroChessProvider({
 // exportiong a hook to use the context
 export const useMicroChess = (): MicroChessContextType => {
   const microChessContext = React.useContext(MicroChessContext)
-  console.log('getting', microChessContext)
   if (!microChessContext) {
     throw new Error('useMicroChess must be used within a MicroChessProvider')
   }

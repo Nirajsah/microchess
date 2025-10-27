@@ -1,72 +1,252 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import Ranks from './Ranks'
 import Files from './Files'
 import { PromotionCard } from './PromotionCard'
-import { BoardType, Color, Fen, Piece, PromoteData, Square } from './types'
+import {
+  BoardType,
+  Color,
+  Piece,
+  PieceColor,
+  PromoteData,
+  Square,
+} from './types'
 import { RightSideMenu } from './RightSideMenu'
-import { fen_to_board } from 'wasm'
 import ChessBoard from './ChessBoard'
 import Modal from '../Modal'
 import Settings from '../Themes'
 import Navbar from './Navbar'
 import { LeftSideMenu } from '../LeftSideMenu'
-
-const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-type Player = 'w' | 'b' | '-'
+import { useWalletNotifications } from '@/hooks/useWalletNotification'
+import { useChessWasm } from '@/hooks/useWasm'
+import {
+  gameData,
+  getGameChainInfo,
+  getMvString,
+  isGameChain,
+  timer,
+  makeMove,
+} from './utils'
+import { useMicroChess } from '@/context/MicroChessProvider'
 
 const CBoard = () => {
-  const chainId = window.sessionStorage.getItem('chainId') ?? ''
-  const [player, setPlayer] = React.useState<Player>('-')
-  const [boardState, _setBoardState] = React.useState<Fen>(fen)
-  const [color, _setColor] = React.useState<Color>('w')
   const [capturedPieces, _setCapturedPieces] = React.useState<string[]>([])
-  const [opponentId, _setOpponentId] = React.useState<string | null>(null)
-  const [whiteTime, _setWhiteTime] = React.useState(900) // 15 minutes
-  const [blackTime, _setBlackTime] = React.useState(900) // 15 minutes
+  const [_isGameChain, _setIsGameChain] = React.useState<boolean | null>(null) // null = not checked yet
+  const [_assign, setAssign] = React.useState<{
+    chainId: string
+    timestamp: number
+  } | null>(null)
 
-  const [board, setBoard] = React.useState<BoardType>(() => {
-    let obj = fen_to_board(boardState)
-    setPlayer(obj.player_turn)
-    return {
-      position: obj.position,
-      KingInCheck: obj.king_in_check,
-      whiteCastle: obj.white_c,
-      blackCastle: obj.black_c,
-      en_passant: obj.en_passant,
-    }
-  })
-
-  // Use useEffect to update the boards when boardState changes
-  React.useEffect(() => {
-    let obj = fen_to_board(boardState)
-    setBoard({
-      position: obj.position,
-      KingInCheck: obj.king_in_check,
-      whiteCastle: obj.white_c,
-      blackCastle: obj.black_c,
-      en_passant: obj.en_passant,
-    })
-    setPlayer(obj.player_turn)
-  }, [boardState])
-
+  const { initBoard, isInitialized } = useChessWasm()
+  const { userKey } = useMicroChess()
+  const notification = useWalletNotifications()
   const [moves, _setMoves] = React.useState<
     Array<{ white: string; black: string }>
   >([])
 
-  const renderSquare = () => {
-    // const _isBlack = color.toLowerCase() === 'b'
+  const [board, setBoard] = React.useState<BoardType>({
+    position: {},
+    KingInCheck: '',
+    en_passant: '',
+    player_turn: 'w',
+    color: '' as Color,
+    game_state: '',
+    opponent: '',
+    timer: {
+      white: 900,
+      black: 900,
+    },
+    winner: null,
+  })
 
+  // Step 1: Check if it's a game chain on mount
+  useEffect(() => {
+    const checkGameChain = async () => {
+      try {
+        const res = await isGameChain()
+        const check = JSON.parse(res.result).data.isGameChain
+        _setIsGameChain(check)
+      } catch (err) {
+        console.error('Error checking game chain:', err)
+      }
+    }
+
+    checkGameChain()
+  }, []) // Only run once on mount
+
+  // Step 2: If not a game chain, fetch chain info
+  useEffect(() => {
+    const fetchChainInfo = async () => {
+      try {
+        const res = await getGameChainInfo()
+        const gameChain = JSON.parse(res.result).data.gameChain
+        setAssign(gameChain)
+      } catch (err) {
+        console.error('Error fetching chain info:', err)
+      }
+    }
+
+    // Only fetch if we know it's NOT a game chain
+    if (_isGameChain === false) {
+      fetchChainInfo()
+    }
+  }, [_isGameChain, !_assign])
+
+  // Step 3: After chain is assigned, re-check if it's now a game chain
+  useEffect(() => {
+    if (!userKey) return
+    const recheckGameChain = async () => {
+      try {
+        const res = await isGameChain()
+        const check = JSON.parse(res.result).data.isGameChain
+        _setIsGameChain(check)
+      } catch (err) {
+        console.error('Error rechecking game chain:', err)
+      }
+    }
+
+    // After assignment, recheck the chain status
+    if (_assign && _isGameChain === false) {
+      recheckGameChain()
+    }
+  }, []) // Run when assign changes
+
+  // Step 4: Fetch game data function
+  const fetchAndUpdateBoard = React.useCallback(async () => {
+    if (!isInitialized || _isGameChain !== true) {
+      return
+    }
+
+    try {
+      const movesList = await getMvString()
+      const mvList = JSON.parse(movesList.result).data.mvString
+      console.log('movelist', mvList)
+      _setMoves(mvList)
+
+      const res = await gameData(userKey)
+      const playerClock = await timer()
+      console.log(playerClock)
+      if (!res || !res.result) {
+        throw new Error('No response from API')
+      }
+
+      const data = JSON.parse(res.result).data.gameData
+      const { white, black } = JSON.parse(playerClock.result).data.timer
+
+      const boardData = initBoard(data.fen)
+
+      if (boardData) {
+        setBoard({
+          position: boardData.position,
+          KingInCheck: boardData.king_in_check,
+          en_passant: boardData.en_passant,
+          player_turn: boardData.player_turn as PieceColor,
+          color: data.color,
+          game_state: data.gameState,
+          opponent: data.opponent,
+          timer: {
+            white,
+            black,
+          },
+          winner: data.winner,
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching game ', error)
+    }
+  }, [isInitialized, _isGameChain, userKey, initBoard])
+
+  // Step 5: Initialize with default board and fetch when conditions are met
+  React.useEffect(() => {
+    // Always set default board on mount
+    const defaultFen =
+      'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    const defaultBoardData = initBoard(defaultFen)
+
+    if (defaultBoardData) {
+      setBoard({
+        position: defaultBoardData.position,
+        KingInCheck: defaultBoardData.king_in_check,
+        en_passant: defaultBoardData.en_passant,
+        player_turn: defaultBoardData.player_turn as PieceColor,
+        color: '' as Color,
+        game_state: 'NotStarted',
+        opponent: '',
+        timer: {
+          white: 900,
+          black: 900,
+        },
+        winner: null,
+      })
+    }
+
+    // Fetch actual data only when initialized AND confirmed game chain
+    if (isInitialized && _isGameChain === true) {
+      fetchAndUpdateBoard()
+    }
+  }, [isInitialized, _isGameChain, fetchAndUpdateBoard])
+
+  // Step 6: Handle notifications
+  React.useEffect(() => {
+    if (notification && _isGameChain === true) {
+      fetchAndUpdateBoard()
+    }
+  }, [notification, _isGameChain, fetchAndUpdateBoard])
+
+  const renderSquare = () => {
     return (
       <div className="w-full chess-board">
         <div className="h-[12.5%] z-50 absolute text-black">
-          <Ranks color={color as Color} />
+          <Ranks color={board.color as Color} />
         </div>
-        <ChessBoard boardData={board} />
+        <ChessBoard boardData={board} makeMove={localMove} />
         <div className="flex text-black">
-          <Files color={color as Color} />
+          <Files color={board.color as Color} />
         </div>
       </div>
     )
+  }
+
+  function localMove(selectedSquare: Square, to_square: Square, piece: Piece) {
+    if (board.color === 'White' && piece.charAt(0) === 'b') {
+      return
+    }
+    if (board.color === 'Black' && piece.charAt(0) === 'w') {
+      return
+    }
+
+    if (piece.charAt(0) === board.color) {
+      return
+    }
+
+    if (
+      (piece === 'bP' && getRank(to_square) === 1) ||
+      (piece === 'wP' && getRank(to_square) === 8)
+    ) {
+      setPromoteData({
+        from: selectedSquare,
+        to: to_square,
+        piece,
+        show: true,
+      })
+      return
+    }
+
+    makeMove(selectedSquare, to_square, piece)
+
+    setBoard((prevBoard: BoardType) => {
+      const updatedPosition = { ...prevBoard.position }
+      if (updatedPosition[to_square]) {
+        delete updatedPosition[to_square]
+      }
+      delete updatedPosition[selectedSquare]
+      updatedPosition[to_square] = piece
+
+      return { ...prevBoard, position: updatedPosition }
+    })
+  }
+
+  function getRank(square: Square): number {
+    return parseInt(square.charAt(1))
   }
 
   const [open, setOpen] = React.useState(false)
@@ -76,19 +256,6 @@ const CBoard = () => {
     piece: '' as Piece,
     show: false,
   })
-
-  /* const appBackgrounds = {
-    classicWood: '#f5f5dc', // Beige
-    modernMinimalist: '#e0e0e0', // Light Silver
-    forest: '#2e7d3217', // Dark Forest Green
-    oceanBreeze: '#e0f7fa', // Light Cyan
-    mutedPastel: '#fce4ec', // Soft Pink
-    nightMode: '#121212', // Deep Charcoal
-    desertSand: '#f4a460', // Sandy Brown
-    softViolet: '#f8bbd0', // Light Pink
-    default: '#ffebe84a',
-    dark: '#151515',
-  } */
 
   return (
     <div className="w-full min-h-full relative bg-[#0a0a0a]">
@@ -104,38 +271,42 @@ const CBoard = () => {
           <Navbar />
         </div> */}
         <div className="flex flex-col lg:flex-row gap-4 w-full justify-center items-center">
-          <div className="flex w-full max-w-[720px] relative">
-            {/* <div className="flex text-white w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
-              Opponent {opponentId}
-            </div> */}
+          <div className="flex flex-col w-full max-w-[720px] relative">
+            {board.opponent && (
+              <div className="flex text-white w-full max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
+                Opponent: {board.opponent}
+              </div>
+            )}
             <div className="w-full relative max-w-[720px] rounded-md">
               {renderSquare()}
             </div>
             {promoteData.show && (
               <div className="absolute w-full h-full flex justify-center items-center drop-shadow-2xl z-50 rounded-md">
                 <PromotionCard
-                  color="white"
+                  color={board.color as Color}
                   promoteData={promoteData}
                   setPromoteData={setPromoteData}
                 />
               </div>
             )}
-            {/* <div className="flex w-full text-white max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
-              Player {owner}
-            </div> */}
+            {userKey && (
+              <div className="flex w-full text-white max-w-[720px] justify-between my-2 text-sm font-semibold font-sans">
+                Player: {userKey}
+              </div>
+            )}
           </div>
 
           <div className="w-full lg:w-[20%]">
             <RightSideMenu
               checkStatus={board.KingInCheck}
-              player={null}
-              color={color}
-              opponentId={opponentId}
+              player={board.player_turn || '-'} // Pass player info
+              color={board.color as Color}
+              game_state={board.game_state}
+              opponentId={board.opponent}
               capturedPieces={capturedPieces}
               moves={moves}
-              whiteTime={whiteTime}
-              blackTime={blackTime}
-              key={chainId}
+              timer={board.timer}
+              assign={_assign}
             />
           </div>
         </div>

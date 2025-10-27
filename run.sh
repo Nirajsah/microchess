@@ -17,43 +17,47 @@ export PATH="$PWD/target/debug:$PATH"
 source /dev/stdin <<<"$(linera net helper 2>/dev/null)"
 
 echo "Setting up Linera network..."
-linera_spawn_and_read_wallet_variables linera net up --testing-prng-seed 37 --extra-wallets 3
+FAUCET_PORT=8079
+FAUCET_URL=http://localhost:$FAUCET_PORT
+linera_spawn linera net up --with-faucet --faucet-port $FAUCET_PORT
+
+LINERA_TMP_DIR=$(mktemp -d)
 
 echo "Setting up owner and chain variables..."
-OWNER_1=df44403a282330a8b086603516277c014c844a4b418835873aced1132a3adcd5
-OWNER_2=43c319a4eab3747afcd608d32b73a2472fcaee390ec6bed3e694b4908f55772d
-CHAIN_1=e476187f6ddfeb9d588c7b45d3df334d5501d6499b3f9ad5595cae86cce16a65
+export LINERA_WALLET_1="$LINERA_TMP_DIR/wallet_1.json"
+export LINERA_KEYSTORE_1="$LINERA_TMP_DIR/keystore_1.json"
+export LINERA_STORAGE_1="rocksdb:$LINERA_TMP_DIR/client_1.db"
 
-echo "Generating public keys..."
-PUB_KEY_1=$(linera -w0 keygen)
-PUB_KEY_2=$(linera -w1 keygen)
+linera --with-wallet 1 wallet init --faucet $FAUCET_URL
 
-echo "Opening multi-owner chain..."
-read -d '' MESSAGE_ID CHESS_CHAIN < <(linera -w0 --wait-for-outgoing-messages open-multi-owner-chain \
-    --from $CHAIN_1 \
-    --owner-public-keys $PUB_KEY_1 $PUB_KEY_2 \
-    --initial-balance 1; printf '\0')
+INFO_1=($(linera --with-wallet 1 wallet request-chain --faucet $FAUCET_URL))
+CHAIN_1="${INFO_1[0]}"
+OWNER_1="${INFO_1[3]}"
 
-echo "Assigning keys..."
-linera -w0 assign --key $PUB_KEY_1 --message-id $MESSAGE_ID
-linera -w1 assign --key $PUB_KEY_2 --message-id $MESSAGE_ID
+cd chess/ 
+
+cargo build --release --target wasm32-unknown-unknown
 
 echo "Publishing and creating Chess Game project..."
-APP_ID=$(linera -w0 --wait-for-outgoing-messages \
-  project publish-and-create chess chess $CHESS_CHAIN \
-    --json-argument "{
-        \"players\": [\"$OWNER_1\", \"$OWNER_2\"],
+LINERA_APPLICATION_ID=$(linera --with-wallet 1 publish-and-create \
+  target/wasm32-unknown-unknown/release/chess_{contract,service}.wasm \
+  --json-argument "{
         \"startTime\": 600000000,
         \"increment\": 600000000,
         \"blockDelay\": 100000000
     }")
 
+
+
+echo $LINERA_APPLICATION_ID
+
 echo "Starting Linera services..."
-linera -w0 service --port 8080 &
-linera -w1 service --port 8081 &
+linera -w1 service --port 8080 &
 
 echo "Waiting for services to start..."
 sleep 1
+
+echo "http://localhost:8080/chains/$CHAIN_1/applications/$LINERA_APPLICATION_ID"
 
 echo "Setup complete. Press Ctrl+C to stop all processes and exit."
 

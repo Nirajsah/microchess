@@ -2,16 +2,16 @@ import React, { useRef, useState } from 'react'
 import { BoardType, Piece, Square } from './types'
 import ChessTile from './ChessTile'
 import CustomDragLayer from './CustomDragLayer'
-import { generate_possible_moves } from 'wasm'
 import { useMicroChess } from '@/context/MicroChessProvider'
 import { ThemeName, themes } from './theme'
-import { makeMove } from './utils'
+import { useChessWasm } from '@/hooks/useWasm'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
 
 interface BoardProps {
   boardData: BoardType
+  makeMove: (from: Square, to: Square, piece: Piece) => void
 }
 
 export default function ChessBoard(props: BoardProps) {
@@ -24,7 +24,9 @@ export default function ChessBoard(props: BoardProps) {
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null)
   const [possMoves, setPossMoves] = React.useState<Square[]>([])
 
-  const isBlack = false
+  const { generateMoves } = useChessWasm()
+
+  const isBlack = props.boardData.color === 'Black'
 
   function handleMouseDown(_e: React.MouseEvent, piece: Piece, square: Square) {
     if (!piece) return
@@ -33,14 +35,7 @@ export default function ChessBoard(props: BoardProps) {
 
     window.addEventListener('mousemove', handleMouseMove)
 
-    const mv = generate_possible_moves(
-      piece,
-      square,
-      board,
-      true,
-      true,
-      'd5' as Piece
-    )
+    const mv = generateMoves(square)
     setPossMoves(mv as Square[])
   }
 
@@ -60,38 +55,58 @@ export default function ChessBoard(props: BoardProps) {
     const boardR = boardRef.current
     if (!boardR) return
 
-    const boardRect = boardR.getBoundingClientRect()
-    const tileSize = 100
+    const resetDragState = () => {
+      setDraggingPiece(null)
+      setSelectedSquare(null)
+      setPossMoves([])
+    }
 
-    // Calculate which square was clicked
-    const boardX = e.clientX - boardRect.left
-    const boardY = e.clientY - boardRect.top
+    // Find the closest child that has a `data-square` attribute
+    const targetEl = (e.target as HTMLElement).closest(
+      '[data-square]'
+    ) as HTMLElement | null
 
-    // Calculate file (0-7) and rank (0-7)
-    const fileIndex = Math.floor(boardX / tileSize)
-    const rankIndex = Math.floor(boardY / tileSize)
+    if (!targetEl || !boardR.contains(targetEl)) return
+    if (!targetEl || !boardR.contains(targetEl)) {
+      window.removeEventListener('mousemove', handleMouseMove)
+      resetDragState()
+      return
+    }
 
-    let targetSquare
-    if (isBlack) {
-      //For black perspective
-      const file = String.fromCharCode(97 + (7 - fileIndex))
-      const rank = rankIndex + 1
-      targetSquare = `${file}${rank}` as Square
-    } else {
-      // For white perspective
-      const file = String.fromCharCode(97 + fileIndex)
-      const rank = 8 - rankIndex
-      targetSquare = `${file}${rank}` as Square
+    const targetSquare = targetEl.dataset.square
+    if (!targetSquare) {
+      window.removeEventListener('mousemove', handleMouseMove)
+      resetDragState()
+      return
+    }
+
+    if (!selectedSquare) {
+      window.removeEventListener('mousemove', handleMouseMove)
+      resetDragState()
+      return
     }
 
     const piece = board[selectedSquare as Square]
 
-    makeMove(selectedSquare as Square, targetSquare, piece as Piece)
+    if (!possMoves.includes(targetSquare as Square)) {
+      window.removeEventListener('mousemove', handleMouseMove)
+      resetDragState()
+      return
+    }
 
-    setDraggingPiece(null)
-    setSelectedSquare(null)
-    setPossMoves([])
     window.removeEventListener('mousemove', handleMouseMove)
+
+    try {
+      props.makeMove(
+        selectedSquare as Square,
+        targetSquare as Square,
+        piece as Piece
+      )
+    } catch (err) {
+      console.error('makeMove threw an error:', err)
+    } finally {
+      resetDragState()
+    }
   }
 
   const selectedTheme = themes[chessSettings.theme as ThemeName]
@@ -131,9 +146,8 @@ export default function ChessBoard(props: BoardProps) {
                 : selectedTheme.light
 
             return (
-              <div>
+              <div key={square}>
                 <ChessTile
-                  key={square}
                   background={bg}
                   piece={piece}
                   isDragging={square === selectedSquare}

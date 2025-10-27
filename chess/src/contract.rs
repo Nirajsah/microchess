@@ -5,20 +5,17 @@ mod state;
 
 use std::str::FromStr;
 
-use self::state::Chess;
+use crate::state::ChessState;
+
 use chess::{
-    chessboard::ChessBoard,
-    piece::{Color, Piece},
-    playerprofile::Rank,
-    square::Square,
-    zobrist::PIECE_KEYS,
-    CastleType, ChessError, ChessResponse, Clock, FriendId, Game, GameChain, GameState,
-    InstantiationArgument, Message, MoveType, Operation, PlayerRequest,
+    ChessResponse, Clock, GameChain, GameWrapper, InstantiationArgument, Message, Operation, Player,
 };
+use chess_lib::{game::game::GameState, Result};
 use linera_sdk::{
+    abi::WithContractAbi,
     linera_base_types::{
-        Account, AccountOwner, Amount, ApplicationId, ApplicationPermissions, ChainId,
-        ChainOwnership, TimeDelta, TimeoutConfig, WithContractAbi,
+        AccountOwner, Amount, ApplicationPermissions, ChainId, ChainOwnership, TimeDelta,
+        TimeoutConfig, Timestamp,
     },
     util::BlockingWait,
     views::{RootView, View},
@@ -27,7 +24,7 @@ use linera_sdk::{
 
 #[allow(dead_code)]
 pub struct ChessContract {
-    state: Chess,
+    state: ChessState,
     runtime: ContractRuntime<Self>,
 }
 
@@ -38,252 +35,72 @@ impl WithContractAbi for ChessContract {
 }
 
 impl Contract for ChessContract {
-    type Message = Message;
-    type Parameters = ();
     type InstantiationArgument = InstantiationArgument;
+    type Message = Message;
     type EventValue = ();
+    type Parameters = ();
 
     async fn load(runtime: ContractRuntime<Self>) -> Self {
-        let state = Chess::load(runtime.root_view_storage_context())
+        let state = ChessState::load(runtime.root_view_storage_context())
             .await
             .expect("Failed to load state");
         ChessContract { state, runtime }
     }
 
-    async fn instantiate(&mut self, argument: Self::InstantiationArgument) {
+    async fn instantiate(&mut self, _argument: Self::InstantiationArgument) {
+        // will be used in future
         self.runtime.application_parameters();
-        let timer = argument.start_time;
-        self.state
-            .clock
-            .set(Clock::new(self.runtime.system_time(), timer));
-
-        let players_colors = vec![
-            (argument.players[0], Color::White),
-            (argument.players[1], Color::Black),
-        ];
-
-        for (_player, _color) in players_colors {
-            //self.state.owners.insert(&player, color).unwrap();
-            log::info!("Not setting the owners now, will set when new game_chain starts");
-        }
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
         match operation {
+            // A player makes a new game request to its own chain
             Operation::NewGame { player } => {
-                log::info!("{player} has arrived");
-                let players = self.state.get_players();
-                if players.len() == 2 {
-                    return ChessResponse::Err(ChessError::InvalidRequest);
-                }
-                if players.len() == 1 {
-                    if player == players[0] {
-                        return ChessResponse::Err(ChessError::InvalidRequest);
-                    }
-                    let game = self.state.board.get().new();
-                    // let game = self.state.board.get().with_fen("8/7P/7P/8/8/8/8/7r w - - 0 1");
-                    self.state.add_player(player);
-                    self.state.board.set(game);
-                    ChessResponse::Ok
-                } else {
-                    self.state.add_player(player);
-                    ChessResponse::Ok
-                }
-            }
+                let player = Player {
+                    chain_id: self.runtime.chain_id(),
+                    owner: player,
+                };
+                let app_chain = self.app_chain();
+                self.runtime
+                    .send_message(app_chain, Message::NewGameReq { player });
 
-            Operation::CapturePiece {
-                from,
-                to,
-                piece,
-                captured_piece,
-            } => {
-                // check if the game is still ongoing
-                self.is_game_over();
-
-                let block_time = self.runtime.system_time();
-                let clock = self.state.clock.get_mut();
-                let owner = self.runtime.authenticated_signer().unwrap();
-                let active_player = self.state.board.get().active;
-                /* let active = self
-                    .state
-                    .owners
-                    .get(&owner)
-                    .await
-                    .expect("Failed to get active player")
-                    .expect("Active player not found");
-
-                if !cfg!(test) {
-                    assert_eq!(
-                        active_player, active,
-                        "Only the active player can make a move."
-                    );
-                } */
-
-                if piece.starts_with("w")
-                    && active_player != Color::White
-                    && captured_piece.starts_with("w")
-                {
-                    return ChessResponse::Err(ChessError::InvalidCapture);
-                }
-                if piece.starts_with("b")
-                    && active_player != Color::Black
-                    && captured_piece.starts_with("b")
-                {
-                    return ChessResponse::Err(ChessError::InvalidCapture);
-                }
-
-                let piece = ChessBoard::get_piece(&piece).expect("Invalid piece");
-                let captured_piece = ChessBoard::get_piece(&captured_piece).expect("Invalid piece");
-                let from_sq = Square::from_str(&from).expect("Invalid square");
-                let to_sq = Square::from_str(&to).expect("Invalid square");
-                let m: MoveType = MoveType::Capture(captured_piece);
-
-                let success = self
-                    .state
-                    .board
-                    .get_mut()
-                    .make_move(from_sq, to_sq, piece, m);
-
-                match success {
-                    Ok(_) => {
-                        self.state.board.get_mut().switch_player_turn();
-                        let moves = ChessBoard::create_capture_string(&from, &to);
-                        self.state
-                            .board
-                            .get_mut()
-                            .create_move_string(Color::White, moves); // need to get the current player who made the move
-
-                        clock.make_move(block_time, active_player);
-                        self.runtime
-                            .assert_before(block_time.saturating_add(clock.block_delay));
-
-                        // check for threefold repetition and 50 Move rule, update the game state
-                        if self.state.board.get_mut().check_threefold_repetition()
-                            || self.state.board.get().check_50_move_rule()
-                        {
-                            self.state.board.get_mut().state = GameState::Draw;
-                        }
-
-                        // check if the current player is checkmate, i.e if white makes a move after switch turn black is active player and we check if active player is in checkmate
-                        if self.state.board.get_mut().is_checkmate() {
-                            // returns false, if not checkmate
-                            self.state.board.get_mut().state = GameState::Checkmate;
-                        };
-
-                        ChessResponse::Ok
-                    }
-                    Err(_) => panic!("Operation Failed"),
-                }
+                ChessResponse::Ok
             }
 
             Operation::MakeMove { from, to, piece } => {
-                // check if the game is still ongoing
-                self.is_game_over();
-
-                let owner = self.runtime.authenticated_signer().unwrap();
-
-                let active_player = self.state.board.get().active;
-                /* let active = self
-                    .state
-                    .owners
-                    .get(&owner)
-                    .await
-                    .expect("Failed to get active player")
-                    .expect("Active player not found");
-
-                if !cfg!(test) {
-                    assert_eq!(
-                        active_player, active,
-                        "Only the active player can make a move."
-                    );
-                } */
-
-                // Early return if the piece is not owned by the active player
-                if piece.starts_with("w") && active_player != Color::White {
-                    return ChessResponse::Err(ChessError::InvalidMove);
-                }
-
-                // Early return if the piece is not owned by the active player
-                if piece.starts_with("b") && active_player != Color::Black {
-                    return ChessResponse::Err(ChessError::InvalidMove);
-                }
-
-                let p = ChessBoard::get_piece(&piece).expect("Invalid piece");
-                let from_sq = Square::from_str(&from).expect("Invalid square");
-                let to_sq = Square::from_str(&to).expect("Invalid square");
-                let mut m: MoveType = MoveType::Move;
-
-                if self.state.board.get().board.en_passant & (1u64 << to_sq as usize) != 0
-                    && piece.ends_with("P")
-                {
-                    m = MoveType::EnPassant;
-                }
-
-                match p {
-                    Piece::WhiteKing => {
-                        // if the player is in check, return
-                        if self.state.board.get().board.in_check(active_player) {
-                            return ChessResponse::Err(ChessError::InvalidMove);
-                        }
-
-                        if from_sq == Square::E1 && to_sq == Square::G1 {
-                            m = MoveType::Castle(CastleType::KingSide);
-                        } else if from_sq == Square::E1 && to_sq == Square::C1 {
-                            m = MoveType::Castle(CastleType::QueenSide);
-                        }
-                    }
-                    Piece::BlackKing => {
-                        // if the player is in check, return
-                        if self.state.board.get().board.in_check(active_player) {
-                            return ChessResponse::Err(ChessError::InvalidMove);
-                        }
-
-                        if from_sq == Square::E8 && to_sq == Square::G8 {
-                            m = MoveType::Castle(CastleType::KingSide);
-                        } else if from_sq == Square::E8 && to_sq == Square::C8 {
-                            m = MoveType::Castle(CastleType::QueenSide);
-                        }
-                    }
-                    _ => {}
-                }
-
+                assert_ne!(self.runtime.chain_id(), self.app_chain());
+                let active_player = self.state.board.get().active_player;
                 let clock = self.state.clock.get_mut();
                 let block_time = self.runtime.system_time();
 
-                let success = self.state.board.get_mut().make_move(from_sq, to_sq, p, m);
+                assert_eq!(
+                    self.runtime.authenticated_signer(),
+                    Some(self.state.board.get().players[active_player.index()].unwrap()),
+                    "Only active player can make a move"
+                );
 
-                match success {
-                    Ok(_) => {
-                        self.state.board.get_mut().switch_player_turn();
-                        self.state
-                            .board
-                            .get_mut()
-                            .create_move_string(Color::White, to); // need to get current player, who made the move
+                assert!(
+                    !clock.timed_out(block_time, active_player),
+                    "Player ran out of time."
+                );
 
+                match self
+                    .state
+                    .board
+                    .get_mut()
+                    .commit_move(from, to, piece, None)
+                {
+                    Ok(mv) => {
                         clock.make_move(block_time, active_player);
-
-                        let clock = self.state.clock.get_mut();
-
-                        log::info!("clock: {:?}, block_time: {:?}", clock, block_time);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
-
-                        // check for threefold repetition and 50 Move rule, update the game state
-                        if self.state.board.get_mut().check_threefold_repetition()
-                            || self.state.board.get().check_50_move_rule()
-                        {
-                            self.state.board.get_mut().state = GameState::Draw;
+                        if let Some(san) = mv.san {
+                            self.state.board.get_mut().moves_string.push(san);
                         }
-
-                        if self.state.board.get_mut().is_checkmate() {
-                            // returns false, if not checkmate
-                            self.state.board.get_mut().state = GameState::Checkmate;
-                        };
 
                         ChessResponse::Ok
                     }
                     Err(e) => ChessResponse::Err(e),
-                    //Err(_) => panic!("Operation Failed"),
                 }
             }
             Operation::PawnPromotion {
@@ -292,266 +109,51 @@ impl Contract for ChessContract {
                 piece,
                 promoted_piece,
             } => {
-                // check if the game is still ongoing
-                self.is_game_over();
-
-                let from_sq = Square::from_str(&from).expect("Invalid square");
-                let piece = Piece::from_str(&piece).expect("Invalid piece");
-
-                if piece != Piece::WhitePawn && piece != Piece::BlackPawn {
-                    return ChessResponse::Err(ChessError::InvalidPromotion);
-                }
-
-                if piece == Piece::WhitePawn {
-                    if from_sq.rank() != 7 {
-                        return ChessResponse::Err(ChessError::InvalidPromotion);
-                    }
-                } else if piece == Piece::BlackPawn && from_sq.rank() != 2 {
-                    return ChessResponse::Err(ChessError::InvalidPromotion);
-                }
-
+                assert_ne!(self.runtime.chain_id(), self.app_chain());
+                let active_player = self.state.board.get().active_player;
                 let block_time = self.runtime.system_time();
-
                 let clock = self.state.clock.get_mut();
-                let owner = self.runtime.authenticated_signer().unwrap();
-                let active_player = self.state.board.get().active;
-                /* let active = self
-                    .state
-                    .owners
-                    .get(&owner)
-                    .await
-                    .expect("Failed to get active player")
-                    .expect("Active player not found");
+
                 assert_eq!(
-                    active_player, active,
-                    "Only the active player can make a move."
-                ); */
-
-                let to_sq = Square::from_str(&to).expect("Invalid square");
-                let promoting_to = Piece::from_str(&promoted_piece).expect("Invalid piece");
-
-                let success = self.state.board.get_mut().make_move(
-                    from_sq,
-                    to_sq,
-                    piece,
-                    MoveType::Promotion(promoting_to),
+                    self.runtime.authenticated_signer(),
+                    Some(self.state.board.get().players[active_player.index()].unwrap()),
+                    "Only active player can make a move"
                 );
 
-                match success {
-                    Ok(_) => {
-                        self.state.board.get_mut().switch_player_turn();
-                        self.state
-                            .board
-                            .get_mut()
-                            .create_move_string(Color::White, to);
+                assert!(
+                    !clock.timed_out(block_time, active_player),
+                    "Player ran out of time."
+                );
 
+                match self
+                    .state
+                    .board
+                    .get_mut()
+                    .commit_move(from, to, piece, Some(promoted_piece))
+                {
+                    Ok(mv) => {
                         clock.make_move(block_time, active_player);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
 
-                        self.state.board.get_mut().is_checkmate();
-                        clock.make_move(block_time, active_player);
-                        self.runtime
-                            .assert_before(block_time.saturating_add(clock.block_delay));
-
-                        // check for threefold repetition and 50 Move rule, update the game state
-                        if self.state.board.get_mut().check_threefold_repetition()
-                            || self.state.board.get().check_50_move_rule()
-                        {
-                            self.state.board.get_mut().state = GameState::Draw;
+                        if let Some(san) = mv.san {
+                            self.state.board.get_mut().moves_string.push(san);
                         }
-
-                        if self.state.board.get_mut().is_checkmate() {
-                            // returns false, if not checkmate
-                            self.state.board.get_mut().state = GameState::Checkmate;
-                        };
-
                         ChessResponse::Ok
                     }
-                    Err(_) => panic!("Operation Failed"),
+                    Err(e) => ChessResponse::Err(e),
                 }
-            }
-            Operation::Resign => {
-                self.is_game_over();
-                let owner = self.runtime.authenticated_signer().unwrap();
-                let active_player = self.state.board.get().active;
-                /* let active = self
-                    .state
-                    .owners
-                    .get(&owner)
-                    .await
-                    .expect("Failed to get active player")
-                    .expect("Active player not found");
-
-                if !cfg!(test) {
-                    assert_eq!(
-                        active_player, active,
-                        "Only the active player can make a move."
-                    );
-                } */
-
-                self.handle_winner().await;
-
-                self.state.board.get_mut().state = GameState::Resign;
-                ChessResponse::Ok
-            }
-
-            Operation::StartGame {
-                players,
-                amount,
-                match_time,
-            } => self.start_game(players, amount, match_time).await,
-
-            Operation::RequestGame {
-                player,
-                timer,
-                rank,
-            } => {
-                self.request_game_chain(player, timer, rank);
-                ChessResponse::Ok
-            }
-
-            // Make a request to main_chain_id to play a game with friend
-            Operation::FriendlyGame { player, timer } => self.request_friendly_match(player, timer),
-
-            // Done
-            Operation::StartFriendlyGame { player, hash } => {
-                self.start_friendly_match(player, hash).await
             }
         }
     }
 
     async fn execute_message(&mut self, message: Self::Message) {
         match message {
-            Message::FriendlyGame { hash, player } => {
-                assert_eq!(self.runtime.chain_id(), self.main_chain_id());
-
-                let friendly_match = self.state.friend_lobby.get(&hash).await;
-
-                match friendly_match {
-                    // If retrieving the match succeeded
-                    Ok(Some(friend)) => {
-                        // Safely parse the amount
-                        let amount = Amount::from_str("1").unwrap_or_else(|_| {
-                            eprintln!("Failed to parse amount");
-                            Amount::default() // Or handle this error appropriately
-                        });
-
-                        self.start_game([friend.player, player.player], amount, friend.timer)
-                            .await;
-                    }
-
-                    // If there's no match in the lobby, insert the player
-                    Ok(None) => {
-                        // Insert the player into the friend_lobby and handle errors gracefully
-                        if let Err(e) = self.state.friend_lobby.insert(&hash, player) {
-                            eprintln!("Unable to insert into friend_lobby: {}", e);
-                        } else {
-                            println!("Player inserted into friend_lobby successfully");
-                        }
-                    }
-
-                    // Handle the case where retrieving the match failed
-                    Err(_) => {
-                        // Implement error handling for failure to get the match from the lobby
-                        // You can implement further error handling here (e.g., retry logic, etc.)
-                        todo!()
-                    }
-                }
+            Message::Start { players, timer } => self.start_new_game(players, timer),
+            Message::GameChainData { game_chain_data } => {
+                self.state.game_chain.set(game_chain_data)
             }
-
-            Message::StartGame {
-                player,
-                timer,
-                rank,
-            } => {
-                log::info!(
-                    "Player received {player} Timer: {:?} PlayerRank: {:?}",
-                    timer,
-                    rank
-                );
-                log::info!("ChainId {:?}", self.runtime.chain_id());
-
-                // Try to get the player request from the lobby.
-                let player_request = self.state.lobby.get(&rank).await;
-
-                match player_request {
-                    // If a player is found with that rank, start the game
-                    Ok(Some(existing_player_request)) => {
-                        let player_one = existing_player_request.player; // The player found in the lobby
-                        self.start_game(
-                            [player_one, player], // Start the game with the existing and new player
-                            Amount::from_str("1").unwrap(), // Handle unwrap with care, consider using Result or Option
-                            timer,
-                        )
-                        .await;
-                    }
-
-                    // If no player is found with that rank, insert the new player into the lobby
-                    Ok(None) => {
-                        self.state
-                            .lobby
-                            .insert(
-                                &rank,
-                                PlayerRequest {
-                                    player,
-                                    timer,
-                                    rank: rank.clone(),
-                                },
-                            )
-                            .expect("Unable to insert player into the lobby");
-                    }
-
-                    // If an error occurred while querying the lobby (e.g., database or async error)
-                    Err(e) => {
-                        log::error!("Error retrieving player by rank: {}", e);
-                        // Handle the error gracefully, perhaps return or handle retry logic
-                    }
-                }
-            }
-
-            Message::Start { players, timer } => {
-                // Check that there are exactly two players
-                if players.len() != 2 {
-                    log::error!("Expected exactly two players, but got {}", players.len());
-                    return;
-                }
-
-                // Check if the game is already running (assuming `game_players` holds players in an active game)
-                let game_players = self.state.get_players();
-                if !game_players.is_empty() {
-                    log::info!("Game is already running...");
-                    return;
-                }
-
-                // Create the owners and their associated colors
-                let owners = [players[0], players[1]];
-                let players_colors = vec![(owners[0], Color::White), (owners[1], Color::Black)];
-
-                // Add players and assign colors
-                for (player, color) in players_colors {
-                    // Handle potential errors when adding players or inserting into owners map
-                    self.state.add_player(player);
-
-                    if let Err(e) = self.state.owners.insert(&player, color) {
-                        log::error!("Failed to insert owner: {}", e);
-                        return;
-                    }
-                }
-
-                // Initialize the game state (this can be based on your specific requirements)
-                let game = self.state.board.get().new(); // Or use FEN if needed
-                                                         // let game = self.state.board.get().with_fen("8/7P/7P/8/8/8/8/7r w - - 0 1");
-
-                self.state
-                    .clock
-                    .set(Clock::new(self.runtime.system_time(), timer));
-
-                // Set the game state
-                self.state.board.set(game);
-
-                log::info!("Starting a new match...");
-            }
+            Message::NewGameReq { player } => self.new_match(player),
         }
     }
 
@@ -561,23 +163,103 @@ impl Contract for ChessContract {
 }
 
 impl ChessContract {
-    pub fn is_game_over(&self) -> ChessResponse {
-        match self.state.board.get().state {
-            GameState::Checkmate => ChessResponse::Err(ChessError::InvalidRequest),
-            GameState::Stalemate => ChessResponse::Err(ChessError::InvalidRequest),
-            GameState::Draw => ChessResponse::Err(ChessError::InvalidRequest),
-            GameState::InPlay => ChessResponse::Ok,
-            GameState::Resign => ChessResponse::Err(ChessError::InvalidRequest),
+    pub fn app_chain(&mut self) -> ChainId {
+        self.runtime.application_creator_chain_id()
+    }
+
+    /// Starting a game on a chain
+    pub fn start_new_game(&mut self, players: [AccountOwner; 2], timer: TimeDelta) {
+        self.state.clock.set(Clock::new(timer));
+
+        let game = self.state.board.get().new(players[0], players[1]);
+        self.state.game_flag.set(true);
+
+        self.state.board.set(game);
+    }
+
+    /// Only App chain has the right to create a new game.
+    pub fn new_match(&mut self, player: Player) {
+        assert_eq!(self.runtime.chain_id(), self.app_chain());
+
+        if let Some(lobby_player) = self.state.lobby.get_mut().pop() {
+            // here we start a new game for incoming player and player sitting in the lobby
+            log::info!("players present starting a new game");
+            let players = [player.owner, lobby_player.owner];
+            match self.create_game_chain(
+                Amount::from_str("10.").unwrap(),
+                TimeDelta::from_secs(1800),
+                players,
+            ) {
+                Ok(game_d) => self
+                    .send_game_chain_data_2players(game_d, &[player, lobby_player])
+                    .unwrap(), // unwrap for testing
+                Err(_) => todo!(),
+            }
+        } else {
+            // we put the player in lobby.
+            self.state.lobby.get_mut().push(player);
         }
     }
 
-    /// This method is used to send a cross-chain message to the main-chain with playerRequest and
-    /// generated hash
-    pub fn request_friendly_match(
+    /// Method to start a new multi-owner chain for game
+    /// Sends a message to newly created chain to start a game with both players
+    ///
+    /// `Returns` (ChainId, Timestamp)
+    pub fn create_game_chain(
         &mut self,
-        player: AccountOwner,
-        timer: TimeDelta,
-    ) -> ChessResponse {
+        fee: Amount,
+        match_time: TimeDelta,
+        players: [AccountOwner; 2],
+    ) -> Result<GameChain> {
+        let timestamp: Timestamp = self.runtime.system_time();
+        let ownership = ChainOwnership::multiple(
+            [(players[0], 100), (players[1], 100)],
+            100,
+            TimeoutConfig::default(),
+        );
+        let app_id = self.runtime.application_id();
+        let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
+        let chain_id = self.runtime.open_chain(ownership, permissions, fee);
+
+        self.runtime.send_message(
+            chain_id,
+            Message::Start {
+                players,
+                timer: match_time,
+            },
+        );
+
+        let game_chain = GameChain {
+            chain_id: Some(chain_id),
+            timestamp,
+            created_at: timestamp,
+        };
+
+        Ok(game_chain)
+    }
+
+    // Method to send required chain data to players.
+    // this is required, the web-client needs to assign player's wallet with new chain
+    pub fn send_game_chain_data_2players(
+        &mut self,
+        game_chain_data: GameChain,
+        players: &[Player],
+    ) -> Result<()> {
+        log::info!("sending necessary data to the players");
+        for p in players.iter() {
+            self.runtime.send_message(
+                p.chain_id,
+                Message::GameChainData {
+                    game_chain_data: game_chain_data.clone(),
+                },
+            );
+        }
+
+        Ok(())
+    }
+
+    /* /// generated hash
+    pub fn request_friendly_match(&mut self, player: PublicKey, timer: TimeDelta) -> ChessResponse {
         assert_ne!(self.runtime.chain_id(), self.main_chain_id());
         let points = self.state.stats.get().points;
         let id = FriendId::create_token_id(&player.to_string(), &points)
@@ -635,49 +317,7 @@ impl ChessContract {
             },
         );
     }
-
-    /// Start a new game on new chain, requires two players and the amount to cover the chain fees
-    /// (Todo!) Add the ability to bet on the game, requires optional betting amount
-    pub async fn start_game(
-        &mut self,
-        players: [AccountOwner; 2],
-        amount: Amount,
-        match_time: TimeDelta,
-    ) -> ChessResponse {
-        assert_eq!(self.runtime.chain_id(), self.main_chain_id());
-        let ownership = ChainOwnership::multiple(
-            [(players[0], 100), (players[1], 100)],
-            100,
-            TimeoutConfig::default(),
-        );
-        let app_id = self.runtime.application_id();
-        let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
-        let chain_id = self.runtime.open_chain(ownership, permissions, amount);
-        for public_key in &players {
-            self.state
-                .game_chains
-                .get_mut_or_default(public_key)
-                .await
-                .unwrap()
-                .insert(GameChain { chain_id });
-        }
-        self.runtime.send_message(
-            chain_id,
-            Message::Start {
-                players,
-                timer: match_time,
-            },
-        );
-
-        log::info!("Game chain_id: {:?}", chain_id);
-
-        ChessResponse::Ok
-    }
-
-    /// Returns creator chain_id
-    pub fn main_chain_id(&mut self) -> ChainId {
-        self.runtime.application_creator_chain_id()
-    }
+    } */
 
     // Handles the winner stats, when a match is over, this function is called to update the
     // leaderboard.
@@ -691,387 +331,9 @@ impl ChessContract {
     //    self.state.add_player_leaderboard(winner);
     //}
 
-    /// Handles the winner of the game, when a match is over
-    pub async fn handle_winner(&mut self) {
-        // self.send_reward_nft().await;
-        // if players were betting on the game. send the amount to the winner(Todo!)
-        // it will require punk records
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #![allow(unused_imports)]
-    use std::{io::Read, str::FromStr};
-
-    use base64::engine::{general_purpose::STANDARD_NO_PAD, Engine as _};
-    use chess::{
-        piece::{Color, Piece},
-        ChessError, ChessResponse, FriendId, GameState, InstantiationArgument, Operation,
-    };
-    use env_logger;
-    use futures::FutureExt as _;
-
-    use linera_sdk::{
-        contract::MockContractRuntime,
-        linera_base_types::AccountOwner,
-        util::BlockingWait,
-        views::{View, ViewStorageContext},
-        Contract, ContractRuntime,
-    };
-    use log::LevelFilter;
-    use sha3::{
-        digest::{ExtendableOutput, Update},
-        Shake128,
-    };
-
-    use super::{Chess, ChessContract};
-
-    #[test]
-    fn new_game() {
-        env_logger::builder().filter_level(LevelFilter::Info).init();
-
-        let owner1 = AccountOwner::from_str(
-            "0xdf44403a282330a8b086603516277c014c844a4b418835873aced1132a3adcd5",
-        )
-        .unwrap();
-        let owner2 = AccountOwner::from_str(
-            "0x43c319a4eab3747afcd608d32b73a2472fcaee390ec6bed3e694b4908f55772d",
-        )
-        .unwrap();
-
-        // Setting Players through InstantiationArgument
-        let initial_value = InstantiationArgument {
-            players: [owner1, owner2],
-            start_time: 600000000.into(),
-            increment: 600000000.into(),
-            block_delay: 100000000.into(),
-        };
-        let mut app = create_and_instantiate_app(initial_value.clone(), owner1);
-
-        let players = initial_value.players;
-
-        let mut response = ChessResponse::Ok;
-
-        for player in players {
-            response = app
-                .execute_operation(Operation::NewGame { player })
-                .now_or_never()
-                .expect("Execution of application operation should not await anything");
-        }
-
-        assert_eq!(
-            app.state.get_players().len(),
-            2,
-            "Players are set, and a new game has started"
-        );
-
-        assert_eq!(response, ChessResponse::Ok, "Error in Response");
-
-        assert_eq!(app.state.board.get().active, Color::White);
-
-        // Test alternating moves:
-
-        // White makes a valid pawn move from a2 to a3
-        response = make_move(&mut app, "a2", "a3", "wP");
-        assert_eq!(response, ChessResponse::Ok, "Pawn move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::Black,
-            "Active player is now Black"
-        );
-
-        log::info!("{:?}", app.state.board.get().active);
-
-        // Black makes a valid pawn move from b7 to b6
-        response = make_move(&mut app, "b7", "b6", "bP");
-        assert_eq!(response, ChessResponse::Ok, "Pawn move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::White,
-            "Active player is now White"
-        );
-
-        // White attempts an illegal knight move from g1 to g5 (invalid)
-        response = make_move(&mut app, "g1", "g5", "wN");
-        assert_eq!(
-            response,
-            ChessResponse::Err(ChessError::InvalidMove),
-            "Knight move should be invalid"
-        );
-        assert_eq!(
-            app.state.board.get().active,
-            Color::White,
-            "Active player is still White"
-        );
-
-        // White makes a valid knight move from g1 to f3
-        response = make_move(&mut app, "g1", "f3", "wN");
-        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::Black,
-            "Active player is now Black"
-        );
-
-        // Black makes a invalid bishop move from f8 to c5(pawn on e7 blocks the move)
-        response = make_move(&mut app, "f8", "c5", "bB");
-        assert_eq!(
-            response,
-            ChessResponse::Err(ChessError::InvalidMove),
-            "Bishop move should be Invalid"
-        );
-        assert_eq!(
-            app.state.board.get().active,
-            Color::Black,
-            "Active player is still Black"
-        );
-
-        // Black makes a valid pawn move from e7 to e6
-        response = make_move(&mut app, "e7", "e6", "bP");
-        assert_eq!(response, ChessResponse::Ok, "Pawn move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::White,
-            "Active player is now White"
-        );
-
-        // White attempts an illegal pawn move from a3 to a5 (invalid)
-        response = make_move(&mut app, "a3", "a5", "wP");
-        assert_eq!(
-            response,
-            ChessResponse::Err(ChessError::InvalidMove),
-            "Pawn move should be invalid"
-        );
-        assert_eq!(
-            app.state.board.get().active,
-            Color::White,
-            "Active player is still White"
-        );
-
-        // White makes a Invalid bishop move from c1 to f4(pawn is blocking at d2)
-        response = make_move(&mut app, "c1", "f4", "wB");
-        assert_eq!(
-            response,
-            ChessResponse::Err(ChessError::InvalidMove),
-            "Bishop move should be Invalid"
-        );
-        assert_eq!(
-            app.state.board.get().active,
-            Color::White,
-            "Active player is still White"
-        );
-
-        // White makes a valid pawn move from e2 to e4
-        response = make_move(&mut app, "e2", "e4", "wP");
-        assert_eq!(response, ChessResponse::Ok, "Pawn move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::Black,
-            "Active player is now Black"
-        );
-
-        // Black attempts an illegal bishop move from f4 to h4 (invalid)
-        response = make_move(&mut app, "f4", "h4", "bB");
-        assert_eq!(
-            response,
-            ChessResponse::Err(ChessError::InvalidMove),
-            "Bishop move should be invalid"
-        );
-        assert_eq!(
-            app.state.board.get().active,
-            Color::Black,
-            "Active player is still Black"
-        );
-
-        // Black makes a valid queen move from d8 to d4
-        response = make_move(&mut app, "d8", "g5", "bQ");
-        assert_eq!(response, ChessResponse::Ok, "Queen move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::White,
-            "Active player is now White"
-        );
-
-        // White makes a king move from e1 to e2 (no check yet)
-        response = make_move(&mut app, "e1", "e2", "wK");
-        assert_eq!(response, ChessResponse::Ok, "King move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::Black,
-            "Active player is now Black"
-        );
-
-        // Black attempts to move the queen but is now in check (this would fail the check)
-        response = make_move(&mut app, "d4", "d5", "bQ");
-        assert_eq!(
-            response,
-            ChessResponse::Err(ChessError::InvalidMove),
-            "Move should not be allowed as the king is in check"
-        );
-
-        // Black resolves the check and makes a valid queen move from g5 to a5
-        response = make_move(&mut app, "g5", "a5", "bQ");
-        assert_eq!(response, ChessResponse::Ok, "Queen move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::White,
-            "Active player is now White"
-        );
-
-        // (c3 d5 f6), (f8, a3, bB, wP)
-        // White makes a Knight move from b1 to c3
-        response = make_move(&mut app, "b1", "c3", "wN");
-        assert_eq!(response, ChessResponse::Ok, "knight move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::Black,
-            "Active player is now Black"
-        );
-
-        // Black captures a piece (from f8 bB captures wP a3)
-        response = capture_piece(&mut app, "f8", "a3", "bB", "wP");
-        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::White,
-            "Active player is now White"
-        );
-
-        // White makes a Knight move from c3 to d5
-        response = make_move(&mut app, "c3", "d5", "wN");
-        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::Black,
-            "Active player is now Black"
-        );
-
-        // Black makes a bishop move
-        response = make_move(&mut app, "c8", "b7", "bB");
-        assert_eq!(response, ChessResponse::Ok, "Bishop move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::White,
-            "Active player is now White"
-        );
-
-        // White makes a Knight move from d5 to f6 (puts black's king in check)
-        response = make_move(&mut app, "d5", "f6", "wN");
-        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::Black,
-            "Active player is now Black"
-        );
-
-        let game_data = app.state.board.get();
-
-        log::info!(
-            "black king before check {:?}",
-            app.state.board.get().board.to_fen(
-                &game_data.active_player(),
-                &game_data.halfmove_clock,
-                &game_data.fullmove_count
-            )
-        );
-
-        // black bishop needs to make a capture to get its king out of check(g8 to f6 wbK)
-        // Black captures a piece (from f8 bB captures wP a3)
-        response = capture_piece(&mut app, "g8", "f6", "bN", "wN");
-        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
-        assert_eq!(
-            app.state.board.get().active,
-            Color::White,
-            "Active player is now White"
-        );
-
-        let game_data = app.state.board.get();
-        log::info!(
-            "black moved and king is out of check now {:?}",
-            app.state.board.get().board.to_fen(
-                &game_data.active_player(),
-                &game_data.halfmove_clock,
-                &game_data.fullmove_count
-            )
-        );
-
-        response = resign(&mut app);
-        assert_eq!(response, ChessResponse::Ok, "Knight move should be valid");
-        assert_eq!(app.state.board.get().state, GameState::Resign);
-        log::info!(
-            "what is the game state after resign: {:?}",
-            app.is_game_over()
-        );
-    }
-
-    fn resign(app: &mut ChessContract) -> ChessResponse {
-        let response = app
-            .execute_operation(Operation::Resign)
-            .now_or_never()
-            .expect("Execution of application operation should not await anything");
-
-        response
-    }
-
-    fn make_move(app: &mut ChessContract, from: &str, to: &str, piece: &str) -> ChessResponse {
-        let response = app
-            .execute_operation(Operation::MakeMove {
-                from: from.to_string(),
-                to: to.to_string(),
-                piece: piece.to_string(),
-            })
-            .now_or_never()
-            .expect("Execution of application operation should not await anything");
-
-        response
-    }
-
-    fn capture_piece(
-        app: &mut ChessContract,
-        from: &str,
-        to: &str,
-        piece: &str,
-        captured_piece: &str,
-    ) -> ChessResponse {
-        let response = app
-            .execute_operation(Operation::CapturePiece {
-                from: from.to_string(),
-                to: to.to_string(),
-                piece: piece.to_string(),
-                captured_piece: captured_piece.to_string(),
-            })
-            .now_or_never()
-            .expect("Execution of application operation should not await anything");
-
-        response
-    }
-
-    fn create_and_instantiate_app(
-        initial_value: InstantiationArgument,
-        authentic_signer: AccountOwner,
-    ) -> ChessContract {
-        let friend_hash = FriendId::create_token_id(&authentic_signer.to_string(), &100).unwrap();
-
-        let token_id = STANDARD_NO_PAD.encode(friend_hash.id);
-
-        log::info!("{:?}", token_id);
-
-        let mut runtime = ContractRuntime::new().with_application_parameters(());
-        runtime.set_system_time(100000000.into());
-        runtime.set_authenticated_signer(authentic_signer);
-        let mut contract = ChessContract {
-            state: Chess::load(runtime.root_view_storage_context())
-                .blocking_wait()
-                .expect("Failed to read from mock key value store"),
-            runtime,
-        };
-
-        contract
-            .instantiate(initial_value)
-            .now_or_never()
-            .expect("Initialization of application state should not await anything");
-
-        contract
+    /// Handles the winner of the game
+    pub fn handle_winner(&mut self) {
+        let winner = self.state.board.get().winner;
+        self.state.board.get_mut().winner = winner;
     }
 }

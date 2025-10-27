@@ -50,6 +50,7 @@ export default function ChessTile(props: ChessTileProps) {
       style={{
         backgroundColor: background,
       }}
+      data-square={square}
       className="w-full h-full flex justify-center items-center"
     >
       {piece && !props.isDragging && (
@@ -68,8 +69,8 @@ export default function ChessTile(props: ChessTileProps) {
         <div
           style={{
             position: 'absolute',
-            width: '30px',
-            height: '30px',
+            width: '25px',
+            height: '25px',
             backgroundColor: 'rgba(255, 255, 255, 0.5)', // Background with 50% opacity
             border: '1px solid white', // Fully opaque white border
             borderRadius: '50%', // This makes it a circle
