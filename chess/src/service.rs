@@ -7,8 +7,11 @@ use std::sync::Arc;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use chess::{GameChain, Operation, PlayersTime};
 use linera_sdk::{
-    abi::WithServiceAbi, graphql::GraphQLMutationRoot, linera_base_types::AccountOwner,
-    views::View, Service, ServiceRuntime,
+    abi::WithServiceAbi,
+    graphql::GraphQLMutationRoot,
+    linera_base_types::{AccountOwner, TimeDelta, Timestamp},
+    views::View,
+    Service, ServiceRuntime,
 };
 use serde::{Deserialize, Serialize};
 
@@ -78,8 +81,20 @@ impl ChessService {
         }
     }
 
-    async fn game_chain(&self) -> &GameChain {
-        self.state.game_chain.get()
+    async fn game_chain(&self) -> Option<GameChain> {
+        let game_data = self.state.game_chain.get();
+
+        let now = self.runtime.system_time();
+        let expiry = game_data
+            .created_at
+            .saturating_add(TimeDelta::from_secs(300));
+
+        // If expired → return None
+        if now > expiry {
+            None
+        } else {
+            Some(game_data.clone())
+        }
     }
 
     async fn is_game_chain(&self) -> bool {

@@ -221,6 +221,7 @@ pub struct GameChain {
     pub timestamp: Timestamp,
     /// The ID of the temporary game chain itself.
     pub chain_id: Option<ChainId>,
+    pub created_at: Timestamp,
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]

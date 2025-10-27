@@ -234,6 +234,7 @@ impl ChessContract {
         let game_chain = GameChain {
             chain_id: Some(chain_id),
             timestamp,
+            created_at: timestamp,
         };
 
         Ok(game_chain)
