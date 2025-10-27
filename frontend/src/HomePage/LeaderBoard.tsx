@@ -12,103 +12,115 @@ type Player = {
 
 const NewPlayerData: Player[] = [
   {
-    id: 'player1', // you need to generate actual public keys for each player
+    id: 'player1',
     rank: 1,
-    name: 'Magnus Carlsen',
-    elo: 2850,
-    matches: 135,
-    wins: 120,
-    losses: 15,
-    countryCode: 'NO',
-    avatarUrl: '/avatars/magnus.png',
+    name: 'Eren Yeager',
+    elo: 2700,
+    matches: 130,
+    wins: 85,
+    losses: 45,
+    countryCode: 'JP',
+    avatarUrl: '/avatars/eren.png',
   },
+
   {
     id: 'player2',
     rank: 2,
-    name: 'Hikaru Nakamura',
+    name: 'Luffy',
     elo: 2785,
     matches: 130,
     wins: 110,
     losses: 20,
-    countryCode: 'US',
-    avatarUrl: '/avatars/hikaru.png',
+    countryCode: 'JP',
+    avatarUrl: '/avatars/luffy.png',
   },
   {
     id: 'player3',
     rank: 3,
-    name: 'Ian Nepomniachtchi',
+    name: 'Naruto Uzumaki',
     elo: 2775,
     matches: 130,
     wins: 105,
     losses: 25,
-    countryCode: 'RU',
-    avatarUrl: '/avatars/nepo.png',
+    countryCode: 'JP',
+    avatarUrl: '/avatars/naruto.png',
   },
   {
     id: 'player4',
     rank: 4,
-    name: 'Alireza Firouzja',
+    name: 'Saitama',
     elo: 2760,
     matches: 130,
     wins: 100,
     losses: 30,
-    countryCode: 'FR',
-    avatarUrl: '/avatars/firouzja.png',
+    countryCode: 'JP',
+    avatarUrl: '/avatars/saitama.png',
   },
   {
     id: 'player5',
     rank: 5,
-    name: 'Fabiano Caruana',
+    name: 'Light Yagami',
     elo: 2750,
     matches: 130,
     wins: 98,
     losses: 32,
-    countryCode: 'US',
-    avatarUrl: '/avatars/caruana.png',
+    countryCode: 'JP',
+    avatarUrl: '/avatars/light.png',
   },
   {
     id: 'player6',
     rank: 6,
-    name: 'Anish Giri',
+    name: 'Levi Ackerman',
     elo: 2740,
     matches: 130,
     wins: 95,
     losses: 35,
-    countryCode: 'NL',
-    avatarUrl: '/avatars/giri.png',
+    countryCode: 'JP',
+    avatarUrl: '/avatars/levi.png',
   },
   {
     id: 'player7',
     rank: 7,
-    name: 'Wesley So',
+    name: 'Roronoa Zoro',
     elo: 2730,
     matches: 130,
     wins: 92,
     losses: 38,
-    countryCode: 'US',
-    avatarUrl: '/avatars/so.png',
+    countryCode: 'JP',
+    avatarUrl: '/avatars/zoro.png',
   },
   {
     id: 'player8',
     rank: 8,
-    name: 'Levon Aronian',
+    name: 'Shoto Todoroki',
     elo: 2720,
     matches: 130,
     wins: 90,
     losses: 40,
-    countryCode: 'US',
-    avatarUrl: '/avatars/aronian.png',
+    countryCode: 'JP',
+    avatarUrl: '/avatars/todoroki.png',
   },
   {
     id: 'player9',
     rank: 9,
-    name: 'Ding Liren',
+    name: 'Tanjiro Kamado',
     elo: 2710,
     matches: 130,
     wins: 88,
     losses: 42,
-    countryCode: 'CN',
-    avatarUrl: '/avatars/ding.png',
+    countryCode: 'JP',
+    avatarUrl: '/avatars/tanjiro.png',
+  },
+  {
+    id: 'player10',
+    rank: 10,
+    name: 'Goku',
+    elo: 2850,
+    matches: 135,
+    wins: 120,
+    losses: 15,
+    countryCode: 'JP',
+    avatarUrl: '/avatars/goku.png',
   },
 ]
 
@@ -159,11 +171,13 @@ const PlayerStats = ({ playerData }: { playerData: Player }) => {
 export default function LeaderBoard() {
   return (
     <div className="max-w-[1280px] mt-8 p-5 text-sm rounded-xl w-full h-full space-y-10">
-      <div className="w-full h-[300px] flex gap-5 justify-center">
+      {/** Will be used later */}
+      {/* <div className="w-full h-[300px] flex gap-5 justify-center">
         <div className="border w-full max-w-[150px]"></div>
         <div className="border w-full max-w-[150px]"></div>
         <div className="border w-full max-w-[150px]"></div>
-      </div>
+      </div> */}
+      <div className="text-center text-[60px] my-10">LeaderBoard</div>
       <div className="">
         <div className="w-full flex justify-between px-2 hero-background-circle">
           <span className="w-[50px] md:w-[60px] lg:w-[70px] text-xs md:text-sm">
