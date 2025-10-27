@@ -1,14 +1,7 @@
-use chess_lib::{
-    board::{bitboard::BitBoard, chessboard::ChessBoard},
-    pieces::Color,
-};
+use chess_lib::board::bitboard::BitBoard;
 
 fn main() {
-    let res = ChessBoard::with_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq d4 0 1");
-    let result = ChessBoard::new();
-    println!("FEN {:?}", result.to_fen(Color::White, &20, &59));
-
-    println!("FEN {:?}", res);
+    println!("used for testing the game logic manually");
 }
 
 pub fn print_bitboard(board: BitBoard) {
