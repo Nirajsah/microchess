@@ -4,6 +4,13 @@
   "main": "pkg/wasm.js",
   "types": "pkg/wasm.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./pkg/wasm.js",
+      "types": "./pkg/wasm.d.ts"
+    },
+    "./pkg/*": "./pkg/*"
+  },
   "files": [
     "pkg"
   ],
