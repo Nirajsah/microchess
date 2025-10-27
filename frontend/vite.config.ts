@@ -19,4 +19,7 @@ export default defineConfig({
     wasm() as PluginOption,
     topLevelAwait(),
   ],
+  optimizeDeps: {
+    exclude: ['@wasm'],
+  },
 })

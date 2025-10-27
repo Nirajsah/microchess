@@ -4,12 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "workspaces": [
-    "frontend",
+    ".",
     "wasm"
   ],
   "scripts": {
     "dev": "vite",
-    "build": "pnpm build:wasm && tsc -b && vite build",
+    "build": "pnpm -r run build && tsc -b && vite build",
     "build:wasm": "cd wasm && bash build.bash --release",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
