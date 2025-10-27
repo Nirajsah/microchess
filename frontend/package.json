@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "pnpm -r run build && tsc -b && vite build",
+    "vercel-build": "bash vercel-build.sh",
     "build:wasm": "cd wasm && bash build.bash --release",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
