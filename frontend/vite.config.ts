@@ -10,6 +10,7 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'src'),
       '@assets': resolve(__dirname, 'src/assets'),
+      '@wasm': resolve(__dirname, 'wasm'),
     },
   },
   plugins: [

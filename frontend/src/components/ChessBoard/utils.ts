@@ -2,7 +2,7 @@ import { Piece, Square } from './types'
 
 function request(query: string): Promise<any> {
   let APP_ID =
-    'eacf2c6dac6ed8a3a0b00dbc471119b1b18fe30bebd8671800e305ce24316272'
+    '8118ccc2ea49da4e311684862a5a17730a44748197be5bf339b8ca53b14330ad'
 
   if (!window.linera) throw new Error('Linera extension not found.')
 
@@ -81,6 +81,14 @@ export function isGameChain() {
 
 export function getGameChainInfo() {
   return request(`{ "query": "query { gameChain { chainId timestamp } }" }`)
+}
+
+export function getMvString() {
+  return request(`{ "query": "query { mvString }" }`)
+}
+
+export function timer() {
+  return request(`{ "query": "query { timer { white black } }" }`)
 }
 
 export const storage = {

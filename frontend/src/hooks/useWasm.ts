@@ -5,7 +5,7 @@ import init, {
   update_board,
   get_board,
   get_game_state,
-} from 'wasm'
+} from 'wasm/pkg'
 
 type ChessWasm = {
   isLoading: boolean
