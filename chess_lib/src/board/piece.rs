@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
@@ -99,27 +99,15 @@ impl Piece {
     }
 
     pub fn is_pawn(&self) -> bool {
-        match *self {
-            Self::WhitePawn => true,
-            Self::BlackPawn => true,
-            _ => false,
-        }
+        matches!(*self, Self::WhitePawn | Self::BlackPawn)
     }
 
     pub fn is_rook(&self) -> bool {
-        match *self {
-            Self::WhiteRook => true,
-            Self::BlackRook => true,
-            _ => false,
-        }
+        matches!(*self, Self::WhiteRook | Self::BlackRook)
     }
 
     pub fn is_king(&self) -> bool {
-        match *self {
-            Self::WhiteKing => true,
-            Self::BlackKing => true,
-            _ => false,
-        }
+        matches!(*self, Self::WhiteKing | Self::BlackKing)
     }
 
     // NOTE: not to used other than fen generation logic
@@ -151,36 +139,42 @@ impl Piece {
             Piece::WhiteKing | Piece::BlackKing => 'K',
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for Piece {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let bytes = s.as_bytes();
         if bytes.len() != 2 {
-            return None;
+            return Err(());
         }
 
         let color = match bytes[0] {
             b'w' | b'W' => Color::White,
             b'b' | b'B' => Color::Black,
-            _ => return None,
+            _ => return Err(()),
         };
 
-        match (color, bytes[1]) {
-            (Color::White, b'P') => Some(Piece::WhitePawn),
-            (Color::White, b'N') => Some(Piece::WhiteKnight),
-            (Color::White, b'B') => Some(Piece::WhiteBishop),
-            (Color::White, b'R') => Some(Piece::WhiteRook),
-            (Color::White, b'Q') => Some(Piece::WhiteQueen),
-            (Color::White, b'K') => Some(Piece::WhiteKing),
+        let piece = match (color, bytes[1]) {
+            (Color::White, b'P') => Piece::WhitePawn,
+            (Color::White, b'N') => Piece::WhiteKnight,
+            (Color::White, b'B') => Piece::WhiteBishop,
+            (Color::White, b'R') => Piece::WhiteRook,
+            (Color::White, b'Q') => Piece::WhiteQueen,
+            (Color::White, b'K') => Piece::WhiteKing,
 
-            (Color::Black, b'P') => Some(Piece::BlackPawn),
-            (Color::Black, b'N') => Some(Piece::BlackKnight),
-            (Color::Black, b'B') => Some(Piece::BlackBishop),
-            (Color::Black, b'R') => Some(Piece::BlackRook),
-            (Color::Black, b'Q') => Some(Piece::BlackQueen),
-            (Color::Black, b'K') => Some(Piece::BlackKing),
+            (Color::Black, b'P') => Piece::BlackPawn,
+            (Color::Black, b'N') => Piece::BlackKnight,
+            (Color::Black, b'B') => Piece::BlackBishop,
+            (Color::Black, b'R') => Piece::BlackRook,
+            (Color::Black, b'Q') => Piece::BlackQueen,
+            (Color::Black, b'K') => Piece::BlackKing,
 
-            _ => None,
-        }
+            _ => return Err(()),
+        };
+
+        Ok(piece)
     }
 }
 

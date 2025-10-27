@@ -170,9 +170,10 @@ impl Game {
         // Parse en passant
         if en_passant != "-" {
             let en_passant_square = match en_passant.chars().nth(0) {
-                Some(file) => en_passant.chars().nth(1).map(|rank| {
-                    (rank.to_digit(10).unwrap() as u8 - 1) * 8 + (file as u8 - 'a' as u8)
-                }),
+                Some(file) => en_passant
+                    .chars()
+                    .nth(1)
+                    .map(|rank| (rank.to_digit(10).unwrap() as u8 - 1) * 8 + (file as u8 - b'a')),
                 None => None,
             };
             if let Some(square) = en_passant_square {
@@ -312,22 +313,19 @@ impl Game {
                 if self.is_castling_valid(&mv) {
                     self.board.exec_castle(mv)
                 } else {
-                    return Err(ChessError::InvalidCastle);
+                    Err(ChessError::InvalidCastle)
                 }
             }
             MoveType::EnPassant => self.board.exec_en_passant_capture(mv),
             MoveType::Promotion(promoted_piece) => {
                 self.board.exec_pawn_promotion(promoted_piece, mv)
             }
-            MoveType::PromotionCapture(promoted_to, captured_piece) => self
-                .board
-                .exec_pawn_promotion(promoted_to, mv)
-                .and_then(|_| {
+            MoveType::PromotionCapture(promoted_to, captured_piece) => {
+                self.board.exec_pawn_promotion(promoted_to, mv).map(|_| {
                     self.board.bitboards[captured_piece.index()].clear(mv.to);
                     self.board.occupancies[captured_piece.color().index()].clear(mv.to);
-
-                    Ok(())
-                }),
+                })
+            }
         }
     }
 
@@ -388,10 +386,7 @@ impl Game {
         piece: String,
         promoted_to: Option<String>,
     ) -> Result<CompleteMove> {
-        if self.state == GameState::Stalemate
-            || self.state == GameState::Checkmate
-            || self.state == GameState::Checkmate
-        {
+        if self.state == GameState::Stalemate || self.state == GameState::Checkmate {
             return Err(ChessError::GameOver);
         }
 
@@ -435,7 +430,7 @@ impl Game {
 
                 Ok(save_mv)
             }
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
         }
     }
 
@@ -460,12 +455,10 @@ impl Game {
             MoveType::PromotionCapture(promoted_to, captured_piece) => self
                 .board
                 .undo_pawn_promotion(promoted_to, move_d)
-                .and_then(|_| {
+                .map(|_| {
                     self.board.bitboards[captured_piece.index()].set(move_d.to);
                     self.board.occupancies[captured_piece.color().index()].set(move_d.to);
                     self.board.square_map[move_d.to.index()] = Some(captured_piece);
-
-                    Ok(())
                 })?,
         };
 
@@ -480,7 +473,7 @@ impl Game {
         self.active_player = self.active_player.opposite();
         if self.active_player == Color::White {
             self.fullmove_number += 1
-        } 
+        }
     }
 
     pub fn compute_hash(&self) -> u64 {
@@ -627,7 +620,7 @@ impl Game {
             };
         }
 
-        return false;
+        false
     }
 
     /// called for active player, after a move succeed and turn is changes we call game_state,

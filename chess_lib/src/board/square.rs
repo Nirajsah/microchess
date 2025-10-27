@@ -35,7 +35,7 @@ impl From<Square> for u8 {
 
 impl PartialEq<u8> for Square {
     fn eq(&self, rhs: &u8) -> bool {
-        self == rhs
+        (*self as u8) == *rhs
     }
 }
 
@@ -105,8 +105,8 @@ impl FromStr for Square {
             return Err("Invalid square".to_string());
         }
 
-        let file_idx = (file as u8 - b'a') as u8;
-        let rank_idx = (rank as u8 - b'1') as u8;
+        let file_idx = file as u8 - b'a';
+        let rank_idx = rank as u8 - b'1';
 
         let index = rank_idx * 8 + file_idx;
         Ok(Square::uint_to_square(index))

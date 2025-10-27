@@ -47,11 +47,9 @@ impl Contract for ChessContract {
         ChessContract { state, runtime }
     }
 
-    async fn instantiate(&mut self, argument: Self::InstantiationArgument) {
+    async fn instantiate(&mut self, _argument: Self::InstantiationArgument) {
+        // will be used in future
         self.runtime.application_parameters();
-        //self.state
-        //  .clock
-        // .set(Clock::new(self.runtime.system_time(), &argument));
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {

@@ -90,6 +90,7 @@ impl ChessBoard {
         square_map[7] = Some(Piece::WhiteRook); // h1
 
         // Rank 2 (White pawns) - indices 8-15
+        #[allow(clippy::needless_range_loop)]
         for i in 8..16 {
             square_map[i] = Some(Piece::WhitePawn);
         }
@@ -97,6 +98,7 @@ impl ChessBoard {
         // Ranks 3-6 (empty squares) - indices 16-47 are already None
 
         // Rank 7 (Black pawns) - indices 48-55
+        #[allow(clippy::needless_range_loop)]
         for i in 48..56 {
             square_map[i] = Some(Piece::BlackPawn);
         }
@@ -118,9 +120,8 @@ impl ChessBoard {
         let rank = mv.from.rank() - 1;
         let file_dest = mv.to.file() - 1;
 
-        let rook_from =
-            Square::uint_to_square((rank * 8 + if file_dest == 6 { 7 } else { 0 }) as u8);
-        let rook_to = Square::uint_to_square((rank * 8 + if file_dest == 6 { 5 } else { 3 }) as u8);
+        let rook_from = Square::uint_to_square(rank * 8 + if file_dest == 6 { 7 } else { 0 });
+        let rook_to = Square::uint_to_square(rank * 8 + if file_dest == 6 { 5 } else { 3 });
 
         let rook = if mv.piece.color() == Color::White {
             Piece::WhiteRook
@@ -136,10 +137,10 @@ impl ChessBoard {
         let rook_idx = rook.index();
         let color_idx = mv.piece.color().index();
 
-        let from_bit = 1u64 << (mv.from as usize);
-        let to_bit = 1u64 << (mv.to as usize);
-        let from_rook_bit = 1u64 << (rook_from as usize);
-        let to_rook_bit = 1u64 << (rook_to as usize);
+        let from_bit = 1u64 << (mv.from.index());
+        let to_bit = 1u64 << (mv.to.index());
+        let from_rook_bit = 1u64 << (rook_from.index());
+        let to_rook_bit = 1u64 << (rook_to.index());
 
         // Update king bitboards and occupancy (clear old, set new)
         self.bitboards[king_idx] ^= from_bit | to_bit;
@@ -168,10 +169,9 @@ impl ChessBoard {
         let file_dest = mv.to.file() - 1;
 
         // Determine rook positions (same logic as exec_castle)
-        let rook_from =
-            Square::uint_to_square((rank * 8 + if file_dest == 6 { 7 } else { 0 }) as u8);
+        let rook_from = Square::uint_to_square(rank * 8 + if file_dest == 6 { 7 } else { 0 });
 
-        let rook_to = Square::uint_to_square((rank * 8 + if file_dest == 6 { 5 } else { 3 }) as u8);
+        let rook_to = Square::uint_to_square(rank * 8 + if file_dest == 6 { 5 } else { 3 });
 
         let rook = if mv.piece.color() == Color::White {
             Piece::WhiteRook
@@ -348,7 +348,7 @@ impl ChessBoard {
                 };
 
                 // Remove captured pawn from occupancies and square map
-                if let Some(captured_piece) = self.square_map[capture_square.index()] {
+                if self.square_map[capture_square.index()].is_some() {
                     opponent_occ.clear(capture_square);
                     all_occ.clear(capture_square);
                 }
@@ -386,7 +386,7 @@ impl ChessBoard {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     #[inline]
@@ -426,7 +426,7 @@ impl ChessBoard {
                 };
 
                 // Remove captured pawn from occupancies and square map
-                if let Some(captured_piece) = self.square_map[capture_square.index()] {
+                if self.square_map[capture_square.index()].is_some() {
                     opponent_occ.clear(capture_square);
                     all_occ.clear(capture_square);
                 }
@@ -566,65 +566,53 @@ impl ChessBoard {
 
         if color == Color::White && from == Square::E1 {
             // White queenside castling (e8 -> c8)
-            if (self.castling_rights & 0b0100) != 0 {
-                if !all_occ.is_set(Square::B1)
-                    && !all_occ.is_set(Square::C1)
-                    && !all_occ.is_set(Square::D1)
-                {
-                    // ← ADD THESE CHECKS
-                    if !self.is_under_attack(Square::E1, Color::Black)
-                        && !self.is_under_attack(Square::D1, Color::Black)
-                        && !self.is_under_attack(Square::C1, Color::Black)
-                    {
-                        move_mask.set(Square::C1);
-                    }
-                }
+            if (self.castling_rights & 0b0100) != 0
+                && !all_occ.is_set(Square::B1)
+                && !all_occ.is_set(Square::C1)
+                && !all_occ.is_set(Square::D1)
+                && !self.is_under_attack(Square::E1, Color::Black)
+                && !self.is_under_attack(Square::D1, Color::Black)
+                && !self.is_under_attack(Square::C1, Color::Black)
+            {
+                move_mask.set(Square::C1);
             }
-
             // White kingside castling (e8 -> g8)
-            if (self.castling_rights & 0b1000) != 0 {
-                if !all_occ.is_set(Square::F1) && !all_occ.is_set(Square::G1) {
-                    // ← ADD THESE CHECKS
-                    if !self.is_under_attack(Square::E1, Color::Black)
-                        && !self.is_under_attack(Square::F1, Color::Black)
-                        && !self.is_under_attack(Square::G1, Color::Black)
-                    {
-                        move_mask.set(Square::G1);
-                    }
-                }
+            if (self.castling_rights & 0b1000) != 0
+                && !all_occ.is_set(Square::F1)
+                && !all_occ.is_set(Square::G1)
+                && !self.is_under_attack(Square::E1, Color::Black)
+                && !self.is_under_attack(Square::F1, Color::Black)
+                && !self.is_under_attack(Square::G1, Color::Black)
+            {
+                move_mask.set(Square::G1);
             }
         }
 
         if color == Color::Black && from == Square::E8 {
             // Black queenside castling (e8 -> c8)
-            if (self.castling_rights & 0b0001) != 0 {
-                if !all_occ.is_set(Square::B8)
-                    && !all_occ.is_set(Square::C8)
-                    && !all_occ.is_set(Square::D8)
-                {
-                    // ← ADD THESE CHECKS
-                    if !self.is_under_attack(Square::E8, Color::White)
-                        && !self.is_under_attack(Square::D8, Color::White)
-                        && !self.is_under_attack(Square::C8, Color::White)
-                    {
-                        move_mask.set(Square::C8);
-                    }
-                }
+            if (self.castling_rights & 0b0001) != 0
+                && !all_occ.is_set(Square::B8)
+                && !all_occ.is_set(Square::C8)
+                && !all_occ.is_set(Square::D8)
+                && !self.is_under_attack(Square::E8, Color::White)
+                && !self.is_under_attack(Square::D8, Color::White)
+                && !self.is_under_attack(Square::C8, Color::White)
+            {
+                move_mask.set(Square::C8);
             }
 
             // Black kingside castling (e8 -> g8)
-            if (self.castling_rights & 0b0010) != 0 {
-                if !all_occ.is_set(Square::F8) && !all_occ.is_set(Square::G8) {
-                    // ← ADD THESE CHECKS
-                    if !self.is_under_attack(Square::E8, Color::White)
-                        && !self.is_under_attack(Square::F8, Color::White)
-                        && !self.is_under_attack(Square::G8, Color::White)
-                    {
-                        move_mask.set(Square::G8);
-                    }
-                }
+            if (self.castling_rights & 0b0010) != 0
+                && !all_occ.is_set(Square::F8)
+                && !all_occ.is_set(Square::G8)
+                && !self.is_under_attack(Square::E8, Color::White)
+                && !self.is_under_attack(Square::F8, Color::White)
+                && !self.is_under_attack(Square::G8, Color::White)
+            {
+                move_mask.set(Square::G8);
             }
         }
+
         let opponent_attacks = self.attack_mask(color.opposite());
 
         move_mask & !opponent_attacks
@@ -778,7 +766,7 @@ impl ChessBoard {
         };
 
         let idx = to.index() as i8 + offset;
-        if idx >= 0 && idx < 64 {
+        if (0..64).contains(&idx) {
             Some(Square::uint_to_square(idx as u8))
         } else {
             None
@@ -2111,7 +2099,7 @@ mod tests {
         let mut board = ChessBoard::new();
 
         // Sequence: e2-e4, e7-e5, Nf3, Nc6
-        let moves = vec![
+        let moves = [
             MoveData {
                 piece: Piece::WhitePawn,
                 from: Square::E2,
@@ -2169,7 +2157,7 @@ mod tests {
         let mut board = ChessBoard::new();
 
         // Setup: move white pawn to e4, black pawn to d5, then capture
-        let setup_moves = vec![
+        let setup_moves = [
             MoveData {
                 piece: Piece::WhitePawn,
                 from: Square::E2,

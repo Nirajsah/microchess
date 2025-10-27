@@ -1,4 +1,4 @@
-use async_graphql::{ComplexObject, Error, SimpleObject};
+use async_graphql::{ComplexObject, SimpleObject};
 use chess::{Clock, GameChain, GameWrapper, Player};
 use linera_sdk::{
     views::{

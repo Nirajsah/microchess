@@ -9,7 +9,7 @@ use chess::{GameChain, Operation, PlayersTime};
 use linera_sdk::{
     abi::WithServiceAbi,
     graphql::GraphQLMutationRoot,
-    linera_base_types::{AccountOwner, TimeDelta, Timestamp},
+    linera_base_types::{AccountOwner, TimeDelta},
     views::View,
     Service, ServiceRuntime,
 };

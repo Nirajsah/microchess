@@ -3,10 +3,9 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ChessError,
     board::{chessboard::ChessBoard, piece::Piece, square::Square},
+    game::game::GameState,
 };
- use crate::game::game::GameState;
 
 #[derive(Clone, Copy, Default, Debug, Serialize, Deserialize, PartialEq)]
 pub enum MoveType {
@@ -156,7 +155,7 @@ impl CompleteMove {
                 notation
             }
             MoveType::EnPassant => {
-                format!("{}x{}", self.from.to_string(), self.to.to_string())
+                format!("{}x{}", self.from, self.to)
             }
         }
     }

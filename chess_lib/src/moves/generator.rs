@@ -7,15 +7,18 @@ pub const NOT_HG_FILE: BitBoard = BitBoard(0x3F3F3F3F3F3F3F3F);
 pub const NOT_AB_FILE: BitBoard = BitBoard(0xFCFCFCFCFCFCFCFC);
 
 // Rank and file masks for boundary checking
-const RANK_1: BitBoard = BitBoard(0x00000000000000FF);
+
+/* const RANK_1: BitBoard = BitBoard(0x00000000000000FF);
 const RANK_2: BitBoard = BitBoard(0x000000000000FF00);
 const RANK_7: BitBoard = BitBoard(0x00FF000000000000);
-const RANK_8: BitBoard = BitBoard(0xFF00000000000000);
+const RANK_8: BitBoard = BitBoard(0xFF00000000000000); */
 
 /// Precomputed pawn moves for all squares (avoids Vec allocations)
 #[inline(always)]
 pub fn computed_pawn_moves(color: &Color) -> [BitBoard; 64] {
     let mut pawn_moves = [BitBoard::EMPTY; 64];
+
+    #[allow(clippy::needless_range_loop)]
     for i in 0..64 {
         pawn_moves[i] = pawn_moves_fast(i, color);
     }
@@ -26,6 +29,8 @@ pub fn computed_pawn_moves(color: &Color) -> [BitBoard; 64] {
 #[inline(always)]
 pub fn computed_pawn_attacks(color: &Color) -> [BitBoard; 64] {
     let mut pawn_attacks = [BitBoard::EMPTY; 64];
+
+    #[allow(clippy::needless_range_loop)]
     for i in 0..64 {
         pawn_attacks[i] = pawn_attacks_fast(i as u8, color);
     }
@@ -36,6 +41,8 @@ pub fn computed_pawn_attacks(color: &Color) -> [BitBoard; 64] {
 #[inline(always)]
 pub fn computed_knight_attacks() -> [BitBoard; 64] {
     let mut knight_attacks = [BitBoard::EMPTY; 64];
+
+    #[allow(clippy::needless_range_loop)]
     for i in 0..64 {
         knight_attacks[i] = knight_attacks_fast(i as u8);
     }
@@ -46,6 +53,8 @@ pub fn computed_knight_attacks() -> [BitBoard; 64] {
 #[inline(always)]
 pub fn computed_king_moves() -> [BitBoard; 64] {
     let mut king_moves = [BitBoard::EMPTY; 64];
+
+    #[allow(clippy::needless_range_loop)]
     for i in 0..64 {
         king_moves[i] = king_attacks_fast(i as u8);
     }
@@ -67,7 +76,7 @@ pub fn pawn_moves_fast(square: usize, color: &Color) -> BitBoard {
             }
 
             // Double step from starting position
-            if square >= 8 && square <= 15 {
+            if (8..=15).contains(&square) {
                 // On 2nd rank
                 moves |= square_bb << 16;
             }
@@ -80,7 +89,7 @@ pub fn pawn_moves_fast(square: usize, color: &Color) -> BitBoard {
             }
 
             // Double step from starting position
-            if square >= 48 && square <= 55 {
+            if (48..=55).contains(&square) {
                 // On 7th rank
                 moves |= square_bb >> 16;
             }

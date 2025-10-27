@@ -204,7 +204,6 @@ criterion_main!(benches);
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     // ============================================================
     // Starting Position Tests
