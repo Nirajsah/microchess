@@ -1,5 +1,6 @@
 import React from 'react'
 import { PlayerProfile, PlayerProfileCard } from '../popup/PlayerProfileCard'
+import { Link } from 'react-router-dom'
 
 export default function Navbar() {
   const [showProfile, setShowProfile] = React.useState(false)
@@ -22,7 +23,9 @@ export default function Navbar() {
   return (
     <div className="absolute top-0 left-0 w-full h-14 p-3 flex justify-center">
       <div className="w-full max-w-[1280px] flex justify-between items-center">
-        <div className="">MicroChess</div>
+        <Link to="/">
+          <div className="">MicroChess</div>
+        </Link>
         <div className="relative">
           <button
             onClick={() => setShowProfile(!showProfile)}

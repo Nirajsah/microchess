@@ -4,7 +4,6 @@ import ChessTile from './ChessTile'
 import CustomDragLayer from './CustomDragLayer'
 import { useMicroChess } from '@/context/MicroChessProvider'
 import { ThemeName, themes } from './theme'
-import { makeMove } from './utils'
 import { useChessWasm } from '@/hooks/useWasm'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
@@ -12,6 +11,7 @@ const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
 
 interface BoardProps {
   boardData: BoardType
+  makeMove: (from: Square, to: Square, piece: Piece) => void
 }
 
 export default function ChessBoard(props: BoardProps) {
@@ -55,24 +55,58 @@ export default function ChessBoard(props: BoardProps) {
     const boardR = boardRef.current
     if (!boardR) return
 
+    const resetDragState = () => {
+      setDraggingPiece(null)
+      setSelectedSquare(null)
+      setPossMoves([])
+    }
+
     // Find the closest child that has a `data-square` attribute
     const targetEl = (e.target as HTMLElement).closest(
       '[data-square]'
     ) as HTMLElement | null
 
     if (!targetEl || !boardR.contains(targetEl)) return
+    if (!targetEl || !boardR.contains(targetEl)) {
+      window.removeEventListener('mousemove', handleMouseMove)
+      resetDragState()
+      return
+    }
+
     const targetSquare = targetEl.dataset.square
+    if (!targetSquare) {
+      window.removeEventListener('mousemove', handleMouseMove)
+      resetDragState()
+      return
+    }
+
+    if (!selectedSquare) {
+      window.removeEventListener('mousemove', handleMouseMove)
+      resetDragState()
+      return
+    }
+
     const piece = board[selectedSquare as Square]
 
-    // need to check if possMoves has the target square as possible moves.
-    if (!possMoves.includes(targetSquare as Square)) return
+    if (!possMoves.includes(targetSquare as Square)) {
+      window.removeEventListener('mousemove', handleMouseMove)
+      resetDragState()
+      return
+    }
 
-    makeMove(selectedSquare as Square, targetSquare as Square, piece as Piece)
-
-    setDraggingPiece(null)
-    setSelectedSquare(null)
-    setPossMoves([])
     window.removeEventListener('mousemove', handleMouseMove)
+
+    try {
+      props.makeMove(
+        selectedSquare as Square,
+        targetSquare as Square,
+        piece as Piece
+      )
+    } catch (err) {
+      console.error('makeMove threw an error:', err)
+    } finally {
+      resetDragState()
+    }
   }
 
   const selectedTheme = themes[chessSettings.theme as ThemeName]

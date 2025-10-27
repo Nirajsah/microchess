@@ -11,7 +11,7 @@ import CapturedPieces from './CapturedPieces'
 import Timer from './Timer'
 import { Color, PieceColor } from './types'
 import { UserPlus, Shuffle, Users } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { assignChain, startGame } from './utils'
 import { useMicroChess } from '@/context/MicroChessProvider'
@@ -23,8 +23,11 @@ export interface MatchData {
   capturedPieces: string[]
   checkStatus: string
   opponentId: string | null
-  whiteTime: number
-  blackTime: number
+  game_state: string
+  timer: {
+    white: number
+    black: number
+  }
   assign: {
     chainId: string
     timestamp: number
@@ -43,6 +46,7 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
   )
 }
 
+
 const MatchDataUI = (data: MatchData) => {
   const {
     player,
@@ -50,21 +54,30 @@ const MatchDataUI = (data: MatchData) => {
     moves,
     capturedPieces,
     checkStatus,
-    whiteTime,
-    blackTime,
+    timer,
+    game_state,
   } = data
+
+  const movePairs = React.useMemo(() =>
+    moves ? Array.from({ length: Math.ceil(moves.length / 2) }, (_, i) => ({
+      white: moves[i * 2] || '',
+      black: moves[i * 2 + 1] || ''
+    })) : []
+    , [moves]);
+
   return (
     <div className="w-full items-center justify-between flex flex-col gap-4 h-[720px]">
       <div className="py-4 text-3xl px-2 font-bold w-full border border-[#ffffff24] bg-[#0a0a0a]">
         {/* {player} Plays */}
-        Status:
+        Status: {game_state}
       </div>
 
       <div className="w-full relative gap-2 flex flex-col">
         <div className="p-2 border border-[#ffffff24] bg-[#0a0a0a] opacity-85 w-[130px] text-center text-2xl tracking-[4px] text-white">
           <Timer
-            initialTime={color === 'b' ? blackTime : whiteTime}
-            isActive={player === 'b'}
+            initialTime={color === 'White' ? timer.black : timer.white}
+            isActive={color === 'White' ? player === 'b' : player === 'w'}
+            isStarted={game_state === 'OnGoing'}
           />
         </div>
         <div className="w-full relative border border-[#ffffff24] bg-[#0a0a0a]">
@@ -78,10 +91,10 @@ const MatchDataUI = (data: MatchData) => {
                 </tr>
               </thead>
             </table>
-            <div className="h-[250px] overflow-y-scroll scrollbar-hide flex flex-col-reverse">
+            <div className="h-[250px] overflow-y-scroll scrollbar-hide text-xs flex flex-col-reverse">
               <table className="w-full">
                 <tbody>
-                  {moves.map((move, index) => (
+                  {moves && movePairs.map((move: any, index) => (
                     <tr className="flex px-2 w-full" key={index}>
                       <td className="w-[33.3%]">{index + 1}</td>
                       <td className="w-[33.3%] text-center">
@@ -97,8 +110,9 @@ const MatchDataUI = (data: MatchData) => {
         </div>
         <div className="p-2 border border-[#ffffff24] bg-[#0a0a0a] opacity-85 w-[130px] text-center text-2xl tracking-[4px] text-white">
           <Timer
-            initialTime={color === 'w' ? whiteTime : blackTime}
-            isActive={player === 'w'}
+            initialTime={color === 'White' ? timer.white : timer.black}
+            isActive={color === 'White' ? player === 'w' : player === 'b'}
+            isStarted={game_state === 'OnGoing'}
           />
         </div>
       </div>

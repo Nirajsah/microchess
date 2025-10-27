@@ -1,4 +1,4 @@
-import { Piece, Square } from './types'
+import { Color, Piece, Square } from './types'
 import {
   whiteRook,
   whiteKnight,
@@ -7,13 +7,13 @@ import {
   blackRook,
   blackKnight,
   blackBishop,
-  blackQueen
-} from "@/assets"
+  blackQueen,
+} from '@/assets'
 
 import { promotePiece } from './utils'
 
 interface PromotionCardProps {
-  color: 'white' | 'black'
+  color: Color
   promoteData: { from: Square; to: Square; piece: Piece; show: boolean }
   setPromoteData: (value: {
     from: Square
@@ -54,17 +54,13 @@ export const PromotionCard = ({
   promoteData,
   setPromoteData,
 }: PromotionCardProps) => {
+  const pieceData = color === 'White' ? whitePieces : blackPieces
 
-  const pieceData = color === 'white' ? whitePieces : blackPieces
-
-  const promotion = async (
+  const promotion = (
     piece: Piece,
     promoteData: { from: Square; to: Square; piece: Piece; show: boolean }
   ) => {
-    console.log('Promote Piece:', promoteData, piece)
-
     promotePiece(promoteData.from, promoteData.to, promoteData.piece, piece)
-
     setPromoteData({ ...promoteData, show: false })
   }
 

@@ -20,10 +20,14 @@ export type BoardType = {
   KingInCheck: string
   en_passant: string | null
   player_turn?: PieceColor
-  color: string
+  color: Color
   opponent: string
   game_state: string
   winner: string | null
+  timer: {
+    white: number
+    black: number
+  }
 }
 
 export type PieceColor = 'w' | 'b'

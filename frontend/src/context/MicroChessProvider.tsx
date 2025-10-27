@@ -3,7 +3,6 @@ import { ThemeName } from '../components/ChessBoard/theme'
 import { storage } from '@/components/ChessBoard/utils'
 
 type MicroChessSettings = {
-  enableDrag: boolean
   theme: ThemeName
 }
 
@@ -19,7 +18,6 @@ export const MicroChessContext =
 
 const defaultSettings: MicroChessSettings = {
   theme: 'forest',
-  enableDrag: true,
 }
 
 export default function MicroChessProvider({
@@ -32,16 +30,25 @@ export default function MicroChessProvider({
   const [userKey, setUserKey] = React.useState<string>('')
 
   React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const dragNdrop = window.sessionStorage.getItem('enableDrag') ?? ''
-      const isDragNdrop = parseInt(dragNdrop, 10)
-      setChessSettings({
-        ...chessSettings,
-        enableDrag: Boolean(isDragNdrop),
-      })
+    const theme = storage.getTheme()
+    const publicKey = storage.getPublicKey()
+
+    setChessSettings((prev: MicroChessSettings) => ({
+      ...prev,
+      theme: (theme as ThemeName) ?? ('forest' as ThemeName),
+    }))
+
+    if (publicKey) {
+      setUserKey(publicKey)
     }
-    setUserKey(() => storage.getPublicKey() || '')
   }, [])
+
+  // 🔹 Sync theme changes back to storage
+  React.useEffect(() => {
+    if (chessSettings?.theme) {
+      storage.setTheme(chessSettings.theme)
+    }
+  }, [chessSettings.theme])
 
   return (
     <MicroChessContext.Provider
