@@ -186,8 +186,8 @@ impl ChessContract {
             log::info!("players present starting a new game");
             let players = [player.owner, lobby_player.owner];
             match self.create_game_chain(
-                Amount::from_str("10.").unwrap(),
-                TimeDelta::from_secs(1800),
+                Amount::from_str("1.").unwrap(),
+                TimeDelta::from_secs(1800), // 30 mins
                 players,
             ) {
                 Ok(game_d) => self

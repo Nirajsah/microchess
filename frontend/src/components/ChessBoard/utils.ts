@@ -1,8 +1,7 @@
 import { Piece, Square } from './types'
 
 function request(query: string): Promise<any> {
-  let APP_ID =
-    '8118ccc2ea49da4e311684862a5a17730a44748197be5bf339b8ca53b14330ad'
+  let APP_ID = import.meta.env.VITE_MICROCHESS_APPLICATION_ID
 
   if (!window.linera) throw new Error('Linera extension not found.')
 
