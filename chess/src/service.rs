@@ -106,23 +106,27 @@ impl ChessService {
     }
 
     async fn timer(&self) -> PlayersTime {
-        let time = self.state.clock.get().time_left;
-        PlayersTime {
-            white: time[0],
-            black: time[1],
-        }
-    } /*
-      async fn captured_pieces(&self) -> &Vec<Piece> {
-          &self.state.board.get().captured_pieces
-      }
-      async fn timer(&self) -> &Clock {
-          &self.state.clock.get()
-      }
-      async fn time_left(&self) -> PlayerTime {
-          self.state.clock.get().time_left_for_player()
-      }
-      async fn get_leaderboard(&self) -> Vec<PlayerStats> {
-          self.state.get_leaderboard()
-      }
-      */
+        let clock = self.state.clock.get();
+        let board = self.state.board.get();
+        let block_time = self.runtime.system_time();
+        let active_player = board.active_player;
+
+        // get correct and real time values for both the players
+        clock.time_left_for_players(block_time, active_player)
+    }
+
+    /*
+    async fn captured_pieces(&self) -> &Vec<Piece> {
+        &self.state.board.get().captured_pieces
+    }
+    async fn timer(&self) -> &Clock {
+        &self.state.clock.get()
+    }
+    async fn time_left(&self) -> PlayerTime {
+        self.state.clock.get().time_left_for_player()
+    }
+    async fn get_leaderboard(&self) -> Vec<PlayerStats> {
+        self.state.get_leaderboard()
+    }
+    */
 }

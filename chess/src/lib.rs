@@ -262,13 +262,36 @@ impl Clock {
         );
         let i = player.index();
         self.time_left[i] = self.time_left[i].saturating_sub(duration);
+
+        self.current_turn_start = Some(block_time); // need to reset the current_turn_start for the next player
     }
 
     /// Returns the time left for a given player.
-    pub fn time_left_for_players(&self) -> PlayersTime {
+    pub fn time_left_for_players(
+        &self,
+        block_time: Timestamp,
+        active_player: Color,
+    ) -> PlayersTime {
+        let mut white_time = self.time_left[Color::White.index()];
+        let mut black_time = self.time_left[Color::Black.index()];
+
+        // Deduct elapsed time from active player only
+        if let Some(turn_start) = self.current_turn_start {
+            let elapsed = block_time.delta_since(turn_start);
+
+            match active_player {
+                Color::White => {
+                    white_time = white_time.saturating_sub(elapsed);
+                }
+                Color::Black => {
+                    black_time = black_time.saturating_sub(elapsed);
+                }
+            }
+        }
+
         PlayersTime {
-            white: self.time_left[Color::White.index()],
-            black: self.time_left[Color::Black.index()],
+            white: white_time,
+            black: black_time,
         }
     }
 
