@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { StarBorder } from '../components/ui/star-border'
-import ShortBoard from '/public/short_chess_board.svg'
+import ShortBoard from '/public/shortboard.png'
 import { BackgroundBeamsDemo } from '@/components/ui/background-beam-demo'
 
 const BorderAnimation = () => {
