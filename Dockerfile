@@ -4,14 +4,16 @@
 FROM rust:1.86.0-slim AS builder
 
 # Install dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     protobuf-compiler \
+    libprotobuf-dev \
     clang \
     make \
     libssl-dev \
     ca-certificates \
     curl \
+    build-base \
     && rm -rf /var/lib/apt/lists/*
 
 # Add wasm target
@@ -25,11 +27,10 @@ RUN cargo install --locked linera-storage-service@0.15.3 && \
 WORKDIR /app
 
 # Copy project files
-COPY chess/ ./chess/
-COPY deploy.sh ./deploy.sh
+COPY . .
 
 # Build the WASM target
-RUN cd chess && cargo build --release --target wasm32-unknown-unknown
+RUN cargo build --release --target wasm32-unknown-unknown -p chess
 
 # ==============================
 # Stage 2: Runtime image
@@ -37,18 +38,16 @@ RUN cd chess && cargo build --release --target wasm32-unknown-unknown
 FROM debian:bookworm-slim
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    libssl-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+    openssl \
+    libgcc-s1 \
+    && rm -rf /var/lib/apt/lists/* 
 
 # Set up working directory
 WORKDIR /app
 
 # Copy Linera binaries from builder
-RUN mkdir -p /app/chess
-
 COPY --from=builder /usr/local/cargo/bin/linera /usr/local/bin/
 COPY --from=builder /usr/local/cargo/bin/linera-server /usr/local/bin/
 COPY --from=builder /usr/local/cargo/bin/linera-proxy /usr/local/bin/
