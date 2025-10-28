@@ -1,0 +1,19 @@
+[workspace.metadata]
+description = "MicroChess workspace for Linera smart contract and chess_lib."
+
+[workspace]
+members = [
+    "chess",
+    "chess_lib"
+]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+
+
+[profile.release]
+opt-level = "z"
+lto = true
+
+
