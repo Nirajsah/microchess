@@ -32,4 +32,4 @@ jobs:
           push: true
           platforms: linux/arm64
           tags: |
-            ${{ secrets.OCIR_REGION }}/${{ secrets.OCIR_USERNAME }}/microchess:latest
+            ${{ secrets.OCIR_REGION }}/${{ secrets.OCIR_NAMESPACE }}/microchess:latest
