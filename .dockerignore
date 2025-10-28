@@ -1,0 +1,19 @@
+# Ignore build artifacts
+target/
+**/target/
+
+# Ignore Git data
+.git/
+.gitignore
+
+# Ignore editor & OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Ignore local environment files
+.env
+*.log
+
+# Ignore cargo-related caches
+.cargo/
