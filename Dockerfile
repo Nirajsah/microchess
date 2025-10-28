@@ -1,9 +1,10 @@
 # ==============================
 # Stage 1: Build Linera + WASM app
 # ==============================
-FROM rust:1.86.0-slim AS builder
+FROM --platform=linux/arm64 rust:1.86.0-slim AS builder
 
 # Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     protobuf-compiler \
@@ -13,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     ca-certificates \
     curl \
+    build-base \
     build-base \
     && rm -rf /var/lib/apt/lists/*
 
@@ -35,9 +37,10 @@ RUN cargo build --release --target wasm32-unknown-unknown -p chess
 # ==============================
 # Stage 2: Runtime image
 # ==============================
-FROM debian:bookworm-slim
+FROM --platform=linux/arm64 debian:bookworm-slim
 
 # Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     openssl \
