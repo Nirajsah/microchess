@@ -94,6 +94,7 @@ const CBoard = () => {
   // Step 3: After chain is assigned, re-check if it's now a game chain
   useEffect(() => {
     if (!userKey) return
+
     const recheckGameChain = async () => {
       try {
         const res = await isGameChain()
@@ -207,16 +208,10 @@ const CBoard = () => {
   }
 
   function localMove(selectedSquare: Square, to_square: Square, piece: Piece) {
-    if (board.color === 'White' && piece.charAt(0) === 'b') {
-      return
-    }
-    if (board.color === 'Black' && piece.charAt(0) === 'w') {
-      return
-    }
-
-    if (piece.charAt(0) === board.color) {
-      return
-    }
+    if (board.color === 'White' && piece.charAt(0) === 'b') return
+    if (board.color === 'Black' && piece.charAt(0) === 'w') return
+    if (board.player_turn !== piece.charAt(0)) return
+    if (piece.charAt(0) === board.color) return
 
     if (
       (piece === 'bP' && getRank(to_square) === 1) ||

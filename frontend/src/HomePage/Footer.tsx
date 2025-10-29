@@ -26,10 +26,11 @@ export default function Footer() {
 
           {/* Right: Footer Content */}
           <div className="w-full md:w-1/2 text-right space-y-6">
-            <h2 className="text-3xl font-bold text-lime-400">Let’s Connect</h2>
-            <p className="text-neutral-300 max-w-md ml-auto">
-              Building the future one move at a time. Whether it’s crypto,
-              chess, or cool UI, we’re all about that precision and flow.
+            <h2 className="text-3xl font-bold text-lime-400">Let’s Play</h2>
+            <p className="text-neutral-300 max-w-[100px] ml-auto">
+              Chess. Reimagined for the decentralized era. MicroChess brings the
+              elegance of classic strategy into a world of verifiable wins,
+              digital ownership, and community-driven competition.
             </p>
 
             <div className="flex justify-end gap-4 text-lime-300">
