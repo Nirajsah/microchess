@@ -57,8 +57,7 @@ function buildGraphQLQuery(queryBody: string): string {
 
 // Start a new game
 export function startGame(player: string) {
-  const escapedPlayer = player.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-  const mutation = `mutation { newGame(player: "${escapedPlayer}") }`
+  const mutation = `mutation { newGame(player: "${player}") }`
   let query = buildGraphQLQuery(mutation)
   request(query).then((res) => console.log(res))
 }

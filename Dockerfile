@@ -13,7 +13,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     ca-certificates \
     curl \
-    build-base \
     && rm -rf /var/lib/apt/lists/*
 
 # Add wasm target

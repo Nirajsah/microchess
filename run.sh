@@ -34,9 +34,7 @@ INFO_1=($(linera --with-wallet 1 wallet request-chain --faucet $FAUCET_URL))
 CHAIN_1="${INFO_1[0]}"
 OWNER_1="${INFO_1[3]}"
 
-cd chess/ 
-
-cargo build --release --target wasm32-unknown-unknown
+cargo build -p chess --release --target wasm32-unknown-unknown 
 
 echo "Publishing and creating Chess Game project..."
 LINERA_APPLICATION_ID=$(linera --with-wallet 1 publish-and-create \
@@ -49,13 +47,22 @@ LINERA_APPLICATION_ID=$(linera --with-wallet 1 publish-and-create \
 
 
 
-echo $LINERA_APPLICATION_ID
-
+echo "Waiting for services to start..."
 echo "Starting Linera services..."
 linera -w1 service --port 8080 &
-
-echo "Waiting for services to start..."
 sleep 1
+
+echo $LINERA_APPLICATION_ID
+
+# === Write to frontend/.env.local ===
+FRONTEND_ENV_FILE="$PWD/frontend/.env.local"
+ENV_VAR_NAME="VITE_MICROCHESS_APPLICATION_ID"
+
+# clear the old id
+:> $FRONTEND_ENV_FILE
+ 
+# Remove old line
+echo "$ENV_VAR_NAME=\"$LINERA_APPLICATION_ID\"" >> "$FRONTEND_ENV_FILE"
 
 echo "http://localhost:8080/chains/$CHAIN_1/applications/$LINERA_APPLICATION_ID"
 
