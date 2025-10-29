@@ -14,23 +14,27 @@ Welcome to the MicroChess, a cutting-edge project that merges classic chess game
 - **Web3 Integration:** Seamlessly interact with blockchain features through an intuitive web interface.
 - **Future Enhancements:** Planned updates include computer opponents for solo play and premium features for advanced users.
 
-To get started with the Decentralized Game Platform, follow these steps:
+To get started with the Microchess, follow these steps:
 
 ## Compiling and Deployment
 
-You should have rust and bun.js or yarn installed.
+You should have rust and pnpm installed.
 
 ```
 git clone https://github.com/linera-io/linera-protocol.git
 cd linera-protocol
 cargo install --path linera-service
 cargo install --path linera-storage-service
-git clone https://github.com/Nirajsah/stella.git
-cd stella
-./run.sh
-cd frontend
-bun vite build
-bun preview
+
+# make sure linera and its corresponding binaries are installed
+git clone https://github.com/Nirajsah/microchess.git
+cd microchess
+./run.sh # this scripts deploys the app and starts the linera service
+cd frontend # .env.local should have the updated APP_ID in place
+
+pnpm dev
+
+# make sure to clone and build the croissant wallet and setup it up as extension
 ```
 
 **_To play you need to have port number, chainId and owner stored in the sessionStorage of you browser_**
@@ -54,28 +58,12 @@ bun preview
   - Queens
   - Kings
 
-## Todo List
-
-### Chess Rules
-
-- [x] Implement capturing mechanics.
-- [x] Implement pawn double move.
-- [x] Implement turn-based play (White moves first).
-- [x] Detect and handle check.
-- [x] Implement castling.
-- [x] Implement en passant.
-- [x] Detect and handle checkmate.
-- [x] Implement pawn promotion.
-- [x] Implement stalemate detection.
-- [x] Implement draw by threefold repetition.
-- [x] Implement draw by the fifty-move rule.
-
 ### Future Features
 
-- [ ] Add support for different game modes.
 - [ ] Develop a tournament feature.
 - [ ] Implement AI opponent for single-player mode.
-- [ ] Expand game options beyond chess.
+
+To be added...
 
 ## License
 
