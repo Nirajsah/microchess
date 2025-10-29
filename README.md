@@ -34,10 +34,10 @@ cd frontend # .env.local should have the updated APP_ID in place
 
 pnpm dev
 
-# make sure to clone and build the croissant wallet and setup it up as extension
 ```
 
-**_To play you need to have port number, chainId and owner stored in the sessionStorage of you browser_**
+**make sure to clone and build the croissant wallet and set it up as extension**
+https://github.com/Nirajsah/croissant
 
 ## MicroChess Completed Features
 
