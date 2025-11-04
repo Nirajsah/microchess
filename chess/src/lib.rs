@@ -1,16 +1,19 @@
 #![allow(non_snake_case)]
 
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
-use async_graphql::{InputObject, Request, Response, SimpleObject};
-use chess_lib::{game::game::Game, pieces::Color, ChessError, Result};
+use async_graphql::{Request, Response, SimpleObject};
+use base64::{engine::general_purpose, Engine};
+use chess_lib::{game::game::Game, pieces::Color, ChessError};
 use serde::{Deserialize, Serialize};
 pub struct ChessAbi;
 use linera_sdk::{
     abi::{ContractAbi, ServiceAbi},
     graphql::GraphQLMutationRoot,
     linera_base_types::{AccountOwner, ChainId, TimeDelta, Timestamp},
-    ToBcsBytes,
 };
 
 impl ContractAbi for ChessAbi {
@@ -46,31 +49,6 @@ pub struct InstantiationArgument {
 //    pub win_rate: f32,
 //}
 
-#[derive(
-    Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Ord, PartialOrd, SimpleObject, InputObject,
-)]
-#[graphql(input_name = "FriendIdInput")]
-pub struct FriendId {
-    pub id: String,
-}
-
-impl FriendId {
-    pub fn create_token_id(player_key: &String, points: &u32) -> Result<FriendId> {
-        use base64::engine::{general_purpose::STANDARD_NO_PAD, Engine as _};
-        use sha3::Digest as _;
-
-        let mut hasher = sha3::Sha3_256::new();
-        hasher.update(player_key.to_bcs_bytes().unwrap());
-        hasher.update(points.to_bcs_bytes().unwrap());
-
-        let id = hasher.finalize().to_vec();
-
-        let token_id = STANDARD_NO_PAD.encode(id);
-
-        Ok(FriendId { id: token_id })
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChessResponse {
     Ok,
@@ -94,6 +72,16 @@ pub enum Operation {
         piece: String,
         promoted_piece: String,
     },
+    FrGame {
+        player: AccountOwner,
+    },
+    FrGameHash {
+        token: String,
+        player: AccountOwner,
+    },
+    Resign,
+    Increment,
+    Subscribe,
     /* Resign,
     /// Start the game on a temporary chain
     StartGame {
@@ -135,6 +123,10 @@ pub enum Message {
     },
     GameChainData {
         game_chain_data: GameChain,
+    },
+
+    FriendlyGameReq {
+        players: [Player; 2],
     }, /*
        StartGame {
            player: PublicKey,
@@ -147,6 +139,57 @@ pub enum Message {
        }, */
 }
 
+const TOKEN_TIME: u64 = 300; // 300 seconds = 5 minutes
+
+// struct with expiration
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TimedToken {
+    player: Player,
+    expires_at: u64,
+}
+
+#[allow(dead_code)]
+impl TimedToken {
+    pub fn new(player: Player) -> Self {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        Self {
+            player,
+            expires_at: now + TOKEN_TIME,
+        }
+    }
+
+    // Encode the token into a base64 string
+    pub fn encode_token(&self) -> String {
+        let bytes = bincode::serialize(self).unwrap();
+        general_purpose::STANDARD.encode(bytes)
+    }
+
+    // Decode the base64 string back into a token
+    pub fn decode_token(encoded: &str) -> Option<Player> {
+        let bytes = general_purpose::STANDARD.decode(encoded).unwrap();
+        let timed_token: TimedToken = bincode::deserialize(&bytes).unwrap();
+        // Check if expired
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        if now > timed_token.expires_at {
+            return None;
+        }
+
+        Some(timed_token.player)
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum Event {
+    Increment { value: u64 },
+}
 /* #[derive(
     Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject, InputObject,
 )]
@@ -161,11 +204,6 @@ pub struct Player {
     pub owner: AccountOwner,
     pub chain_id: ChainId,
 }
-
-/* #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
-pub struct Players {
-
-}; */
 
 #[derive(Clone, Default, Serialize, Deserialize, SimpleObject)]
 pub struct GameWrapper {
