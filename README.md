@@ -31,9 +31,7 @@ git clone https://github.com/Nirajsah/microchess.git
 cd microchess
 ./run.sh # this scripts deploys the app and starts the linera service
 cd frontend # .env.local should have the updated APP_ID in place
-
 pnpm dev
-
 ```
 
 **make sure to clone and build the croissant wallet and set it up as extension**
