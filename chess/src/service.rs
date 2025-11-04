@@ -115,6 +115,13 @@ impl ChessService {
         clock.time_left_for_players(block_time, active_player)
     }
 
+    async fn count(&self) -> &u64 {
+        self.state.game_count.get()
+    }
+
+    async fn friend_id(&self) -> &str {
+        self.state.game_token.get()
+    }
     /*
     async fn captured_pieces(&self) -> &Vec<Piece> {
         &self.state.board.get().captured_pieces

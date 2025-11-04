@@ -8,19 +8,23 @@ use std::str::FromStr;
 use crate::state::ChessState;
 
 use chess::{
-    ChessResponse, Clock, GameChain, GameWrapper, InstantiationArgument, Message, Operation, Player,
+    ChessResponse, Clock, Event, GameChain, GameWrapper, InstantiationArgument, Message, Operation,
+    Player, TimedToken,
 };
-use chess_lib::{game::game::GameState, Result};
+use chess_lib::{game::game::GameState, ChessError, Result};
 use linera_sdk::{
     abi::WithContractAbi,
     linera_base_types::{
-        AccountOwner, Amount, ApplicationPermissions, ChainId, ChainOwnership, TimeDelta,
-        TimeoutConfig, Timestamp,
+        AccountOwner, Amount, ApplicationPermissions, ChainId, ChainOwnership, StreamUpdate,
+        TimeDelta, TimeoutConfig, Timestamp,
     },
     util::BlockingWait,
     views::{RootView, View},
     Contract, ContractRuntime,
 };
+use tracing::Instrument;
+
+const STREAM_NAME: &[u8] = b"chess";
 
 #[allow(dead_code)]
 pub struct ChessContract {
@@ -37,7 +41,7 @@ impl WithContractAbi for ChessContract {
 impl Contract for ChessContract {
     type InstantiationArgument = InstantiationArgument;
     type Message = Message;
-    type EventValue = ();
+    type EventValue = Event;
     type Parameters = ();
 
     async fn load(runtime: ContractRuntime<Self>) -> Self {
@@ -54,6 +58,41 @@ impl Contract for ChessContract {
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
         match operation {
+            Operation::Resign => {
+                todo!()
+            }
+            // we take the hash, decode it and send a req to app_chain
+            Operation::FrGameHash { token, player } => self.request_friendly_match(token, player),
+            // Create a new hash for a friendly match
+            Operation::FrGame { player } => {
+                let player = Player {
+                    chain_id: self.runtime.chain_id(),
+                    owner: player,
+                };
+                let token = TimedToken::new(player).encode_token();
+                self.state.game_token.set(token);
+                ChessResponse::Ok
+            }
+            Operation::Subscribe => {
+                let app_id = self.runtime.application_id().forget_abi();
+                let chain_id = self.app_chain();
+                self.runtime
+                    .subscribe_to_events(chain_id, app_id, STREAM_NAME.into());
+
+                ChessResponse::Ok
+            }
+            // testing events
+            Operation::Increment => {
+                *self.state.game_count.get_mut() += 1;
+                self.runtime.emit(
+                    STREAM_NAME.into(),
+                    &Event::Increment {
+                        value: *self.state.game_count.get(),
+                    },
+                );
+
+                ChessResponse::Ok
+            }
             // A player makes a new game request to its own chain
             Operation::NewGame { player } => {
                 let player = Player {
@@ -154,6 +193,27 @@ impl Contract for ChessContract {
                 self.state.game_chain.set(game_chain_data)
             }
             Message::NewGameReq { player } => self.new_match(player),
+            Message::FriendlyGameReq { players } => self.start_friendly_match(players).await,
+        }
+    }
+
+    async fn process_streams(&mut self, updates: Vec<StreamUpdate>) {
+        for update in updates {
+            assert_eq!(update.stream_id.stream_name, STREAM_NAME.into());
+            assert_eq!(
+                update.stream_id.application_id,
+                self.runtime.application_id().forget_abi().into()
+            );
+            for index in update.new_indices() {
+                let event = self
+                    .runtime
+                    .read_event(update.chain_id, STREAM_NAME.into(), index);
+                match event {
+                    Event::Increment { value } => {
+                        self.state.game_count.set(value);
+                    }
+                }
+            }
         }
     }
 
@@ -165,6 +225,10 @@ impl Contract for ChessContract {
 impl ChessContract {
     pub fn app_chain(&mut self) -> ChainId {
         self.runtime.application_creator_chain_id()
+    }
+
+    pub fn resign(&mut self) -> ChessResponse {
+        todo!()
     }
 
     /// Starting a game on a chain
@@ -183,17 +247,13 @@ impl ChessContract {
 
         if let Some(lobby_player) = self.state.lobby.get_mut().pop() {
             // here we start a new game for incoming player and player sitting in the lobby
-            log::info!("players present starting a new game");
             let players = [player.owner, lobby_player.owner];
-            match self.create_game_chain(
-                Amount::from_str("1.").unwrap(),
-                TimeDelta::from_secs(1800), // 30 mins
-                players,
-            ) {
-                Ok(game_d) => self
-                    .send_game_chain_data_2players(game_d, &[player, lobby_player])
-                    .unwrap(), // unwrap for testing
-                Err(_) => todo!(),
+            let fee = Amount::from_str("1.").unwrap();
+            let match_time = TimeDelta::from_secs(900); // 15 mins
+
+            if let Ok(game_chain_data) = self.create_game_chain(fee, match_time, players) {
+                self.send_game_chain_data_2players(game_chain_data, &[player, lobby_player])
+                    .unwrap();
             }
         } else {
             // we put the player in lobby.
@@ -245,7 +305,6 @@ impl ChessContract {
         game_chain_data: GameChain,
         players: &[Player],
     ) -> Result<()> {
-        log::info!("sending necessary data to the players");
         for p in players.iter() {
             self.runtime.send_message(
                 p.chain_id,
@@ -254,70 +313,50 @@ impl ChessContract {
                 },
             );
         }
+        // this means a game has started on a chain, we can increase the count,
+        // in the future when a game starts on a multi-owner-chain i.e., (game_chain)
+        // we send a message from the game_chain to app_chain to update this count.
+        // or maybe, we send a final message when the game_chain is closed.
+        *self.state.game_count.get_mut() += 1;
 
         Ok(())
     }
 
-    /* /// generated hash
-    pub fn request_friendly_match(&mut self, player: PublicKey, timer: TimeDelta) -> ChessResponse {
-        assert_ne!(self.runtime.chain_id(), self.main_chain_id());
-        let points = self.state.stats.get().points;
-        let id = FriendId::create_token_id(&player.to_string(), &points)
-            .expect("Unable to generate hash");
-
-        // Todo!() Need to store and return the hash to the user.
-        let main_chain_id = self.main_chain_id();
-        let player_rank = self.state.stats.get().rank.clone();
-        let player = PlayerRequest {
-            player,
-            timer,
-            rank: player_rank,
+    /// This method sends a message to app_chain with necessary details to create a new game chain for both players
+    pub fn request_friendly_match(&mut self, token: String, player: AccountOwner) -> ChessResponse {
+        let app_chain = self.app_chain();
+        assert_ne!(self.runtime.chain_id(), app_chain);
+        let player = Player {
+            chain_id: self.runtime.chain_id(),
+            owner: player,
         };
-
-        log::info!("Hash_id: {:?}", id);
+        let friend = if let Some(player) = TimedToken::decode_token(&token) {
+            player
+        } else {
+            return ChessResponse::Err(ChessError::new("INVALID TOKEN"));
+        };
+        let players: [Player; 2] = [player, friend];
         self.runtime
-            .send_message(main_chain_id, Message::FriendlyGame { hash: id, player });
+            .send_message(app_chain, Message::FriendlyGameReq { players });
+
         ChessResponse::Ok
     }
 
-    /// This method is used to send hash and player's PlayerRequest to the main_chain_id, requires
-    /// (game hash, and public_key)
-    pub async fn start_friendly_match(
-        &mut self,
-        player: AccountOwner,
-        hash: FriendId,
-    ) -> ChessResponse {
-        assert_ne!(self.runtime.chain_id(), self.main_chain_id());
+    /// Responsible for creating a chain and sending the necessary data to the players
+    pub async fn start_friendly_match(&mut self, players: [Player; 2]) {
+        let app_chain = self.app_chain();
+        assert_eq!(self.runtime.chain_id(), app_chain);
 
-        let main_chain_id = self.main_chain_id();
-        let rank = self.state.stats.get().rank.clone();
+        let fee = Amount::from_str("1.").unwrap();
+        let match_time = TimeDelta::from_secs(900); // 15 mins
 
-        // Timer does not matter here, as the player who generated the hash timer will be used.
-        let player = PlayerRequest {
-            player,
-            timer: TimeDelta::from_micros(0),
-            rank,
-        };
-
-        self.runtime
-            .send_message(main_chain_id, Message::FriendlyGame { hash, player });
-        ChessResponse::Ok
+        if let Ok(game_chain_data) =
+            self.create_game_chain(fee, match_time, [players[0].owner, players[1].owner])
+        {
+            self.send_game_chain_data_2players(game_chain_data, &players)
+                .unwrap()
+        }
     }
-
-    /// A method to send a request to the main chain to start a new chain with player's public_key
-    pub fn request_game_chain(&mut self, player: AccountOwner, timer: TimeDelta, rank: Rank) {
-        assert_ne!(self.runtime.chain_id(), self.main_chain_id());
-        let main_chain_id = self.main_chain_id();
-        self.runtime.send_message(
-            main_chain_id,
-            Message::StartGame {
-                player,
-                timer,
-                rank,
-            },
-        );
-    }
-    } */
 
     // Handles the winner stats, when a match is over, this function is called to update the
     // leaderboard.

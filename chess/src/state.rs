@@ -20,19 +20,16 @@ pub struct ChessState {
     pub game_chain: RegisterView<GameChain>,
     /// Lobby to hold players for potential match
     pub lobby: RegisterView<Vec<Player>>, // will be updated to include ranks.
-    // The current game players
-    // pub players: RegisterView<Option<Players>>,
     /// Flag
     pub game_flag: RegisterView<bool>,
+    /// Count the number of games played on microchess
+    pub game_count: RegisterView<u64>,
+    pub game_token: RegisterView<String>,
     /*
-    /// Player Requesting to play with a Friend(need a hash)
-    pub friend_lobby: MapView<FriendId, PlayerRequest>,
     /// LeaderBoard (max 10)
     pub leaderboard: RegisterView<Vec<PlayerProfile>>,
     /// Player Stats
     pub stats: RegisterView<PlayerProfile>,
-    // Temporary chains for individual games, by player.
-    // pub game_chains: MapView<PublicKey, BTreeSet<GameChain>>,
     // store the betting amount on temp chain.
     // pub bet_amount: RegisterView<Amount>,
     */
