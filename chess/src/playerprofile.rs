@@ -1,31 +1,22 @@
+use std::ops::Deref;
+
 /**
- * Todo!(When a match is over the points update will be based on game type, i.e., Standard, Bullet, Blitz...)
+ * TODO(When a match is over the points update will be based on game type, i.e., Standard, Bullet, Blitz...)
 */
-use async_graphql::{scalar, SimpleObject};
+use async_graphql::{scalar, InputObject, SimpleObject};
+use linera_sdk::linera_base_types::AccountOwner;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, SimpleObject)]
+#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerProfile {
-    pub points: u32,       // Total points the player has accumulated
-    pub games_played: u32, // Total number of games played
-    pub games_won: u32,    // Total number of games won
-    pub games_lost: u32,   // Total number of games lost
-    pub draw_count: u32,   // Number of games drawn
-    pub win_rate: f32,     // Winrate of a player, 42.2%
-    pub rank: Rank,        // Player Rank (Default: Bronze)
-}
-
-scalar!(Rank);
-
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Ord, PartialOrd, Serialize)]
-pub enum Rank {
-    #[default]
-    Bronze, // 0–999 points
-    Silver,   // 1000–1999 points
-    Gold,     // 2000–2999 points
-    Platinum, // 3000–3999 points
-    Diamond,  // 4000+ points
+    pub id: AccountOwner,     // Player Rank (Default: Bronze)
+    pub name: Option<String>, // player's name
+    pub elo: u32,             // Total points the player has accumulated
+    pub matches: u32,         // Total number of games played
+    pub won: u32,             // Total number of games won
+    pub lost: u32,            // Total number of games lost
+    pub ath: u32,             // All time high
 }
 
 scalar!(GameResult);
@@ -37,72 +28,61 @@ pub enum GameResult {
     Draw, // Add 2 points
 }
 
-impl Rank {
-    pub fn from_points(points: u32) -> Self {
-        match points {
-            0..=999 => Rank::Bronze,
-            1000..=1999 => Rank::Silver,
-            2000..=2999 => Rank::Gold,
-            3000..=3999 => Rank::Platinum,
-            _ => Rank::Diamond,
-        }
-    }
-
-    // A helper function to get the lower bound of the rank range
-    pub fn points(&self) -> u32 {
-        match self {
-            Rank::Bronze => 0,
-            Rank::Silver => 1000,
-            Rank::Gold => 2000,
-            Rank::Platinum => 3000,
-            Rank::Diamond => 4000,
-        }
-    }
+#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
+pub struct Players {
+    pub player_1: PlayerProfile,
+    pub player_2: PlayerProfile,
 }
 
-impl From<Rank> for u32 {
-    fn from(val: Rank) -> Self {
-        val.points()
+#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject, InputObject)]
+pub struct MatchId {
+    pub id: u32,
+}
+
+impl Deref for MatchId {
+    type Target = u32;
+
+    fn deref(&self) -> &Self::Target {
+        &self.id
     }
 }
 
 impl PlayerProfile {
-    /// Constructor to create a new player profile
-    pub fn new(points: u32) -> Self {
-        let rank = Rank::from_points(points);
-        PlayerProfile {
-            points,
-            games_played: 0,
-            games_won: 0,
-            games_lost: 0,
-            draw_count: 0,
-            win_rate: 0.0,
-            rank,
+    // create a new profile
+    pub fn new(id: AccountOwner, name: Option<String>) -> Self {
+        Self {
+            id,
+            name,
+            elo: 0,
+            matches: 0,
+            won: 0,
+            lost: 0,
+            ath: 0,
         }
     }
+    // send player to app_chain for a match, this will be sent to game_chain
+    // -> game_chain sends data back to app_chain to handle point updates after match
+    // -> app_chain sends point updates to the player's chains
+    pub fn player(&self) -> Self {
+        self.clone()
+        /*
+        elo, id ,name, matches, won, lost
+        -> player_chain send to app_chain
+        -> app_chain to game_chain
+        -> game_chain to app_chain
+        -> app_chain to player chain
 
-    /// A function to update points, recalculate win_rate and rank
-    pub fn update_points(&mut self, result: GameResult) {
-        match result {
-            GameResult::Win => {
-                self.points += 5; // Add 5 points for a win
-                self.games_won += 1;
-            }
-            GameResult::Loss => {
-                self.points = self.points.saturating_sub(1); // Subtract 1 point for a loss
-                self.games_lost += 1;
-            }
-            GameResult::Draw => {
-                self.points += 2; // Add 2 point for a draw
-                self.draw_count += 1;
-            }
-        }
-        self.games_played += 1;
 
-        // Recalculate the win rate
-        self.win_rate = (self.games_won as f32 / self.games_played as f32) * 100.0;
+        // when a match starts the app_chain stores the matchid as well as both the players profile.
+        the game_chain receives, both player(elo, id, name), match_id.
 
-        // Recalculate the player's rank based on updated points
-        self.rank = Rank::from_points(self.points);
+        after match ends the game_chain sends, match_id and result(winner)
+        app_chain decides and update_leaderboard, send update points to players and deleted both players profile from its state
+        */
+    }
+
+    // update player stats after a match, message received from app_chain
+    pub fn update(&mut self) {
+        todo!()
     }
 }

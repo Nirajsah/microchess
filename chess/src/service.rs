@@ -82,23 +82,25 @@ impl ChessService {
     }
 
     async fn game_chain(&self) -> Option<GameChain> {
-        let game_data = self.state.game_chain.get();
+        if let Some(game_data) = self.state.game_chain.get() {
+            let now = self.runtime.system_time();
+            let expiry = game_data
+                .timestamp
+                .saturating_add(TimeDelta::from_secs(300));
 
-        let now = self.runtime.system_time();
-        let expiry = game_data
-            .created_at
-            .saturating_add(TimeDelta::from_secs(300));
-
-        // If expired → return None
-        if now > expiry {
-            None
+            // If expired → return None
+            if now < expiry {
+                Some(game_data.clone())
+            } else {
+                None
+            }
         } else {
-            Some(game_data.clone())
+            None
         }
     }
 
     async fn is_game_chain(&self) -> bool {
-        *self.state.game_flag.get()
+        self.state.match_id.get().is_some()
     }
 
     async fn mv_string(&self) -> &Vec<String> {

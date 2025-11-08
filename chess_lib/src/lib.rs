@@ -35,6 +35,15 @@ pub enum ChessError {
     Stalemate,
     #[error("Game is over")]
     GameOver,
+
+    #[error("{0}")]
+    Other(String),
+}
+
+impl ChessError {
+    pub fn new<S: Into<String>>(msg: S) -> Self {
+        Self::Other(msg.into())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, ChessError>;

@@ -13,7 +13,7 @@ import { Color, PieceColor } from './types'
 import { UserPlus, Shuffle, Users } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { assignChain, startGame } from './utils'
+import { assignChain, reqFriendlyGame, startGame } from './utils'
 import { useMicroChess } from '@/context/MicroChessProvider'
 
 export interface MatchData {
@@ -46,7 +46,6 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
   )
 }
 
-
 const MatchDataUI = (data: MatchData) => {
   const {
     player,
@@ -58,12 +57,16 @@ const MatchDataUI = (data: MatchData) => {
     game_state,
   } = data
 
-  const movePairs = React.useMemo(() =>
-    moves ? Array.from({ length: Math.ceil(moves.length / 2) }, (_, i) => ({
-      white: moves[i * 2] || '',
-      black: moves[i * 2 + 1] || ''
-    })) : []
-    , [moves]);
+  const movePairs = React.useMemo(
+    () =>
+      moves
+        ? Array.from({ length: Math.ceil(moves.length / 2) }, (_, i) => ({
+            white: moves[i * 2] || '',
+            black: moves[i * 2 + 1] || '',
+          }))
+        : [],
+    [moves]
+  )
 
   return (
     <div className="w-full items-center justify-between flex flex-col gap-4 h-[720px]">
@@ -94,15 +97,18 @@ const MatchDataUI = (data: MatchData) => {
             <div className="h-[250px] overflow-y-scroll scrollbar-hide text-xs flex flex-col-reverse">
               <table className="w-full">
                 <tbody>
-                  {moves && movePairs.map((move: any, index) => (
-                    <tr className="flex px-2 w-full" key={index}>
-                      <td className="w-[33.3%]">{index + 1}</td>
-                      <td className="w-[33.3%] text-center">
-                        {move.white || ''}
-                      </td>
-                      <td className="w-[33.3%] text-end">{move.black || ''}</td>
-                    </tr>
-                  ))}
+                  {moves &&
+                    movePairs.map((move: any, index) => (
+                      <tr className="flex px-2 w-full" key={index}>
+                        <td className="w-[33.3%]">{index + 1}</td>
+                        <td className="w-[33.3%] text-center">
+                          {move.white || ''}
+                        </td>
+                        <td className="w-[33.3%] text-end">
+                          {move.black || ''}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -160,13 +166,15 @@ const MatchSelect = (assign: any) => {
     setStep(step)
   }
 
+  const handleRandomClick = () => {
+    setStep('loading')
+    startGame()
+  }
+
   const handleFriendlyClick = () => {
     setStep('loading')
 
-    setTimeout(() => {
-      setHash(generateHash())
-      setStep('hash')
-    }, 1500)
+    reqFriendlyGame()
   }
 
   const handleCopy = () => {
@@ -197,7 +205,7 @@ const MatchSelect = (assign: any) => {
             {/* Random Matchmaking */}
             <div>
               <MatchButton
-                handleFriendlyMatch={handleFriendlyClick}
+                handleMatchMaking={handleRandomClick}
                 name="Random Match"
                 icon={<Shuffle className="w-6 h-6" />}
               />
@@ -211,7 +219,7 @@ const MatchSelect = (assign: any) => {
             {/* Friendly Match */}
             <div>
               <MatchButton
-                handleFriendlyMatch={handleFriendlyClick}
+                handleMatchMaking={handleFriendlyClick}
                 name="Friendly Match"
                 icon={<Users className="w-6 h-6" />}
               />
@@ -300,7 +308,7 @@ const MatchSelect = (assign: any) => {
 }
 
 type MatchMakingButtonType = {
-  handleFriendlyMatch: () => void
+  handleMatchMaking: () => void
   name: string
   icon: any
 }
@@ -348,11 +356,10 @@ const AssignButton: React.FC<AssignButtonProps> = ({
 
 const MatchButton = (props: MatchMakingButtonType) => {
   const [pressed, setPressed] = useState(false)
-  const { userKey } = useMicroChess()
 
   function handleClick() {
     setPressed(true)
-    startGame(userKey)
+    props.handleMatchMaking()
     setTimeout(() => setPressed(false), 120) // revert after 120ms
   }
 

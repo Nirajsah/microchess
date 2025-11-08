@@ -25,6 +25,7 @@ import {
   isGameChain,
   timer,
   makeMove,
+  gameId,
 } from './utils'
 import { useMicroChess } from '@/context/MicroChessProvider'
 
@@ -78,6 +79,8 @@ const CBoard = () => {
     const fetchChainInfo = async () => {
       try {
         const res = await getGameChainInfo()
+        const f = await gameId()
+        console.log('friend id', f)
         const gameChain = JSON.parse(res.result).data.gameChain
         setAssign(gameChain)
       } catch (err) {

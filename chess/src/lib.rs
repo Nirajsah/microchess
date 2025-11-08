@@ -7,14 +7,21 @@ use std::{
 
 use async_graphql::{Request, Response, SimpleObject};
 use base64::{engine::general_purpose, Engine};
-use chess_lib::{game::game::Game, pieces::Color, ChessError};
+use chess_lib::{
+    game::game::{Game, GameState},
+    pieces::Color,
+    ChessError,
+};
 use serde::{Deserialize, Serialize};
 pub struct ChessAbi;
+pub mod playerprofile;
 use linera_sdk::{
     abi::{ContractAbi, ServiceAbi},
     graphql::GraphQLMutationRoot,
     linera_base_types::{AccountOwner, ChainId, TimeDelta, Timestamp},
 };
+
+use crate::playerprofile::{MatchId, PlayerProfile, Players};
 
 impl ContractAbi for ChessAbi {
     type Operation = Operation;
@@ -58,9 +65,7 @@ pub enum ChessResponse {
 #[derive(Debug, Deserialize, Serialize, Clone, GraphQLMutationRoot)]
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
-    NewGame {
-        player: AccountOwner,
-    },
+    NewGame,
     MakeMove {
         from: String,
         to: String,
@@ -72,39 +77,37 @@ pub enum Operation {
         piece: String,
         promoted_piece: String,
     },
-    FrGame {
-        player: AccountOwner,
-    },
+    FrGame,
     FrGameHash {
         token: String,
-        player: AccountOwner,
     },
     Resign,
-    Increment,
     Subscribe,
-    /* Resign,
-    /// Start the game on a temporary chain
-    StartGame {
-        /// The `Owner` controlling player 1 and 2, respectively.
-        players: [AccountOwner; 2],
-        /// A small amount to cover the fees for the game, on the new chain
-        amount: Amount,
-        /// Game's total time (~15 mins)
-        match_time: TimeDelta,
-    },
-    RequestGame {
-        player: AccountOwner,
-        timer: TimeDelta,
-        rank: Rank,
-    },
-    FriendlyGame {
-        player: AccountOwner,
-        timer: TimeDelta,
-    },
-    StartFriendlyGame {
-        player: AccountOwner,
-        hash: FriendId,
-    }, */
+    Profile {
+        name: String,
+    }, /* Resign,
+       /// Start the game on a temporary chain
+       StartGame {
+           /// The `Owner` controlling player 1 and 2, respectively.
+           players: [AccountOwner; 2],
+           /// A small amount to cover the fees for the game, on the new chain
+           amount: Amount,
+           /// Game's total time (~15 mins)
+           match_time: TimeDelta,
+       },
+       RequestGame {
+           player: AccountOwner,
+           timer: TimeDelta,
+           rank: Rank,
+       },
+       FriendlyGame {
+           player: AccountOwner,
+           timer: TimeDelta,
+       },
+       StartFriendlyGame {
+           player: AccountOwner,
+           hash: FriendId,
+       }, */
 }
 //     /// The `Owner` controlling player 1 and 2, respectively.
 //     pub players: [Owner; 2],
@@ -115,7 +118,8 @@ pub enum Operation {
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Message {
     Start {
-        players: [AccountOwner; 2],
+        players: Players,
+        match_id: MatchId,
         timer: TimeDelta,
     },
     NewGameReq {
@@ -157,7 +161,7 @@ impl TimedToken {
             .as_secs();
 
         Self {
-            player,
+            player: player,
             expires_at: now + TOKEN_TIME,
         }
     }
@@ -188,20 +192,25 @@ impl TimedToken {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Event {
-    Increment { value: u64 },
+    GameCount { value: u64 },
 }
-/* #[derive(
-    Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject, InputObject,
-)]
-pub struct PlayerRequest {
-    pub player: AccountOwner,
-    pub timer: TimeDelta,
-    pub rank: Rank,
-} */
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
+#[derive(Debug, Deserialize, Serialize)]
+pub enum EventType {
+    GameCount,
+    Leaderboard,
+} /* #[derive(
+      Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject, InputObject,
+  )]
+  pub struct PlayerRequest {
+      pub player: AccountOwner,
+      pub timer: TimeDelta,
+      pub rank: Rank,
+  } */
+
+#[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
 pub struct Player {
-    pub owner: AccountOwner,
+    pub profile: PlayerProfile,
     pub chain_id: ChainId,
 }
 
@@ -232,6 +241,12 @@ impl GameWrapper {
             .position(|p| p.as_ref() == Some(account))
             .map(|i| if i == 0 { Color::White } else { Color::Black })
     }
+
+    pub fn handle_resign(&mut self, opponent: Color) {
+        self.inner.state = GameState::Resign;
+        let winner = self.players[opponent.index()];
+        self.winner = winner;
+    }
 }
 
 impl Deref for GameWrapper {
@@ -251,15 +266,12 @@ impl DerefMut for GameWrapper {
 /// The ID and timestamp of a temporary chain for a single game.
 ///
 /// Register View needs this struct to impl Default trait. but ChainId does not, we use Option<ChainId<ChainId>
-#[derive(
-    Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject)]
 pub struct GameChain {
     /// The Timestamp of the `OpenChain` message that created the chain.
     pub timestamp: Timestamp,
     /// The ID of the temporary game chain itself.
-    pub chain_id: Option<ChainId>,
-    pub created_at: Timestamp,
+    pub chain_id: ChainId,
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]

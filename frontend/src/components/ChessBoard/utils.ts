@@ -56,11 +56,27 @@ function buildGraphQLQuery(queryBody: string): string {
 // Escape backslashes and double-quotes in the player string
 
 // Start a new game
-export function startGame(player: string) {
-  const mutation = `mutation { newGame(player: "${player}") }`
+export function startGame() {
+  const mutation = `mutation { newGame }`
   let query = buildGraphQLQuery(mutation)
   request(query).then((res) => console.log(res))
 }
+// Request a friendly match
+export function reqFriendlyGame() {
+  const mutation = `mutation { frGame }`
+  let query = buildGraphQLQuery(mutation)
+  request(query).then((res) => console.log(res))
+}
+
+export function gameId() {
+  const mutation = `query { friendId }`
+  let query = buildGraphQLQuery(mutation)
+  return request(query)
+}
+
+// query {
+//   friendId
+// }
 
 // Ask the wallet to assign the wallet with new chain
 export function assignChain(chainId: string, timestamp: number) {
