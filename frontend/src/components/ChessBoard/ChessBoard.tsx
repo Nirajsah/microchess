@@ -23,6 +23,13 @@ export default function ChessBoard(props: BoardProps) {
   const [dragPosition, setDragPosition] = useState({ xPercent: 0, yPercent: 0 })
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null)
   const [possMoves, setPossMoves] = React.useState<Square[]>([])
+  const [activeSquare, setActiveSquare] = React.useState<{
+    from: Square
+    to: Square
+  }>({
+    from: '' as Square,
+    to: '' as Square,
+  })
 
   const { generateMoves } = useChessWasm()
 
@@ -102,6 +109,10 @@ export default function ChessBoard(props: BoardProps) {
         targetSquare as Square,
         piece as Piece
       )
+      setActiveSquare({
+        from: selectedSquare as Square,
+        to: targetSquare as Square,
+      })
     } catch (err) {
       console.error('makeMove threw an error:', err)
     } finally {
@@ -110,6 +121,35 @@ export default function ChessBoard(props: BoardProps) {
   }
 
   const selectedTheme = themes[chessSettings.theme as ThemeName]
+
+  const getSquareBackground = (
+    square: Square,
+    piece: Piece,
+    number: number
+  ) => {
+    // King in check - highest priority
+    // if (kingInCheckSquare === square) {
+    //   return 'bg-red-500'
+    // }
+
+    // Currently selected square
+    if (selectedSquare === square) {
+      return selectedTheme.selectedSquare
+    }
+
+    // Last move highlighting
+    if (activeSquare.from === square || activeSquare.to === square) {
+      return '#d5ce61' // Semi-transparent yellow for last move
+    }
+
+    // Possible move with piece (capture)
+    if (possMoves.includes(square) && piece) {
+      return 'bg-red-400'
+    }
+
+    // Default checkerboard pattern
+    return number % 2 === 0 ? selectedTheme.dark : selectedTheme.light
+  }
 
   return (
     <div
@@ -136,14 +176,7 @@ export default function ChessBoard(props: BoardProps) {
             const piece = board[square as Square] as Piece
             const number = fileIndex + rankIndex
 
-            const bg =
-              selectedSquare === square
-                ? selectedTheme.selectedSquare
-                : possMoves.includes(square as Square) && piece
-                ? 'bg-red-400'
-                : number % 2 === 0
-                ? selectedTheme.dark
-                : selectedTheme.light
+            const bg = getSquareBackground(square as Square, piece, number)
 
             return (
               <div key={square}>

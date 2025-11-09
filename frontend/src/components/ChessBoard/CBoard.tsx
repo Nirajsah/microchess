@@ -12,8 +12,6 @@ import {
 } from './types'
 import { RightSideMenu } from './RightSideMenu'
 import ChessBoard from './ChessBoard'
-import Modal from '../Modal'
-import Settings from '../Themes'
 import Navbar from './Navbar'
 import { LeftSideMenu } from '../LeftSideMenu'
 import { useWalletNotifications } from '@/hooks/useWalletNotification'
@@ -32,10 +30,13 @@ import { useMicroChess } from '@/context/MicroChessProvider'
 const CBoard = () => {
   const [capturedPieces, _setCapturedPieces] = React.useState<string[]>([])
   const [_isGameChain, _setIsGameChain] = React.useState<boolean | null>(null) // null = not checked yet
-  const [_assign, setAssign] = React.useState<{
-    chainId: string
-    timestamp: number
-  } | null>(null)
+  const [_assign, setAssign] = React.useState<
+    | {
+        chainId: string
+        timestamp: number
+      }
+    | undefined
+  >(undefined)
 
   const { initBoard, isInitialized } = useChessWasm()
   const { userKey } = useMicroChess()
@@ -80,7 +81,6 @@ const CBoard = () => {
       try {
         const res = await getGameChainInfo()
         const f = await gameId()
-        console.log('friend id', f)
         const gameChain = JSON.parse(res.result).data.gameChain
         setAssign(gameChain)
       } catch (err) {
@@ -261,13 +261,7 @@ const CBoard = () => {
         <LeftSideMenu />
       </div>
       <Navbar />
-      <div className="flex flex-col items-center justify-center p-3 h-full">
-        <Modal select={open} unselect={() => setOpen(!open)}>
-          <Settings />
-        </Modal>
-        {/* <div className="absolute left-0 w-full p-2 max-w-[1320px] flex items-center justify-between">
-          <Navbar />
-        </div> */}
+      <div className="flex flex-col items-center p-3">
         <div className="flex flex-col lg:flex-row gap-4 w-full justify-center items-center">
           <div className="flex flex-col w-full max-w-[720px] relative">
             {board.opponent && (
@@ -294,7 +288,7 @@ const CBoard = () => {
             )}
           </div>
 
-          <div className="w-full lg:w-[20%]">
+          <div className="w-full max-w-[400px]">
             <RightSideMenu
               checkStatus={board.KingInCheck}
               player={board.player_turn || '-'} // Pass player info
