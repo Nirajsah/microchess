@@ -1,19 +1,19 @@
 #![allow(non_snake_case)]
 
-use std::{
-    ops::{Deref, DerefMut},
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::ops::{Deref, DerefMut};
 
-use async_graphql::{Request, Response, SimpleObject};
+use async_graphql::{Enum, InputObject, Request, Response, SimpleObject};
 use base64::{engine::general_purpose, Engine};
 use chess_lib::{
     game::game::{Game, GameState},
     pieces::Color,
     ChessError,
 };
+use leaderboard::Leaderboard;
+use playerprofile::PlayerHash;
 use serde::{Deserialize, Serialize};
 pub struct ChessAbi;
+pub mod leaderboard;
 pub mod playerprofile;
 use linera_sdk::{
     abi::{ContractAbi, ServiceAbi},
@@ -21,7 +21,7 @@ use linera_sdk::{
     linera_base_types::{AccountOwner, ChainId, TimeDelta, Timestamp},
 };
 
-use crate::playerprofile::{MatchId, PlayerProfile, Players};
+use crate::playerprofile::Players;
 
 impl ContractAbi for ChessAbi {
     type Operation = Operation;
@@ -46,15 +46,11 @@ pub struct InstantiationArgument {
     pub block_delay: TimeDelta,
 }
 
-//#[derive(Clone, Debug, Default, Deserialize, Serialize, SimpleObject)]
-//pub struct PlayerStats {
-//    pub player_id: String,
-//    pub games_played: u32,
-//    pub wins: u32,
-//    pub losses: u32,
-//    pub draws: u32,
-//    pub win_rate: f32,
-//}
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Enum)]
+pub enum MatchType {
+    Random,
+    Friendly,
+}
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChessResponse {
@@ -65,7 +61,14 @@ pub enum ChessResponse {
 #[derive(Debug, Deserialize, Serialize, Clone, GraphQLMutationRoot)]
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
+    // setup operations
     NewGame,
+    FrGame,
+    FrGameHash {
+        token: String,
+    },
+
+    // match operations
     MakeMove {
         from: String,
         to: String,
@@ -77,92 +80,89 @@ pub enum Operation {
         piece: String,
         promoted_piece: String,
     },
-    FrGame,
-    FrGameHash {
-        token: String,
-    },
     Resign,
+
+    // basic user operations
     Subscribe,
     Profile {
         name: String,
-    }, /* Resign,
-       /// Start the game on a temporary chain
-       StartGame {
-           /// The `Owner` controlling player 1 and 2, respectively.
-           players: [AccountOwner; 2],
-           /// A small amount to cover the fees for the game, on the new chain
-           amount: Amount,
-           /// Game's total time (~15 mins)
-           match_time: TimeDelta,
-       },
-       RequestGame {
-           player: AccountOwner,
-           timer: TimeDelta,
-           rank: Rank,
-       },
-       FriendlyGame {
-           player: AccountOwner,
-           timer: TimeDelta,
-       },
-       StartFriendlyGame {
-           player: AccountOwner,
-           hash: FriendId,
-       }, */
+    },
 }
-//     /// The `Owner` controlling player 1 and 2, respectively.
-//     pub players: [Owner; 2],
-//     /// The initial time each player has to think about their turns.
-//     pub start_time: TimeDelta,
-//
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Message {
+    // game_chain receiving data to start a new game
     Start {
-        players: Players,
         match_id: MatchId,
+        players: Players,
         timer: TimeDelta,
+        match_type: MatchType,
     },
+    // app_chain receiving player to put in lobby or start a game.
     NewGameReq {
-        player: Player,
+        player: PlayerHash,
     },
+    // receiving game_chain data from the app_chain
     GameChainData {
         game_chain_data: GameChain,
     },
-
+    // app_chain receiving both players details to start a friendly match
     FriendlyGameReq {
-        players: [Player; 2],
-    }, /*
-       StartGame {
-           player: PublicKey,
-           timer: TimeDelta,
-           rank: Rank,
-       },
-       FriendlyGame {
-           hash: FriendId,
-           player: PlayerRequest,
-       }, */
+        players: Players,
+    },
+    // MatchMetadata from the game_chain to the app_chain
+    MatchEnd {
+        metadata: MatchMetaData,
+    },
+    // app_chain sends points update to the players
+    ProfileUpdate {
+        player_hash: PlayerHash,
+    },
+}
+
+// match duration could be added
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MatchMetaData {
+    pub match_id: MatchId,
+    pub winner: AccountOwner,
+    pub match_type: MatchType,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, SimpleObject, InputObject)]
+pub struct MatchId {
+    value: String,
+}
+
+impl MatchId {
+    pub fn encode_players(players: &Players) -> Self {
+        let bytes = bincode::serialize(players).unwrap();
+        let value = general_purpose::STANDARD.encode(bytes);
+
+        MatchId { value }
+    }
+
+    pub fn decode_players(&self) -> Option<Players> {
+        let bytes = general_purpose::STANDARD.decode(&self.value).unwrap();
+        let players: Players = bincode::deserialize(&bytes).unwrap();
+
+        Some(players)
+    }
 }
 
 const TOKEN_TIME: u64 = 300; // 300 seconds = 5 minutes
 
-// struct with expiration
-#[derive(Serialize, Deserialize, Debug)]
+// Friendly hash active for 5 minutes since creation
+#[derive(Serialize, Deserialize, Debug, SimpleObject)]
 pub struct TimedToken {
-    player: Player,
-    expires_at: u64,
+    player: PlayerHash,
+    expires_at: Timestamp,
 }
 
-#[allow(dead_code)]
 impl TimedToken {
-    pub fn new(player: Player) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
+    pub fn new(now: Timestamp, player: PlayerHash) -> Self {
         Self {
-            player: player,
-            expires_at: now + TOKEN_TIME,
+            player,
+            expires_at: now.saturating_add(TimeDelta::from_secs(TOKEN_TIME)),
         }
     }
 
@@ -173,45 +173,34 @@ impl TimedToken {
     }
 
     // Decode the base64 string back into a token
-    pub fn decode_token(encoded: &str) -> Option<Player> {
-        let bytes = general_purpose::STANDARD.decode(encoded).unwrap();
-        let timed_token: TimedToken = bincode::deserialize(&bytes).unwrap();
-        // Check if expired
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+    pub fn decode_token(encoded: &str, now: Timestamp) -> Option<PlayerHash> {
+        let bytes = general_purpose::STANDARD.decode(encoded).ok()?;
+        let timed_token: TimedToken = bincode::deserialize(&bytes).ok()?;
 
-        if now > timed_token.expires_at {
-            return None;
+        if now <= timed_token.expires_at {
+            Some(timed_token.player)
+        } else {
+            None
         }
-
-        Some(timed_token.player)
     }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Event {
     GameCount { value: u64 },
+    Leaderboard { leaderboard: Vec<Leaderboard> },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum EventType {
     GameCount,
     Leaderboard,
-} /* #[derive(
-      Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject, InputObject,
-  )]
-  pub struct PlayerRequest {
-      pub player: AccountOwner,
-      pub timer: TimeDelta,
-      pub rank: Rank,
-  } */
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
-pub struct Player {
-    pub profile: PlayerProfile,
-    pub chain_id: ChainId,
+pub struct LastMove {
+    pub from: String,
+    pub to: String,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, SimpleObject)]
@@ -222,19 +211,34 @@ pub struct GameWrapper {
     pub players: [Option<AccountOwner>; 2],
     pub winner: Option<AccountOwner>,
     pub moves_string: Vec<String>,
+    pub last_move: Option<LastMove>,
+    pub match_id: Option<MatchId>,
+    pub match_type: Option<MatchType>,
 }
 
 impl GameWrapper {
-    pub fn new(&self, white: AccountOwner, black: AccountOwner) -> Self {
+    pub fn new(
+        &self,
+        white: AccountOwner,
+        black: AccountOwner,
+        match_id: MatchId,
+        match_type: MatchType,
+    ) -> Self {
         Self {
             inner: Game::new(),
             initalized: true,
             players: [Some(white), Some(black)],
             winner: None,
             moves_string: Vec::with_capacity(256),
+            last_move: None,
+            match_id: Some(match_id),
+            match_type: Some(match_type),
         }
     }
 
+    pub fn add_move(&mut self, from: String, to: String) {
+        self.last_move = Some(LastMove { from, to });
+    }
     pub fn get_color_by_account(&self, account: &AccountOwner) -> Option<Color> {
         self.players
             .iter()

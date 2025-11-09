@@ -1,7 +1,8 @@
 use async_graphql::{ComplexObject, SimpleObject};
 use chess::{
-    playerprofile::{MatchId, PlayerProfile, Players},
-    Clock, GameChain, GameWrapper, Player,
+    leaderboard::{Leaderboard, LeaderboardManager},
+    playerprofile::{PlayerHash, PlayerProfile, Players},
+    Clock, GameChain, GameWrapper, MatchId,
 };
 use linera_sdk::{
     views::{
@@ -19,22 +20,22 @@ pub struct ChessState {
     pub board: RegisterView<GameWrapper>,
     /// The current game clock
     pub clock: RegisterView<Clock>,
-    /// Flag, only for game_chain
-    pub match_id: RegisterView<Option<MatchId>>,
     /// Holds Newly created game chain, only for player_chain
     pub game_chain: RegisterView<Option<GameChain>>,
     /// PlayerProfile only for player_chain
     pub profile: RegisterView<Option<PlayerProfile>>,
     /// Lobby to hold players for potential match
-    pub lobby: RegisterView<Vec<Player>>, // will be updated to include ranks.
+    pub lobby: RegisterView<Vec<PlayerHash>>, // will be updated to include ranks.
     /// Count the number of games played on microchess, only for app_chain
     pub game_count: RegisterView<u64>,
     /// Friendly game token stored only on user's chain
     pub game_token: RegisterView<String>,
     /// Holds ongoing game data, only for app_chain
     pub matches: MapView<MatchId, Players>,
+    // LeaderBoard Manager only for app_chain (max 10)
+    pub leaderboard_manager: RegisterView<Option<LeaderboardManager>>,
     // LeaderBoard (max 10)
-    // pub leaderboard: RegisterView<Vec<PlayerProfile>>,
+    pub leaderboard: RegisterView<Vec<Leaderboard>>,
     /*
     /// Player Stats
     pub stats: RegisterView<PlayerProfile>,

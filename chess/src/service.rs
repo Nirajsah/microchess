@@ -5,7 +5,10 @@ mod state;
 use std::sync::Arc;
 
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
-use chess::{GameChain, Operation, PlayersTime};
+use chess::{
+    leaderboard::Leaderboard, playerprofile::PlayerProfile, GameChain, LastMove, Operation,
+    PlayersTime,
+};
 use linera_sdk::{
     abi::WithServiceAbi,
     graphql::GraphQLMutationRoot,
@@ -60,6 +63,7 @@ struct GameData {
     opponent: AccountOwner, // opponent player id
     game_state: String,     // State of the Game, NotStarted, OnGoing, StaleMate or CheckMate
     winner: Option<AccountOwner>,
+    last_move: Option<LastMove>,
 }
 
 #[Object]
@@ -71,6 +75,7 @@ impl ChessService {
         let opponent = game.players[color.opposite().index()].unwrap();
         let game_state = game.state.to_string();
         let winner = game.winner;
+        let last_move = game.last_move.clone();
 
         GameData {
             fen,
@@ -78,6 +83,7 @@ impl ChessService {
             opponent,
             game_state,
             winner,
+            last_move,
         }
     }
 
@@ -100,7 +106,7 @@ impl ChessService {
     }
 
     async fn is_game_chain(&self) -> bool {
-        self.state.match_id.get().is_some()
+        self.state.board.get().match_id.is_some()
     }
 
     async fn mv_string(&self) -> &Vec<String> {
@@ -124,18 +130,21 @@ impl ChessService {
     async fn friend_id(&self) -> &str {
         self.state.game_token.get()
     }
+
+    async fn leaderboard(&self) -> &Vec<Leaderboard> {
+        self.state.leaderboard.get()
+    }
+
+    async fn profile(&self) -> Option<&PlayerProfile> {
+        if let Some(profile) = self.state.profile.get() {
+            Some(profile)
+        } else {
+            None
+        }
+    }
     /*
     async fn captured_pieces(&self) -> &Vec<Piece> {
         &self.state.board.get().captured_pieces
-    }
-    async fn timer(&self) -> &Clock {
-        &self.state.clock.get()
-    }
-    async fn time_left(&self) -> PlayerTime {
-        self.state.clock.get().time_left_for_player()
-    }
-    async fn get_leaderboard(&self) -> Vec<PlayerStats> {
-        self.state.get_leaderboard()
     }
     */
 }
