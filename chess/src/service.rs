@@ -6,8 +6,9 @@ use std::sync::Arc;
 
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use chess::{
-    leaderboard::Leaderboard, playerprofile::PlayerProfile, GameChain, LastMove, Operation,
-    PlayersTime,
+    leaderboard::Leaderboard,
+    playerprofile::{PlayerInfo, PlayerProfile},
+    GameChain, LastMove, Operation, PlayersTime,
 };
 use linera_sdk::{
     abi::WithServiceAbi,
@@ -103,6 +104,12 @@ impl ChessService {
         } else {
             None
         }
+    }
+
+    async fn opponent_profile(&self, opponent: AccountOwner) -> Option<PlayerInfo> {
+        let game = self.state.board.get();
+        let color = game.get_color_by_account(&opponent).unwrap();
+        self.state.board.get().get_profile_info_by_color(color)
     }
 
     async fn is_game_chain(&self) -> bool {

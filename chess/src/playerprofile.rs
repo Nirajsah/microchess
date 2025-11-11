@@ -3,7 +3,7 @@ use std::ops::Deref;
 /**
  * TODO(When a match is over the points update will be based on game type, i.e., Standard, Bullet, Blitz...)
 */
-use async_graphql::{InputObject, SimpleObject};
+use async_graphql::SimpleObject;
 use base64::{engine::general_purpose, Engine};
 use linera_sdk::linera_base_types::{AccountOwner, ChainId};
 use serde::{Deserialize, Serialize};
@@ -22,6 +22,15 @@ pub struct PlayerProfile {
     pub ath: u32,             // All time high
     pub chain_id: ChainId,
     pub player_hash: Option<PlayerHash>,
+}
+
+/// This struct is mainly used to display user profile to opponent player
+#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
+pub struct PlayerInfo {
+    pub name: Option<String>,
+    pub elo: u32,
+    pub matches: u32,
+    pub ath: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
@@ -55,19 +64,6 @@ pub struct Players {
 impl Players {
     pub fn get_players(&self) -> (PlayerProfile, PlayerProfile) {
         (self.player_1.decode(), self.player_2.decode())
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject, InputObject)]
-pub struct MatchId {
-    pub id: u32,
-}
-
-impl Deref for MatchId {
-    type Target = u32;
-
-    fn deref(&self) -> &Self::Target {
-        &self.id
     }
 }
 
@@ -110,8 +106,13 @@ impl PlayerProfile {
         }
     }
 
-    pub fn player(&self) -> Self {
-        self.clone()
+    pub fn info(&self) -> PlayerInfo {
+        PlayerInfo {
+            name: self.name.clone(),
+            elo: self.elo,
+            matches: self.matches,
+            ath: self.ath,
+        }
     }
 
     pub fn to_leaderboard(&self) -> Leaderboard {

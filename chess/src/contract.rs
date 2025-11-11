@@ -71,6 +71,8 @@ impl Contract for ChessContract {
                 let mut profile = PlayerProfile::new(chain_id, id, Some(name));
                 profile.encode();
 
+                self.state.profile.set(Some(profile));
+
                 ChessResponse::Ok
             }
             Operation::Resign => {
@@ -86,6 +88,9 @@ impl Contract for ChessContract {
                     .board
                     .get_mut()
                     .handle_resign(active_player.opposite());
+                // handle match_end
+                self.send_result();
+
                 ChessResponse::Ok
             }
             // we take the hash, decode it and send a req to app_chain
@@ -98,7 +103,9 @@ impl Contract for ChessContract {
                     p.hash()
                 } else {
                     let mut p = PlayerProfile::new(chain_id, id, None);
-                    p.encode()
+                    p.encode();
+                    self.state.profile.set(Some(p.clone()));
+                    p.hash()
                 };
 
                 if let Some(hash) = player {
@@ -122,7 +129,9 @@ impl Contract for ChessContract {
                     p.hash()
                 } else {
                     let mut p = PlayerProfile::new(chain_id, id, None);
-                    p.encode()
+                    p.encode();
+                    self.state.profile.set(Some(p.clone()));
+                    p.hash()
                 };
 
                 if let Some(hash) = player {
@@ -151,7 +160,9 @@ impl Contract for ChessContract {
                     p.hash()
                 } else {
                     let mut p = PlayerProfile::new(chain_id, id, None);
-                    p.encode()
+                    p.encode();
+                    self.state.profile.set(Some(p.clone()));
+                    p.hash()
                 };
 
                 if let Some(hash) = player {
@@ -174,10 +185,17 @@ impl Contract for ChessContract {
                     "Only active player can make a move"
                 );
 
-                assert!(
-                    !clock.timed_out(block_time, active_player),
-                    "Player ran out of time."
-                );
+                if clock.timed_out(block_time, active_player) {
+                    // Mark game as over with opponent as winner
+                    let board = self.state.board.get_mut();
+                    let opponent = active_player.opposite();
+                    board.winner = Some(board.players[opponent.index()].unwrap());
+                    board.state = GameState::Ended;
+
+                    self.send_result();
+
+                    return ChessResponse::Err(ChessError::new("Timed Out"));
+                }
 
                 match self
                     .state
@@ -197,7 +215,13 @@ impl Contract for ChessContract {
 
                         ChessResponse::Ok
                     }
-                    Err(e) => ChessResponse::Err(e),
+                    Err(e) => match e {
+                        ChessError::GameOver => {
+                            self.send_result();
+                            ChessResponse::Err(e)
+                        }
+                        _ => ChessResponse::Err(e),
+                    },
                 }
             }
             Operation::PawnPromotion {
@@ -217,10 +241,17 @@ impl Contract for ChessContract {
                     "Only active player can make a move"
                 );
 
-                assert!(
-                    !clock.timed_out(block_time, active_player),
-                    "Player ran out of time."
-                );
+                if clock.timed_out(block_time, active_player) {
+                    // Mark game as over with opponent as winner
+                    let board = self.state.board.get_mut();
+                    let opponent = active_player.opposite();
+                    board.winner = Some(board.players[opponent.index()].unwrap());
+                    board.state = GameState::Ended;
+
+                    self.send_result();
+
+                    return ChessResponse::Err(ChessError::new("Timed Out"));
+                }
 
                 match self.state.board.get_mut().commit_move(
                     from.clone(),
@@ -240,7 +271,14 @@ impl Contract for ChessContract {
                         }
                         ChessResponse::Ok
                     }
-                    Err(e) => ChessResponse::Err(e),
+
+                    Err(e) => match e {
+                        ChessError::GameOver => {
+                            self.send_result();
+                            ChessResponse::Err(e)
+                        }
+                        _ => ChessResponse::Err(e),
+                    },
                 }
             }
         }
@@ -312,11 +350,7 @@ impl ChessContract {
     ) {
         self.state.clock.set(Clock::new(timer));
         let (player_1, player_2) = players.get_players();
-        let game = self
-            .state
-            .board
-            .get()
-            .new(player_1.id, player_2.id, match_id, match_type);
+        let game = GameWrapper::new(player_1, player_2, match_id, match_type);
 
         self.state.board.set(game);
     }
@@ -370,6 +404,10 @@ impl ChessContract {
         let chain_id = self.runtime.open_chain(ownership, permissions, fee);
 
         let match_id = MatchId::encode_players(players);
+
+        if match_type == MatchType::Random {
+            self.state.matches.insert(&match_id, players.clone()).ok();
+        }
 
         self.runtime.send_message(
             chain_id,
@@ -472,6 +510,9 @@ impl ChessContract {
                 match_type: game.match_type.unwrap(),
                 winner,
             };
+            if metadata.match_type == MatchType::Friendly {
+                return;
+            }
 
             self.runtime
                 .send_message(app_chain, Message::MatchEnd { metadata });
@@ -521,6 +562,7 @@ impl ChessContract {
             MatchType::Friendly => (),
         }
 
+        let _ = self.state.matches.remove(&metadata.match_id);
         self.update_state_event(EventType::Leaderboard);
     }
 }

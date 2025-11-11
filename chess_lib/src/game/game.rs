@@ -47,6 +47,7 @@ pub enum GameState {
     Checkmate,
     Stalemate,
     Resign,
+    Ended,
 }
 
 impl Display for GameState {
@@ -57,6 +58,7 @@ impl Display for GameState {
             GameState::Checkmate => "Checkmate",
             GameState::Stalemate => "Stalemate",
             GameState::Resign => "Resign",
+            GameState::Ended => "Ended",
         };
         write!(f, "{}", g)
     }
@@ -386,7 +388,7 @@ impl Game {
         piece: String,
         promoted_to: Option<String>,
     ) -> Result<CompleteMove> {
-        if self.state == GameState::Stalemate || self.state == GameState::Checkmate {
+        if self.state != GameState::Ongoing && self.state != GameState::NotStarted {
             return Err(ChessError::GameOver);
         }
 

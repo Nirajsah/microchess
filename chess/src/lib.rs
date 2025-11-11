@@ -10,7 +10,7 @@ use chess_lib::{
     ChessError,
 };
 use leaderboard::Leaderboard;
-use playerprofile::PlayerHash;
+use playerprofile::{PlayerHash, PlayerInfo, PlayerProfile};
 use serde::{Deserialize, Serialize};
 pub struct ChessAbi;
 pub mod leaderboard;
@@ -213,25 +213,26 @@ pub struct GameWrapper {
     pub moves_string: Vec<String>,
     pub last_move: Option<LastMove>,
     pub match_id: Option<MatchId>,
+    pub players_profile: [Option<PlayerProfile>; 2],
     pub match_type: Option<MatchType>,
 }
 
 impl GameWrapper {
     pub fn new(
-        &self,
-        white: AccountOwner,
-        black: AccountOwner,
+        white: PlayerProfile,
+        black: PlayerProfile,
         match_id: MatchId,
         match_type: MatchType,
     ) -> Self {
         Self {
             inner: Game::new(),
             initalized: true,
-            players: [Some(white), Some(black)],
+            players: [Some(white.id), Some(black.id)],
             winner: None,
             moves_string: Vec::with_capacity(256),
             last_move: None,
             match_id: Some(match_id),
+            players_profile: [Some(white), Some(black)],
             match_type: Some(match_type),
         }
     }
@@ -239,6 +240,13 @@ impl GameWrapper {
     pub fn add_move(&mut self, from: String, to: String) {
         self.last_move = Some(LastMove { from, to });
     }
+
+    pub fn get_profile_info_by_color(&self, color: Color) -> Option<PlayerInfo> {
+        self.players_profile[color.index()]
+            .as_ref()
+            .map(|profile| profile.info())
+    }
+
     pub fn get_color_by_account(&self, account: &AccountOwner) -> Option<Color> {
         self.players
             .iter()
