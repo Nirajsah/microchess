@@ -1,126 +1,140 @@
-import React, { useRef, useState } from 'react'
-import { BoardType, Piece, Square } from './types'
-import ChessTile from './ChessTile'
-import CustomDragLayer from './CustomDragLayer'
-import { useMicroChess } from '@/context/MicroChessProvider'
-import { ThemeName, themes } from './theme'
-import { useChessWasm } from '@/hooks/useWasm'
+import React, { useRef, useState } from "react";
+import { BoardType, Piece, Square } from "./types";
+import ChessTile from "./ChessTile";
+import CustomDragLayer from "./CustomDragLayer";
+import { useMicroChess } from "@/context/MicroChessProvider";
+import { ThemeName, themes } from "./theme";
+import { useChessWasm } from "@/hooks/useWasm";
 
-const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
+const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
+const ranks = ["8", "7", "6", "5", "4", "3", "2", "1"];
 
 interface BoardProps {
-  boardData: BoardType
-  makeMove: (from: Square, to: Square, piece: Piece) => void
+  boardData: BoardType;
+  makeMove: (from: Square, to: Square, piece: Piece) => void;
 }
 
 export default function ChessBoard(props: BoardProps) {
-  const { chessSettings } = useMicroChess()
-  const boardRef = useRef<HTMLDivElement>(null)
-  const board = props.boardData.position
+  const { chessSettings } = useMicroChess();
+  const boardRef = useRef<HTMLDivElement>(null);
+  const board = props.boardData.position;
 
-  const [draggingPiece, setDraggingPiece] = useState<Piece | null>(null)
-  const [dragPosition, setDragPosition] = useState({ xPercent: 0, yPercent: 0 })
-  const [selectedSquare, setSelectedSquare] = useState<Square | null>(null)
-  const [possMoves, setPossMoves] = React.useState<Square[]>([])
+  const [draggingPiece, setDraggingPiece] = useState<Piece | null>(null);
+  const [dragPosition, setDragPosition] = useState({
+    xPercent: 0,
+    yPercent: 0,
+  });
+  const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
+  const [possMoves, setPossMoves] = React.useState<Square[]>([]);
   const [activeSquare, setActiveSquare] = React.useState<{
-    from: Square
-    to: Square
+    from: Square;
+    to: Square;
   }>({
-    from: '' as Square,
-    to: '' as Square,
-  })
+    from: "" as Square,
+    to: "" as Square,
+  });
 
-  const { generateMoves } = useChessWasm()
+  const { lastMove } = props.boardData;
 
-  const isBlack = props.boardData.color === 'Black'
+  React.useEffect(() => {
+    if (lastMove?.from && lastMove?.to) {
+      setActiveSquare({
+        from: lastMove.from as Square,
+        to: lastMove.to as Square,
+      });
+    }
+  }, [lastMove]);
+
+  const { generateMoves } = useChessWasm();
+
+  const isBlack = props.boardData.color === "Black";
 
   function handleMouseDown(_e: React.MouseEvent, piece: Piece, square: Square) {
-    if (!piece) return
-    setDraggingPiece(piece)
-    setSelectedSquare(square)
+    if (!piece) return;
+    setDraggingPiece(piece);
+    setSelectedSquare(square);
 
-    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener("mousemove", handleMouseMove);
 
-    const mv = generateMoves(square)
-    setPossMoves(mv as Square[])
+    const mv = generateMoves(square);
+    setPossMoves(mv as Square[]);
   }
 
   function handleMouseMove(e: any) {
-    if (!boardRef.current) return
-    const rect = boardRef.current.getBoundingClientRect()
-    const clampedX = Math.max(rect.left, Math.min(e.clientX, rect.right))
-    const clampedY = Math.max(rect.top, Math.min(e.clientY, rect.bottom))
+    if (!boardRef.current) return;
+    const rect = boardRef.current.getBoundingClientRect();
+    const clampedX = Math.max(rect.left, Math.min(e.clientX, rect.right));
+    const clampedY = Math.max(rect.top, Math.min(e.clientY, rect.bottom));
 
-    const x = ((clampedX - rect.left) / rect.width) * 100
-    const y = ((clampedY - rect.top) / rect.height) * 100
+    const x = ((clampedX - rect.left) / rect.width) * 100;
+    const y = ((clampedY - rect.top) / rect.height) * 100;
 
-    setDragPosition({ xPercent: x, yPercent: y })
+    setDragPosition({ xPercent: x, yPercent: y });
   }
 
   function handleMouseUp(e: any) {
-    const boardR = boardRef.current
-    if (!boardR) return
+    const boardR = boardRef.current;
+    if (!boardR) return;
 
     const resetDragState = () => {
-      setDraggingPiece(null)
-      setSelectedSquare(null)
-      setPossMoves([])
-    }
+      setDraggingPiece(null);
+      setSelectedSquare(null);
+      setPossMoves([]);
+    };
 
     // Find the closest child that has a `data-square` attribute
     const targetEl = (e.target as HTMLElement).closest(
-      '[data-square]'
-    ) as HTMLElement | null
+      "[data-square]"
+    ) as HTMLElement | null;
 
-    if (!targetEl || !boardR.contains(targetEl)) return
+    if (!targetEl || !boardR.contains(targetEl)) return;
     if (!targetEl || !boardR.contains(targetEl)) {
-      window.removeEventListener('mousemove', handleMouseMove)
-      resetDragState()
-      return
+      window.removeEventListener("mousemove", handleMouseMove);
+      resetDragState();
+      return;
     }
 
-    const targetSquare = targetEl.dataset.square
+    const targetSquare = targetEl.dataset.square;
     if (!targetSquare) {
-      window.removeEventListener('mousemove', handleMouseMove)
-      resetDragState()
-      return
+      window.removeEventListener("mousemove", handleMouseMove);
+      resetDragState();
+      return;
     }
 
     if (!selectedSquare) {
-      window.removeEventListener('mousemove', handleMouseMove)
-      resetDragState()
-      return
+      window.removeEventListener("mousemove", handleMouseMove);
+      resetDragState();
+      return;
     }
 
-    const piece = board[selectedSquare as Square]
+    const piece = board[selectedSquare as Square];
 
     if (!possMoves.includes(targetSquare as Square)) {
-      window.removeEventListener('mousemove', handleMouseMove)
-      resetDragState()
-      return
+      window.removeEventListener("mousemove", handleMouseMove);
+      resetDragState();
+      return;
     }
 
-    window.removeEventListener('mousemove', handleMouseMove)
+    window.removeEventListener("mousemove", handleMouseMove);
 
     try {
       props.makeMove(
         selectedSquare as Square,
         targetSquare as Square,
         piece as Piece
-      )
-      setActiveSquare({
-        from: selectedSquare as Square,
-        to: targetSquare as Square,
-      })
+      );
     } catch (err) {
-      console.error('makeMove threw an error:', err)
+      console.error("makeMove threw an error:", err);
+      setActiveSquare({
+        from: lastMove?.from as Square,
+        to: lastMove?.to as Square,
+      });
     } finally {
-      resetDragState()
+      resetDragState();
     }
   }
 
-  const selectedTheme = themes[chessSettings.theme as ThemeName]
+  const selectedTheme = themes[chessSettings.theme as ThemeName];
 
   const getSquareBackground = (
     square: Square,
@@ -134,22 +148,22 @@ export default function ChessBoard(props: BoardProps) {
 
     // Currently selected square
     if (selectedSquare === square) {
-      return selectedTheme.selectedSquare
+      return selectedTheme.selectedSquare;
     }
 
     // Last move highlighting
     if (activeSquare.from === square || activeSquare.to === square) {
-      return '#d5ce61' // Semi-transparent yellow for last move
+      return "#d5ce61"; // Semi-transparent yellow for last move
     }
 
     // Possible move with piece (capture)
     if (possMoves.includes(square) && piece) {
-      return 'bg-red-400'
+      return "bg-red-400";
     }
 
     // Default checkerboard pattern
-    return number % 2 === 0 ? selectedTheme.dark : selectedTheme.light
-  }
+    return number % 2 === 0 ? selectedTheme.dark : selectedTheme.light;
+  };
 
   return (
     <div
@@ -157,7 +171,7 @@ export default function ChessBoard(props: BoardProps) {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       className={`relative w-full aspect-square max-w-[720px] max-h-[720px] rounded-md shadow-md overflow-hidden ${
-        draggingPiece ? 'cursor-grabbing' : 'cursor-default'
+        draggingPiece ? "cursor-grabbing" : "cursor-default"
       }`}
     >
       {/* Custom Drag Layer for smooth piece following */}
@@ -171,12 +185,12 @@ export default function ChessBoard(props: BoardProps) {
           files.map((file, fileIndex) => {
             const square = isBlack
               ? files[7 - fileIndex] + (rankIndex + 1) // Adjust rank for black perspective
-              : file + rank
+              : file + rank;
 
-            const piece = board[square as Square] as Piece
-            const number = fileIndex + rankIndex
+            const piece = board[square as Square] as Piece;
+            const number = fileIndex + rankIndex;
 
-            const bg = getSquareBackground(square as Square, piece, number)
+            const bg = getSquareBackground(square as Square, piece, number);
 
             return (
               <div key={square}>
@@ -192,10 +206,10 @@ export default function ChessBoard(props: BoardProps) {
                   }
                 />
               </div>
-            )
+            );
           })
         )}
       </div>
     </div>
-  )
+  );
 }

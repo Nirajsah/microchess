@@ -55,6 +55,10 @@ export function gameData(player: string): Promise<any> {
       opponent
       gameState
       winner
+      lastMove {
+        from 
+        to
+      }
     }
   }`;
   const gqlQuery = buildGraphQLQuery(query);
@@ -156,4 +160,9 @@ export const storage = {
 
   getSessionId: () => sessionStorage.getItem("chess.session_id"),
   setSessionId: (id: string) => sessionStorage.setItem("chess.session_id", id),
+
+  getGameState: () => localStorage.getItem("chess.game_state"),
+  setGameState: (state: string) =>
+    localStorage.setItem("chess.game_state", state),
+  removeGameState: () => localStorage.removeItem("chess.game_state"),
 };
