@@ -258,18 +258,19 @@ impl Game {
         let mut castling_str = String::with_capacity(4);
         let mask = self.board.castling_rights;
 
-        if mask & 0b0001 != 0 {
+        if mask & 0b1000 != 0 {
             castling_str.push('K');
         }
-        if mask & 0b0010 != 0 {
+        if mask & 0b0100 != 0 {
             castling_str.push('Q');
         }
-        if mask & 0b0100 != 0 {
+        if mask & 0b0010 != 0 {
             castling_str.push('k');
         }
-        if mask & 0b1000 != 0 {
+        if mask & 0b0001 != 0 {
             castling_str.push('q');
         }
+
         if castling_str.is_empty() {
             castling_str.push('-');
         }

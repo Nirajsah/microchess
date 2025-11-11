@@ -255,6 +255,9 @@ impl GameWrapper {
     }
 
     pub fn handle_resign(&mut self, opponent: Color) {
+        if self.inner.state == GameState::Resign {
+            return;
+        };
         self.inner.state = GameState::Resign;
         let winner = self.players[opponent.index()];
         self.winner = winner;

@@ -393,6 +393,9 @@ impl ChessContract {
         let timestamp: Timestamp = self.runtime.system_time();
 
         let (player_1, player_2) = players.get_players();
+        if player_1.id == player_2.id {
+            return Err(ChessError::new("Found Players with same id, returning..."));
+        }
 
         let ownership = ChainOwnership::multiple(
             [(player_1.id, 100), (player_2.id, 100)],
