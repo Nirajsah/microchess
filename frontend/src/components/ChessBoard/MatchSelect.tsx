@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState } from "react";
 import {
   Shuffle,
   Users,
@@ -9,73 +9,114 @@ import {
   Sparkles,
   Hash,
   Play,
-} from 'lucide-react'
+} from "lucide-react";
+import {
+  assignChain,
+  friendId,
+  gameWithToken,
+  reqFriendlyGame,
+  startGame,
+} from "@/api";
 
 interface MatchSelectProps {
   assign?: {
-    chainId: string
-    timestamp: number
-  }
-  hash?: string
-  startGame: () => void
-  reqFriendlyGame: () => void
-  joinFriendlyGame: (hash: string) => void
+    chainId: string;
+    timestamp: number;
+  };
+  hash?: string;
+  joinFriendlyGame: (hash: string) => void;
 }
 
-const MatchSelect = ({
-  assign,
-  hash,
-  startGame,
-  reqFriendlyGame,
-  joinFriendlyGame,
-}: MatchSelectProps) => {
+const MatchSelect = ({ assign, hash, joinFriendlyGame }: MatchSelectProps) => {
   type Step =
-    | 'select'
-    | 'random-loading'
-    | 'random-assign'
-    | 'friendly-loading'
-    | 'friendly-share'
-    | 'friendly-join'
+    | "select"
+    | "random-loading"
+    | "random-assign"
+    | "friendly-loading"
+    | "friendly-share"
+    | "friendly-join";
 
-  const [step, setStep] = useState<Step>('select')
-  const [copied, setCopied] = useState(false)
-  const [gameHash, setGameHash] = useState('')
-  const [inputHash, setInputHash] = useState('')
+  const [step, setStep] = useState<Step>("select");
+  const [copied, setCopied] = useState(false);
+  const [gameHash, setGameHash] = useState("");
+  const [inputHash, setInputHash] = useState("");
 
   const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleRandomMatch = () => {
-    setStep('random-loading')
-    startGame()
-  }
+    (async () => {
+      try {
+        const res = await startGame();
+        setStep("random-loading");
+      } catch (e) {
+        console.log(e);
+      }
+    })();
+  };
 
   const handleFriendlyMatch = () => {
-    setStep('friendly-loading')
-    reqFriendlyGame()
-  }
+    (async () => {
+      try {
+        const res = await reqFriendlyGame();
+        console.log(res);
+        setStep("friendly-loading");
+      } catch (e) {
+        console.log(e);
+      }
+    })();
+  };
 
   const handleJoinMatch = () => {
-    if (inputHash.trim()) {
-      joinFriendlyGame(inputHash.trim())
+    (async () => {
+      try {
+        const res = await gameWithToken(inputHash.trim());
+        console.log(res);
+      } catch (e) {
+        console.log(e);
+      }
+    })();
+  };
+
+  React.useEffect(() => {
+    if (step === "select") {
+      setStep("random-assign");
     }
-  }
+  }, [assign]);
 
   // Update hash when received from server
   React.useEffect(() => {
-    if (hash && step === 'friendly-loading') {
-      setGameHash(hash)
-      setStep('friendly-share')
+    if (hash && step === "friendly-loading") {
+      setGameHash(hash);
+      setStep("friendly-share");
     }
-  }, [hash, step])
+    if (assign && step === "random-loading") {
+      setStep("random-assign");
+    }
+  }, [hash, step, assign]);
+
+  const handleStart = () => {
+    if (!assign?.chainId) {
+      return;
+    }
+    (async () => {
+      try {
+        const res = assignChain(assign.chainId, assign?.timestamp);
+        console.log(res);
+        setStep("random-loading");
+      } catch (e) {
+        console.log(e);
+      }
+    })();
+  };
 
   return (
     <div className="h-full w-full max-w-2xl mx-auto">
       {/* Selection Screen */}
-      {step === 'select' && (
+      {step === "select" && (
         <div className="space-y-4 animate-in fade-in duration-300">
           {/* Header */}
           <div className="text-center space-y-2 mb-5">
@@ -163,7 +204,7 @@ const MatchSelect = ({
           </div>
 
           <button
-            onClick={() => setStep('friendly-join')}
+            onClick={() => setStep("friendly-join")}
             className="w-full group relative overflow-hidden rounded-xl bg-zinc-900/50 border border-zinc-800 hover:border-purple-500/50 p-6 text-center transition-all duration-300 hover:scale-[1.01]"
           >
             <div className="flex items-center justify-center gap-3">
@@ -180,7 +221,7 @@ const MatchSelect = ({
       )}
 
       {/* Random Match Loading */}
-      {step === 'random-loading' && (
+      {step === "random-loading" && (
         <div className="flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in duration-300 py-12">
           <div className="relative">
             <div className="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center">
@@ -200,7 +241,7 @@ const MatchSelect = ({
       )}
 
       {/* Random Match - Assign Required */}
-      {step === 'random-assign' && assign && (
+      {step === "random-assign" && assign && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <BackToMenu setStep={setStep} />
 
@@ -213,23 +254,22 @@ const MatchSelect = ({
               <p className="text-zinc-400">Confirm to start the game</p>
             </div>
 
-            <div className="bg-zinc-900/50 rounded-xl p-6 space-y-3">
+            <div className="bg-zinc-900/50 rounded-xl p-6 space-y-1">
               <div className="flex justify-between items-center">
-                <span className="text-zinc-400 text-sm">Chain ID</span>
-                <span className="text-white font-mono">{assign.chainId}</span>
+                <span className="text-white font-mono truncate">
+                  <span className="text-zinc-400 text-sm">ChainId: </span>
+                  {assign.chainId}
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-zinc-400 text-sm">Timestamp</span>
+                <span className="text-zinc-400 text-sm">Timestamp:</span>
                 <span className="text-white font-mono">{assign.timestamp}</span>
               </div>
             </div>
 
             <button
-              onClick={() => {
-                // Call your assign function here
-                console.log('Assigning game...')
-              }}
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/50"
+              onClick={handleStart}
+              className="w-full cursor-pointer bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/50"
             >
               Confirm & Start Game
             </button>
@@ -238,7 +278,7 @@ const MatchSelect = ({
       )}
 
       {/* Friendly Match Loading */}
-      {step === 'friendly-loading' && (
+      {step === "friendly-loading" && (
         <div className="flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in duration-300 py-12">
           <div className="relative">
             <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">
@@ -256,7 +296,7 @@ const MatchSelect = ({
       )}
 
       {/* Friendly Match - Share Hash */}
-      {step === 'friendly-share' && gameHash && (
+      {step === "friendly-share" && gameHash && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <BackToMenu setStep={setStep} />
 
@@ -307,7 +347,7 @@ const MatchSelect = ({
                 className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-4 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-green-500/50 flex items-center justify-center gap-2"
               >
                 <Users className="w-5 h-5" />
-                <span>{copied ? 'Link Copied!' : 'Copy Invitation Link'}</span>
+                <span>{copied ? "Link Copied!" : "Copy Invitation Link"}</span>
               </button>
             </div>
 
@@ -321,7 +361,7 @@ const MatchSelect = ({
       )}
 
       {/* Join with Hash */}
-      {step === 'friendly-join' && (
+      {step === "friendly-join" && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <BackToMenu setStep={setStep} />
 
@@ -371,25 +411,25 @@ const MatchSelect = ({
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default MatchSelect
+export default MatchSelect;
 
 const BackToMenu = ({
   setStep,
 }: {
-  setStep: React.Dispatch<React.SetStateAction<any>>
+  setStep: React.Dispatch<React.SetStateAction<any>>;
 }) => {
   return (
     <button
       onClick={() => {
-        setStep('select')
+        setStep("select");
       }}
       className="relative z-20 flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800/50 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-400 hover:text-white transition-all cursor-pointer pointer-events-auto"
     >
       <ArrowLeft className="w-4 h-4" />
       <span>Back to menu</span>
     </button>
-  )
-}
+  );
+};

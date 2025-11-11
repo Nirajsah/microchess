@@ -1,5 +1,13 @@
 import { Piece, Square } from "../components/ChessBoard/types.ts";
 
+export function connect_wallet(): Promise<any> {
+  if (!window.linera) throw new Error("Linera extension not found.");
+
+  return window.linera.request({
+    type: "CONNECT_WALLET",
+  });
+}
+
 // Ask the wallet to assign the wallet with new chain
 export function assignChain(chainId: string, timestamp: number) {
   (async () => {

@@ -1,28 +1,27 @@
-import { storage } from '@/components/ChessBoard/utils'
-import { useMicroChess } from '@/context/MicroChessProvider'
-import { connect_wallet } from '@/wallet/walletConnection'
-import { useState } from 'react'
+import { storage, connect_wallet } from "@/api";
+import { useMicroChess } from "@/context/MicroChessProvider";
+import { useState } from "react";
 
 export default function Navbar() {
-  const { userKey, setUserKey } = useMicroChess()
-  const [showDis, setShowDis] = useState(false)
+  const { userKey, setUserKey } = useMicroChess();
+  const [showDis, setShowDis] = useState(false);
 
   const handleDisconnect = () => {
-    storage.setPublicKey('')
-    setUserKey('')
-    setShowDis(false)
-  }
+    storage.setPublicKey("");
+    setUserKey("");
+    setShowDis(false);
+  };
 
   const handleConnect = () => {
     connect_wallet().then((res) => {
-      storage.setPublicKey(res.result)
-      setUserKey(res.result)
-    })
-  }
+      storage.setPublicKey(res.result);
+      setUserKey(res.result);
+    });
+  };
 
   const handleClick = () => {
-    setShowDis(true)
-  }
+    setShowDis(true);
+  };
 
   return (
     <div className="fixed z-20 bg-transparent backdrop-blur-lg w-full gap-2 px-3 py-2 lg:h-[80px] lg:px-14 lg:py-6 flex items-center justify-between max-w-[1440px]">
@@ -44,5 +43,5 @@ export default function Navbar() {
         </div>
       )}
     </div>
-  )
+  );
 }

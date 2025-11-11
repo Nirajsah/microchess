@@ -10,55 +10,73 @@ import {
   Check,
   X,
   ThumbsUpIcon,
-} from 'lucide-react'
-import React from 'react'
-import Themes from './Themes'
+} from "lucide-react";
+import React from "react";
+import Themes from "./Themes";
+import { getProfile, updateProfile } from "@/api";
 
 export const LeftSideMenu = () => {
-  const [showMenu, setShowMenu] = React.useState(false)
-  const [showThemes, setShowThemes] = React.useState(false)
-  const [showProfile, setShowProfile] = React.useState(false)
-  const [isEditingName, setIsEditingName] = React.useState(false)
-  const [userName, setUserName] = React.useState('Player Name')
-  const [tempName, setTempName] = React.useState('')
-
-  // Mock user data - replace with your actual data
-  const userStats = {
-    elo: 1542,
-    gamesPlayed: 127,
-    wins: 68,
-    losses: 45,
-    draws: 14,
-    ath: 1603,
-  }
+  const [showMenu, setShowMenu] = React.useState(false);
+  const [showThemes, setShowThemes] = React.useState(false);
+  const [showProfile, setShowProfile] = React.useState(false);
+  const [isEditingName, setIsEditingName] = React.useState(false);
+  const [tempName, setTempName] = React.useState("");
+  const [user, setUser] = React.useState({
+    name: "",
+    elo: 0,
+    matches: 0,
+    won: 0,
+    lost: 0,
+    ath: 0,
+  });
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
-        e.preventDefault()
-        setShowMenu((v) => !v)
+      if ((e.ctrlKey || e.metaKey) && (e.key === "b" || e.key === "B")) {
+        e.preventDefault();
+        setShowMenu((v) => !v);
       }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
+    const checkGameChain = async () => {
+      try {
+        const res = await getProfile();
+        const check = JSON.parse(res.result).data.profile;
+        if (!check) {
+          return;
+        }
+        setUser(check);
+      } catch (err) {
+        console.error("Error checking game chain:", err);
+      }
+    };
+
+    checkGameChain();
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const handleEditName = () => {
-    setTempName(userName)
-    setIsEditingName(true)
-  }
+    setTempName(user.name);
+    setIsEditingName(true);
+  };
 
   const handleSaveName = () => {
-    if (tempName.trim()) {
-      setUserName(tempName.trim())
-    }
-    setIsEditingName(false)
-  }
+    (async () => {
+      try {
+        await updateProfile(tempName.trim());
+      } catch (e) {
+        console.log(e);
+      }
+    })();
+    setIsEditingName(false);
+  };
 
   const handleCancelEdit = () => {
-    setTempName('')
-    setIsEditingName(false)
-  }
+    setTempName("");
+    setIsEditingName(false);
+  };
 
   return (
     <div className="w-full h-full absolute pointer-events-none">
@@ -78,8 +96,8 @@ export const LeftSideMenu = () => {
       <div
         className={`pointer-events-auto fixed top-4 left-4 bottom-4 w-[340px] bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] text-white shadow-2xl rounded-3xl border border-zinc-800/50 z-[90] transform transition-all duration-500 ease-out ${
           showMenu
-            ? 'translate-x-0 opacity-100'
-            : '-translate-x-[calc(100%+2rem)] opacity-0'
+            ? "translate-x-0 opacity-100"
+            : "-translate-x-[calc(100%+2rem)] opacity-0"
         }`}
       >
         <div className="h-full flex flex-col relative overflow-hidden">
@@ -96,9 +114,9 @@ export const LeftSideMenu = () => {
               </div>
               <button
                 onClick={() => {
-                  setShowMenu(false)
-                  setShowThemes(false)
-                  setShowProfile(false)
+                  setShowMenu(false);
+                  setShowThemes(false);
+                  setShowProfile(false);
                 }}
                 className="inline-flex items-center justify-center w-10 h-10 rounded-xl hover:bg-zinc-800/50 transition-all hover:scale-110"
                 aria-label="Close menu"
@@ -138,11 +156,15 @@ export const LeftSideMenu = () => {
               className="w-full px-4 py-3 flex items-center gap-3 hover:bg-zinc-800/30 transition-all group"
             >
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                {userName.charAt(0).toUpperCase()}
+                {user.name
+                  ? user.name.charAt(0).toUpperCase()
+                  : "Guest".charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 text-left">
-                <p className="font-semibold text-white">{userName}</p>
-                <p className="text-sm text-zinc-400">ELO: {userStats.elo}</p>
+                <p className="font-semibold text-white">
+                  {user.name || "Guest"}
+                </p>
+                <p className="text-sm text-zinc-400">ELO: {user.elo}</p>
               </div>
               <div className="text-zinc-400 group-hover:text-white transition-colors">
                 {showProfile ? (
@@ -156,14 +178,16 @@ export const LeftSideMenu = () => {
             {/* Expanded Profile View */}
             <div
               className={`absolute bottom-full left-0 right-0 bg-gradient-to-b from-zinc-900 to-zinc-950 border-t border-zinc-800/50 transition-all duration-500 ease-out overflow-hidden ${
-                showProfile ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+                showProfile ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
               }`}
             >
               <div className="p-4 space-y-4">
                 {/* Profile Header */}
                 <div className="text-center space-y-3">
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white font-bold text-3xl shadow-xl mx-auto">
-                    {userName.charAt(0).toUpperCase()}
+                    {user.name
+                      ? user.name.charAt(0).toUpperCase()
+                      : "Guest".charAt(0).toUpperCase()}
                   </div>
 
                   {/* Editable Name */}
@@ -176,8 +200,8 @@ export const LeftSideMenu = () => {
                         className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-center focus:outline-none focus:border-blue-500 transition-all w-40"
                         autoFocus
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveName()
-                          if (e.key === 'Escape') handleCancelEdit()
+                          if (e.key === "Enter") handleSaveName();
+                          if (e.key === "Escape") handleCancelEdit();
                         }}
                       />
                       <button
@@ -196,7 +220,7 @@ export const LeftSideMenu = () => {
                   ) : (
                     <div className="flex items-center gap-2 justify-center">
                       <h3 className="text-xl font-bold text-white">
-                        {userName}
+                        {user.name || "Guest"}
                       </h3>
                       <button
                         onClick={handleEditName}
@@ -219,7 +243,7 @@ export const LeftSideMenu = () => {
                       <span className="text-zinc-400 text-sm">Rating</span>
                     </div>
                     <span className="text-2xl font-bold text-amber-400">
-                      {userStats.elo}
+                      {user.elo}
                     </span>
                   </div>
                 </div>
@@ -229,7 +253,7 @@ export const LeftSideMenu = () => {
                   <div className="rounded-xl bg-zinc-800/50 border border-zinc-700/50 py-2 px-3.5 text-center">
                     <Target className="w-5 h-5 text-blue-400 mx-auto mb-2" />
                     <p className="text-2xl font-bold text-white">
-                      {userStats.gamesPlayed}
+                      {user.matches}
                     </p>
                     <p className="text-xs text-zinc-400">Games Played</p>
                   </div>
@@ -237,9 +261,7 @@ export const LeftSideMenu = () => {
                     <div className="w-5 h-5 mx-auto mb-2 text-green-400 font-bold">
                       <ThumbsUpIcon size={20} />
                     </div>
-                    <p className="text-2xl font-bold text-white">
-                      {userStats.ath}
-                    </p>
+                    <p className="text-2xl font-bold text-white">{user.ath}</p>
                     <p className="text-xs text-zinc-400">ATH</p>
                   </div>
                 </div>
@@ -248,21 +270,15 @@ export const LeftSideMenu = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                     <span className="text-sm text-zinc-300">Wins</span>
-                    <span className="font-bold text-green-400">
-                      {userStats.wins}
-                    </span>
+                    <span className="font-bold text-green-400">{user.won}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 rounded-lg bg-red-500/10 border border-red-500/20">
                     <span className="text-sm text-zinc-300">Losses</span>
-                    <span className="font-bold text-red-400">
-                      {userStats.losses}
-                    </span>
+                    <span className="font-bold text-red-400">{user.lost}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-500/10 border border-zinc-500/20">
                     <span className="text-sm text-zinc-300">Draws</span>
-                    <span className="font-bold text-zinc-400">
-                      {userStats.draws}
-                    </span>
+                    <span className="font-bold text-zinc-400">{0}</span>
                   </div>
                 </div>
               </div>
@@ -295,5 +311,5 @@ export const LeftSideMenu = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
