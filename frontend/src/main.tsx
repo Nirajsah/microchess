@@ -9,7 +9,7 @@ import MicroChessProvider from './context/MicroChessProvider.tsx'
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <MicroChessProvider>
     <div className="font-sansation text-white min-h-screen w-full flex justify-center">
-      <BrowserRouter>
+        <BrowserRouter>
         <Routes>
           <Route path="/" element={<App />} />
           <Route path="/chess" element={<CBoard />} />
