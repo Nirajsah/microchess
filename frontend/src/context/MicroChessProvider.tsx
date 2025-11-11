@@ -1,54 +1,54 @@
-import React from "react";
-import { ThemeName } from "../components/ChessBoard/theme";
-import { storage } from "@/api";
+import React from 'react'
+import { ThemeName } from '../components/ChessBoard/theme'
+import { storage } from '@/api'
 
 type MicroChessSettings = {
-  theme: ThemeName;
-};
+  theme: ThemeName
+}
 
 type MicroChessContextType = {
-  chessSettings: MicroChessSettings;
-  setChessSettings: React.Dispatch<React.SetStateAction<MicroChessSettings>>;
-  userKey: string;
-  setUserKey: React.Dispatch<React.SetStateAction<string>>;
-};
+  chessSettings: MicroChessSettings
+  setChessSettings: React.Dispatch<React.SetStateAction<MicroChessSettings>>
+  userKey: string
+  setUserKey: React.Dispatch<React.SetStateAction<string>>
+}
 
 export const MicroChessContext =
-  React.createContext<MicroChessContextType | null>(null);
+  React.createContext<MicroChessContextType | null>(null)
 
 const defaultSettings: MicroChessSettings = {
-  theme: "forest",
-};
+  theme: 'forest',
+}
 
 export default function MicroChessProvider({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   const [chessSettings, setChessSettings] =
-    React.useState<MicroChessSettings>(defaultSettings);
-  const [userKey, setUserKey] = React.useState<string>("");
+    React.useState<MicroChessSettings>(defaultSettings)
+  const [userKey, setUserKey] = React.useState<string>('')
 
   React.useEffect(() => {
-    const theme = storage.getTheme();
-    const publicKey = storage.getPublicKey();
+    const theme = storage.getTheme()
+    const publicKey = storage.getPublicKey()
 
     setChessSettings((prev: MicroChessSettings) => ({
       ...prev,
-      theme: (theme as ThemeName) ?? ("forest" as ThemeName),
-    }));
+      theme: (theme as ThemeName) ?? ('forest' as ThemeName),
+    }))
 
     if (publicKey) {
-      setUserKey(publicKey);
+      setUserKey(publicKey)
     }
-  }, []);
+  }, [])
 
   // 🔹 Sync theme changes back to storage
   React.useEffect(() => {
     if (chessSettings?.theme) {
-      storage.setTheme(chessSettings.theme);
+      storage.setTheme(chessSettings.theme)
     }
-  }, [chessSettings.theme]);
+  }, [chessSettings.theme])
 
   return (
     <MicroChessContext.Provider
@@ -56,14 +56,14 @@ export default function MicroChessProvider({
     >
       {children}
     </MicroChessContext.Provider>
-  );
+  )
 }
 
 // exportiong a hook to use the context
 export const useMicroChess = (): MicroChessContextType => {
-  const microChessContext = React.useContext(MicroChessContext);
+  const microChessContext = React.useContext(MicroChessContext)
   if (!microChessContext) {
-    throw new Error("useMicroChess must be used within a MicroChessProvider");
+    throw new Error('useMicroChess must be used within a MicroChessProvider')
   }
-  return microChessContext;
-};
+  return microChessContext
+}

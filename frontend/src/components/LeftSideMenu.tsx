@@ -10,73 +10,70 @@ import {
   Check,
   X,
   ThumbsUpIcon,
-} from "lucide-react";
-import React from "react";
-import Themes from "./Themes";
-import { getProfile, updateProfile } from "@/api";
+} from 'lucide-react'
+import React from 'react'
+import Themes from './Themes'
+import { getProfile, updateProfile } from '@/api'
 
 export const LeftSideMenu = () => {
-  const [showMenu, setShowMenu] = React.useState(false);
-  const [showThemes, setShowThemes] = React.useState(false);
-  const [showProfile, setShowProfile] = React.useState(false);
-  const [isEditingName, setIsEditingName] = React.useState(false);
-  const [tempName, setTempName] = React.useState("");
+  const [showMenu, setShowMenu] = React.useState(false)
+  const [showThemes, setShowThemes] = React.useState(false)
+  const [showProfile, setShowProfile] = React.useState(false)
+  const [isEditingName, setIsEditingName] = React.useState(false)
+  const [tempName, setTempName] = React.useState('')
   const [user, setUser] = React.useState({
-    name: "",
+    name: '',
     elo: 0,
     matches: 0,
     won: 0,
     lost: 0,
     ath: 0,
-  });
+  })
+
+  const getUserProfile = async () => {
+    try {
+      const res = await getProfile()
+      const check = JSON.parse(res.result).data.profile
+      if (!check) {
+        return
+      }
+      setUser(check)
+    } catch (err) {
+      console.error('Error:', err)
+    }
+  }
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === "b" || e.key === "B")) {
-        e.preventDefault();
-        setShowMenu((v) => !v);
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault()
+        setShowMenu((v) => !v)
       }
-    };
-    window.addEventListener("keydown", handleKeyDown);
+    }
+    window.addEventListener('keydown', handleKeyDown)
 
-    const checkGameChain = async () => {
-      try {
-        const res = await getProfile();
-        const check = JSON.parse(res.result).data.profile;
-        if (!check) {
-          return;
-        }
-        setUser(check);
-      } catch (err) {
-        console.error("Error checking game chain:", err);
-      }
-    };
-
-    checkGameChain();
-
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+    getUserProfile()
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const handleEditName = () => {
-    setTempName(user.name);
-    setIsEditingName(true);
-  };
+    setTempName(user.name)
+    setIsEditingName(true)
+  }
 
-  const handleSaveName = () => {
-    (async () => {
-      try {
-        await updateProfile(tempName.trim());
-      } catch (e) {
-        console.log(e);
-      }
-    })();
-    setIsEditingName(false);
-  };
+  const handleSaveName = async () => {
+    try {
+      await updateProfile(tempName.trim())
+    } catch (e) {
+      console.log(e)
+    }
+    setIsEditingName(false)
+  }
 
   const handleCancelEdit = () => {
-    setTempName("");
-    setIsEditingName(false);
-  };
+    setTempName('')
+    setIsEditingName(false)
+  }
 
   return (
     <div className="w-full h-full absolute pointer-events-none">
@@ -96,8 +93,8 @@ export const LeftSideMenu = () => {
       <div
         className={`pointer-events-auto fixed top-4 left-4 bottom-4 w-[340px] bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] text-white shadow-2xl rounded-3xl border border-zinc-800/50 z-[90] transform transition-all duration-500 ease-out ${
           showMenu
-            ? "translate-x-0 opacity-100"
-            : "-translate-x-[calc(100%+2rem)] opacity-0"
+            ? 'translate-x-0 opacity-100'
+            : '-translate-x-[calc(100%+2rem)] opacity-0'
         }`}
       >
         <div className="h-full flex flex-col relative overflow-hidden">
@@ -114,9 +111,9 @@ export const LeftSideMenu = () => {
               </div>
               <button
                 onClick={() => {
-                  setShowMenu(false);
-                  setShowThemes(false);
-                  setShowProfile(false);
+                  setShowMenu(false)
+                  setShowThemes(false)
+                  setShowProfile(false)
                 }}
                 className="inline-flex items-center justify-center w-10 h-10 rounded-xl hover:bg-zinc-800/50 transition-all hover:scale-110"
                 aria-label="Close menu"
@@ -158,11 +155,11 @@ export const LeftSideMenu = () => {
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
                 {user.name
                   ? user.name.charAt(0).toUpperCase()
-                  : "Guest".charAt(0).toUpperCase()}
+                  : 'Guest'.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 text-left">
                 <p className="font-semibold text-white">
-                  {user.name || "Guest"}
+                  {user.name || 'Guest'}
                 </p>
                 <p className="text-sm text-zinc-400">ELO: {user.elo}</p>
               </div>
@@ -178,7 +175,7 @@ export const LeftSideMenu = () => {
             {/* Expanded Profile View */}
             <div
               className={`absolute bottom-full left-0 right-0 bg-gradient-to-b from-zinc-900 to-zinc-950 border-t border-zinc-800/50 transition-all duration-500 ease-out overflow-hidden ${
-                showProfile ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+                showProfile ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
               }`}
             >
               <div className="p-4 space-y-4">
@@ -187,7 +184,7 @@ export const LeftSideMenu = () => {
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white font-bold text-3xl shadow-xl mx-auto">
                     {user.name
                       ? user.name.charAt(0).toUpperCase()
-                      : "Guest".charAt(0).toUpperCase()}
+                      : 'Guest'.charAt(0).toUpperCase()}
                   </div>
 
                   {/* Editable Name */}
@@ -200,8 +197,8 @@ export const LeftSideMenu = () => {
                         className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-center focus:outline-none focus:border-blue-500 transition-all w-40"
                         autoFocus
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") handleSaveName();
-                          if (e.key === "Escape") handleCancelEdit();
+                          if (e.key === 'Enter') handleSaveName()
+                          if (e.key === 'Escape') handleCancelEdit()
                         }}
                       />
                       <button
@@ -220,7 +217,7 @@ export const LeftSideMenu = () => {
                   ) : (
                     <div className="flex items-center gap-2 justify-center">
                       <h3 className="text-xl font-bold text-white">
-                        {user.name || "Guest"}
+                        {user.name || 'Guest'}
                       </h3>
                       <button
                         onClick={handleEditName}
@@ -311,5 +308,5 @@ export const LeftSideMenu = () => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
