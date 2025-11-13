@@ -62,7 +62,7 @@ const CBoard = () => {
       if (boardData) {
         setBoard({
           position: boardData.position,
-          KingInCheck: boardData.king_in_check,
+          KingInCheck: boardData.king_in_check || 'w',
           en_passant: boardData.en_passant,
           player_turn: boardData.player_turn as PieceColor,
           color: data.color,

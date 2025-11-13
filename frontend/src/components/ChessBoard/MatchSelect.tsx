@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState } from 'react'
 import {
   Shuffle,
   Users,
@@ -9,7 +9,7 @@ import {
   Hash,
   Play,
   ArrowLeft,
-} from "lucide-react";
+} from 'lucide-react'
 import {
   assignChain,
   friendId,
@@ -18,176 +18,181 @@ import {
   reqFriendlyGame,
   startGame,
   storage,
-} from "@/api";
-import { useWalletNotifications } from "@/hooks/useWalletNotification";
+} from '@/api'
+import { useWalletNotifications } from '@/hooks/useWalletNotification'
 
 const MatchSelect = () => {
   type Step =
-    | "select"
-    | "random-loading"
-    | "random-assign"
-    | "friendly-loading"
-    | "friendly-share"
-    | "friendly-join";
+    | 'select'
+    | 'random-loading'
+    | 'random-assign'
+    | 'friendly-loading'
+    | 'friendly-share'
+    | 'friendly-join'
 
   const fetchChainMetaData = async () => {
     try {
-      console.log("Fetching game chain info...");
-      const res = await getGameChainInfo();
-      const data = JSON.parse(res.result).data.gameChain;
+      console.log('Fetching game chain info...')
+      const res = await getGameChainInfo()
+      const data = JSON.parse(res.result).data.gameChain
       if (!data) {
-        storage.removeGameState();
-        return;
+        storage.removeGameState()
+        return
       }
-      console.log("Game Chain Info:", data);
+      console.log('Game Chain Info:', data)
       setChainMetaData({
         chainId: data.chainId,
         timestamp: data.timestamp,
-      });
-      setStep("random-assign");
-      storage.removeGameState();
+      })
+      setStep('random-assign')
+      storage.removeGameState()
     } catch (error) {
-      storage.removeGameState();
-      console.error("Failed to start game:", error);
-      setStep("select");
+      storage.removeGameState()
+      console.error('Failed to start game:', error)
+      setStep('select')
     }
-  };
+  }
 
   const fetchGameHash = async () => {
     try {
-      const res = await friendId();
-      const data = JSON.parse(res.result).data.friendId;
-      console.log("Game Chain Info:", data);
-      setGameHash(data);
-      setStep("friendly-share");
-      storage.removeGameState();
+      const res = await friendId()
+      const data = JSON.parse(res.result).data.friendId
+      console.log('Game Chain Info:', data)
+      setGameHash(data)
+      setStep('friendly-share')
+      storage.removeGameState()
     } catch (error) {
-      storage.removeGameState();
-      console.error("Failed to start game:", error);
-      setStep("select");
+      storage.removeGameState()
+      console.error('Failed to start game:', error)
+      setStep('select')
     }
-  };
+  }
 
-  const notification = useWalletNotifications();
+  const notification = useWalletNotifications()
 
   const [chainMetaData, setChainMetaData] = React.useState<{
-    chainId: string;
-    timestamp: number;
-  } | null>(null);
+    chainId: string
+    timestamp: number
+  } | null>(null)
   const [step, setStep] = useState<Step>(() => {
-    const savedStep = storage.getGameState();
-    return (savedStep as Step) || "select";
-  });
+    const savedStep = storage.getGameState()
+    return (savedStep as Step) || 'select'
+  })
 
-  const [copied, setCopied] = useState(false);
-  const [gameHash, setGameHash] = useState("");
-  const [inputHash, setInputHash] = useState("");
+  const [copied, setCopied] = useState(false)
+  const [gameHash, setGameHash] = useState('')
+  const [inputHash, setInputHash] = useState('')
 
   const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   React.useEffect(() => {
-    if (step === "random-loading" || step === "friendly-loading") {
-      storage.setGameState(step);
-    } else if (step === "select") {
-      storage.removeGameState();
+    if (step === 'random-loading' || step === 'friendly-loading') {
+      storage.setGameState(step)
+    } else if (step === 'select') {
+      storage.removeGameState()
     }
-  }, [step]);
+  }, [step])
 
   React.useEffect(() => {
-    const pendingStep = storage.getGameState() as Step;
-    console.log(pendingStep);
-    if (pendingStep === "random-loading") {
-      fetchChainMetaData();
-    } else if (pendingStep === "friendly-loading") {
-      fetchGameHash();
+    const pendingStep = storage.getGameState() as Step
+    console.log(pendingStep)
+    if (pendingStep === 'random-loading') {
+      fetchChainMetaData()
+    } else if (pendingStep === 'friendly-loading') {
+      fetchGameHash()
     }
-  }, []);
+  }, [])
 
   const handleRandomMatch = async () => {
     try {
-      setStep("random-loading");
-      storage.setGameState("random-loading");
-      const res = await startGame();
+      setStep('random-loading')
+      storage.setGameState('random-loading')
+      const res = await startGame()
     } catch (error) {
-      storage.removeGameState();
-      console.error("Failed to start game:", error);
-      setStep("select");
+      storage.removeGameState()
+      console.error('Failed to start game:', error)
+      setStep('select')
     }
-  };
+  }
 
   const handleFriendlyMatch = async () => {
-    if (step !== "select") return;
+    if (step !== 'select') return
 
     try {
-      setStep("friendly-loading");
-      storage.setGameState("friendly-loading");
-      await reqFriendlyGame();
+      setStep('friendly-loading')
+      storage.setGameState('friendly-loading')
+      await reqFriendlyGame()
     } catch (error) {
-      storage.removeGameState();
-      console.error("Failed to start friendly game:", error);
-      setStep("select");
+      storage.removeGameState()
+      console.error('Failed to start friendly game:', error)
+      setStep('select')
     }
-  };
+  }
 
   const handleJoinMatch = async () => {
-    if (step !== "friendly-join" || !inputHash.trim()) return;
+    if (step !== 'friendly-join' || !inputHash.trim()) return
 
     try {
-      setStep("friendly-loading");
-      await gameWithToken(inputHash.trim());
-      storage.setGameState("random-loading");
+      setStep('friendly-loading')
+      await gameWithToken(inputHash.trim())
+      storage.setGameState('random-loading')
     } catch (error) {
-      storage.removeGameState();
-      console.error("Failed to join game:", error);
-      setStep("select");
+      storage.removeGameState()
+      console.error('Failed to join game:', error)
+      setStep('select')
     }
-  };
+  }
 
   React.useEffect(() => {
-    if (step === "random-loading") {
-      fetchChainMetaData();
+    if (step === 'random-loading') {
+      fetchChainMetaData()
     }
-    if (step === "friendly-loading") {
-      fetchGameHash();
+    if (step === 'friendly-loading') {
+      fetchGameHash()
     }
-  }, [notification]);
+  }, [notification])
 
   const handleStart = () => {
-    if (!chainMetaData) return;
+    if (!chainMetaData) return
     try {
-      const res = assignChain(chainMetaData.chainId, chainMetaData.timestamp);
-      storage.removeGameState();
+      const res = assignChain(chainMetaData.chainId, chainMetaData.timestamp)
+      storage.removeGameState()
     } catch (e) {
-      console.log(e);
+      console.log(e)
     }
-  };
+  }
 
   const BackToMenu = ({
     setStep,
   }: {
-    setStep: React.Dispatch<React.SetStateAction<any>>;
+    setStep: React.Dispatch<React.SetStateAction<any>>
   }) => {
     return (
       <button
         onClick={() => {
-          setStep("select");
+          setStep('select')
         }}
         className="relative z-20 flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800/50 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-400 hover:text-white transition-all cursor-pointer pointer-events-auto"
       >
         <ArrowLeft className="w-4 h-4" />
         <span>Back to menu</span>
       </button>
-    );
-  };
+    )
+  }
+
+  const handleCancel = () => {
+    setStep('select')
+    storage.removeGameState()
+  }
 
   return (
     <div className="h-full w-full max-w-2xl mx-auto">
       {/* Selection Screen */}
-      {step === "select" && (
+      {step === 'select' && (
         <div className="space-y-4 animate-in fade-in duration-300">
           {/* Header */}
           <div className="text-center space-y-2 mb-5">
@@ -275,7 +280,7 @@ const MatchSelect = () => {
           </div>
 
           <button
-            onClick={() => setStep("friendly-join")}
+            onClick={() => setStep('friendly-join')}
             className="w-full group relative overflow-hidden rounded-xl bg-zinc-900/50 border border-zinc-800 hover:border-purple-500/50 p-6 text-center transition-all duration-300 hover:scale-[1.01]"
           >
             <div className="flex items-center justify-center gap-3">
@@ -292,7 +297,7 @@ const MatchSelect = () => {
       )}
 
       {/* Random Match Loading */}
-      {step === "random-loading" && (
+      {step === 'random-loading' && (
         <div className="flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in duration-300 py-12">
           <div className="relative">
             <div className="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center">
@@ -308,11 +313,17 @@ const MatchSelect = () => {
               Searching for players at your skill level
             </p>
           </div>
+          <button
+            onClick={handleCancel}
+            className="text-orange-400 hover:scale-105"
+          >
+            Cancel
+          </button>
         </div>
       )}
 
       {/* Random Match - Assign Required */}
-      {step === "random-assign" && chainMetaData && (
+      {step === 'random-assign' && chainMetaData && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <BackToMenu setStep={setStep} />
 
@@ -351,7 +362,7 @@ const MatchSelect = () => {
       )}
 
       {/* Friendly Match Loading */}
-      {step === "friendly-loading" && (
+      {step === 'friendly-loading' && (
         <div className="flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in duration-300 py-12">
           <div className="relative">
             <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">
@@ -365,11 +376,18 @@ const MatchSelect = () => {
             </h3>
             <p className="text-zinc-400">Setting up your friendly match</p>
           </div>
+
+          <button
+            onClick={handleCancel}
+            className="text-orange-400 hover:scale-105"
+          >
+            Cancel
+          </button>
         </div>
       )}
 
       {/* Friendly Match - Share Hash */}
-      {step === "friendly-share" && gameHash && (
+      {step === 'friendly-share' && gameHash && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <BackToMenu setStep={setStep} />
 
@@ -420,7 +438,7 @@ const MatchSelect = () => {
                 className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-4 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-green-500/50 flex items-center justify-center gap-2"
               >
                 <Users className="w-5 h-5" />
-                <span>{copied ? "Link Copied!" : "Copy Invitation Link"}</span>
+                <span>{copied ? 'Link Copied!' : 'Copy Invitation Link'}</span>
               </button>
             </div>
 
@@ -434,11 +452,11 @@ const MatchSelect = () => {
       )}
 
       {/* Join with Hash */}
-      {step === "friendly-join" && (
+      {step === 'friendly-join' && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <BackToMenu setStep={setStep} />
 
-          <div className="rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 p-8 space-y-6">
+          <div className="rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 p-4 space-y-6">
             <div className="text-center space-y-2">
               <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-4">
                 <Hash className="w-8 h-8 text-purple-400" />
@@ -468,14 +486,14 @@ const MatchSelect = () => {
               <button
                 onClick={handleJoinMatch}
                 disabled={!inputHash.trim()}
-                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/50 disabled:hover:scale-100 disabled:hover:shadow-none flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/50 disabled:hover:scale-100 disabled:hover:shadow-none flex items-center justify-center gap-2"
               >
                 <Play className="w-5 h-5" />
                 <span>Join Game</span>
               </button>
             </div>
 
-            <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
+            <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-2">
               <p className="text-purple-300 text-sm text-center">
                 💡 Ask your friend for the game hash or invitation link
               </p>
@@ -484,7 +502,7 @@ const MatchSelect = () => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default MatchSelect;
+export default MatchSelect

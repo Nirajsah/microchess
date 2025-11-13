@@ -177,7 +177,9 @@ export default function LeaderBoard() {
         <div className="border w-full max-w-[150px]"></div>
         <div className="border w-full max-w-[150px]"></div>
       </div> */}
-      <div className="text-center text-[60px] my-10">LeaderBoard</div>
+      <div className="text-center text-[40px] lg:text-[60px] my-10">
+        LeaderBoard
+      </div>
       <div className="">
         <div className="w-full flex justify-between px-2 hero-background-circle">
           <span className="w-[50px] md:w-[60px] lg:w-[70px] text-xs md:text-sm">

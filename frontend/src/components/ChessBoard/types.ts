@@ -28,6 +28,10 @@ export type BoardType = {
     white: number
     black: number
   }
+  lastMove: {
+    from: string
+    to: string
+  }
 }
 
 export type PieceColor = 'w' | 'b'
