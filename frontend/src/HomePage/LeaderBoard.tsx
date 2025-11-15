@@ -1,147 +1,36 @@
 type Player = {
-  id: string // Public key
+  id: string
   name: string
-  rank: number
   elo: number
   matches: number
-  wins: number
-  losses: number
-  avatarUrl?: string // optional
-  countryCode?: string // optional, ISO format ("US", "IN", etc.)
+  won: number
+  lost: number
 }
 
-const NewPlayerData: Player[] = [
-  {
-    id: 'player1',
-    rank: 1,
-    name: 'Eren Yeager',
-    elo: 2700,
-    matches: 130,
-    wins: 85,
-    losses: 45,
-    countryCode: 'JP',
-    avatarUrl: '/avatars/eren.png',
-  },
-
-  {
-    id: 'player2',
-    rank: 2,
-    name: 'Luffy',
-    elo: 2785,
-    matches: 130,
-    wins: 110,
-    losses: 20,
-    countryCode: 'JP',
-    avatarUrl: '/avatars/luffy.png',
-  },
-  {
-    id: 'player3',
-    rank: 3,
-    name: 'Naruto Uzumaki',
-    elo: 2775,
-    matches: 130,
-    wins: 105,
-    losses: 25,
-    countryCode: 'JP',
-    avatarUrl: '/avatars/naruto.png',
-  },
-  {
-    id: 'player4',
-    rank: 4,
-    name: 'Saitama',
-    elo: 2760,
-    matches: 130,
-    wins: 100,
-    losses: 30,
-    countryCode: 'JP',
-    avatarUrl: '/avatars/saitama.png',
-  },
-  {
-    id: 'player5',
-    rank: 5,
-    name: 'Light Yagami',
-    elo: 2750,
-    matches: 130,
-    wins: 98,
-    losses: 32,
-    countryCode: 'JP',
-    avatarUrl: '/avatars/light.png',
-  },
-  {
-    id: 'player6',
-    rank: 6,
-    name: 'Levi Ackerman',
-    elo: 2740,
-    matches: 130,
-    wins: 95,
-    losses: 35,
-    countryCode: 'JP',
-    avatarUrl: '/avatars/levi.png',
-  },
-  {
-    id: 'player7',
-    rank: 7,
-    name: 'Roronoa Zoro',
-    elo: 2730,
-    matches: 130,
-    wins: 92,
-    losses: 38,
-    countryCode: 'JP',
-    avatarUrl: '/avatars/zoro.png',
-  },
-  {
-    id: 'player8',
-    rank: 8,
-    name: 'Shoto Todoroki',
-    elo: 2720,
-    matches: 130,
-    wins: 90,
-    losses: 40,
-    countryCode: 'JP',
-    avatarUrl: '/avatars/todoroki.png',
-  },
-  {
-    id: 'player9',
-    rank: 9,
-    name: 'Tanjiro Kamado',
-    elo: 2710,
-    matches: 130,
-    wins: 88,
-    losses: 42,
-    countryCode: 'JP',
-    avatarUrl: '/avatars/tanjiro.png',
-  },
-  {
-    id: 'player10',
-    rank: 10,
-    name: 'Goku',
-    elo: 2850,
-    matches: 135,
-    wins: 120,
-    losses: 15,
-    countryCode: 'JP',
-    avatarUrl: '/avatars/goku.png',
-  },
-]
-
-const PlayerStats = ({ playerData }: { playerData: Player }) => {
+const PlayerStats = ({
+  playerData,
+  index,
+}: {
+  playerData: Player
+  index: number
+}) => {
   return (
     <div
       style={{
         transform: 'skew(-20deg)',
       }}
       className={`flex items-center py-2 px-3 rounded-lg border border-[#ffffff24] ${
-        (playerData.rank === 1 && 'border-orange-400') ||
-        (playerData.rank === 2 && 'border-red-400') ||
-        (playerData.rank === 3 && 'border-purple-400')
+        (index === 1 && 'border-orange-400') ||
+        (index === 2 && 'border-red-400') ||
+        (index === 3 && 'border-purple-400')
       }`}
     >
-      <span className="w-[50px] md:w-[60px] lg:w-[70px] text-sm md:tex-xl lg:text-2xl">
-        {playerData.rank}
+      <span className="w-[50px] md:w-[60px] lg:w-[70px] text-sm md:text-xl lg:text-2xl">
+        {index}
       </span>
-      <div className="flex justify-between w-full">
-        <span className="w-full max-w-[680px] text-sm md:tex-xl lg:text-2xl">
-          {playerData.name}
+      <div className="flex justify-between w-full items-center">
+        <span className="w-full max-w-[680px] text-sm md:text-lg lg:text-xl">
+          {playerData.name ? playerData.name : playerData.id}
         </span>
         <div className="w-full max-w-[140px] flex justify-end">
           <span className="text-sm md:tex-xl lg:text-2xl">
@@ -150,12 +39,12 @@ const PlayerStats = ({ playerData }: { playerData: Player }) => {
         </div>
         <div className="w-full hidden max-w-[140px] md:flex justify-end">
           <span className="text-sm md:tex-xl lg:text-2xl">
-            {playerData.wins}
+            {playerData.won}
           </span>
         </div>
         <div className="w-full hidden max-w-[140px] md:flex justify-end">
           <span className="text-sm md:tex-xl lg:text-2xl">
-            {playerData.losses}
+            {playerData.lost}
           </span>
         </div>
         <div className="w-full max-w-[140px] flex justify-end">
@@ -168,7 +57,20 @@ const PlayerStats = ({ playerData }: { playerData: Player }) => {
   )
 }
 
-export default function LeaderBoard() {
+type LeaderBoard = {
+  id: string
+  name: string
+  elo: number
+  matches: number
+  won: number
+  lost: number
+}
+
+export default function LeaderBoard({
+  leaderboard,
+}: {
+  leaderboard: LeaderBoard[]
+}) {
   return (
     <div className="max-w-[1280px] mt-8 p-5 text-sm rounded-xl w-full h-full space-y-10">
       {/** Will be used later */}
@@ -204,8 +106,8 @@ export default function LeaderBoard() {
           </div>
         </div>
         <div className="flex gap-2 text-2xl mt-1 flex-col rounded-lg">
-          {NewPlayerData.map((player) => (
-            <PlayerStats key={player.rank} playerData={player} />
+          {leaderboard.map((player, index) => (
+            <PlayerStats key={index} playerData={player} index={index + 1} />
           ))}
         </div>
       </div>
