@@ -41,6 +41,17 @@ body,
   }
 }
 
+.middle-truncate {
+  mask-image: linear-gradient(
+    to right,
+    black,
+    black 40%,
+    transparent 50%,
+    black 60%,
+    black
+  );
+}
+
 .chess-board {
   -webkit-user-select: none; /* Chrome, Safari, Opera */
   -moz-user-select: none;

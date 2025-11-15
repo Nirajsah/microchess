@@ -99,12 +99,9 @@ export const LeftSideMenu = () => {
       >
         <div className="h-full flex flex-col relative overflow-hidden">
           {/* Header */}
-          <div className="relative px-6 py-5 border-b border-zinc-800/50 backdrop-blur-sm">
+          <div className="relative rounded-3xl px-6 py-5 border-b border-zinc-800/50 backdrop-blur-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-                  <span className="text-lg font-bold">♔</span>
-                </div>
                 <span className="text-xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
                   MicroChess
                 </span>
@@ -126,17 +123,17 @@ export const LeftSideMenu = () => {
           {/* Main Menu Content */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-3">
             {/* Settings Button */}
-            <button className="group w-full flex items-center gap-3 px-4 py-4 rounded-xl bg-gradient-to-r from-zinc-800/50 to-zinc-900/50 hover:from-zinc-800 hover:to-zinc-900 border border-zinc-700/50 hover:border-zinc-600 transition-all duration-300 hover:scale-[1.02]">
+            {/* <button className="group w-full flex items-center gap-3 p-2 rounded-xl bg-gradient-to-r from-zinc-800/50 to-zinc-900/50 hover:from-zinc-800 hover:to-zinc-900 border border-zinc-700/50 hover:border-zinc-600 transition-all duration-300 hover:scale-[1.02]">
               <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Settings size={20} className="text-blue-400" />
               </div>
               <span className="font-medium">Settings</span>
-            </button>
+            </button> */}
 
             {/* Theme Button */}
             <button
               onClick={() => setShowThemes(true)}
-              className="group w-full flex items-center gap-3 px-4 py-4 rounded-xl bg-gradient-to-r from-zinc-800/50 to-zinc-900/50 hover:from-zinc-800 hover:to-zinc-900 border border-zinc-700/50 hover:border-zinc-600 transition-all duration-300 hover:scale-[1.02]"
+              className="group w-full flex items-center gap-3 p-2 rounded-xl bg-gradient-to-r from-zinc-800/50 to-zinc-900/50 hover:from-zinc-800 hover:to-zinc-900 border border-zinc-700/50 hover:border-zinc-600 transition-all duration-300 hover:scale-[1.02]"
             >
               <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Palette size={20} className="text-purple-400" />

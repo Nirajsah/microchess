@@ -32,7 +32,6 @@ const MatchSelect = () => {
 
   const fetchChainMetaData = async () => {
     try {
-      console.log('Fetching game chain info...')
       const res = await getGameChainInfo()
       const data = JSON.parse(res.result).data.gameChain
       if (!data) {
@@ -57,13 +56,11 @@ const MatchSelect = () => {
     try {
       const res = await friendId()
       const data = JSON.parse(res.result).data.friendId
-      console.log('Game Chain Info:', data)
       setGameHash(data)
       setStep('friendly-share')
-      storage.removeGameState()
+      storage.setGameState('friendly-loading')
     } catch (error) {
       storage.removeGameState()
-      console.error('Failed to start game:', error)
       setStep('select')
     }
   }
@@ -76,11 +73,16 @@ const MatchSelect = () => {
   } | null>(null)
   const [step, setStep] = useState<Step>(() => {
     const savedStep = storage.getGameState()
-    return (savedStep as Step) || 'select'
+    return (savedStep as Step) || 'friendly-share'
   })
 
   const [copied, setCopied] = useState(false)
-  const [gameHash, setGameHash] = useState('')
+  const [gameHash, setGameHash] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    const hash = params.get('gamehash')
+    return (hash as string) || ''
+  })
+
   const [inputHash, setInputHash] = useState('')
 
   const handleCopy = (text: string) => {
@@ -99,7 +101,7 @@ const MatchSelect = () => {
 
   React.useEffect(() => {
     const pendingStep = storage.getGameState() as Step
-    console.log(pendingStep)
+
     if (pendingStep === 'random-loading') {
       fetchChainMetaData()
     } else if (pendingStep === 'friendly-loading') {
@@ -391,7 +393,7 @@ const MatchSelect = () => {
         <div className="space-y-6 animate-in fade-in duration-300">
           <BackToMenu setStep={setStep} />
 
-          <div className="rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 p-8 space-y-6">
+          <div className="rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 p-4 space-y-6">
             <div className="text-center space-y-4">
               <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
                 <Users className="w-8 h-8 text-green-400" />
@@ -404,28 +406,27 @@ const MatchSelect = () => {
 
             {/* Game Hash Display */}
             <div className="space-y-4">
-              <div className="bg-zinc-900/80 rounded-xl p-6 space-y-4">
-                <label className="text-zinc-400 text-sm font-medium block">
-                  Game Hash
-                </label>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 bg-zinc-800/50 rounded-lg px-4 py-3 border border-zinc-700">
-                    <code className="text-white font-mono text-lg tracking-wider break-all">
-                      {gameHash}
-                    </code>
+              <label className="text-zinc-400 text-sm font-medium block">
+                Game Hash
+              </label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 bg-zinc-800/50 rounded-lg px-4 max-w-[300px] py-3 border border-zinc-700">
+                  <div className="text-white w-full overflow-hidden whitespace-nowrap font-mono text-lg tracking-wider truncate">
+                    {gameHash}
                   </div>
-                  <button
-                    onClick={() => handleCopy(gameHash)}
-                    className="flex-shrink-0 w-12 h-12 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 flex items-center justify-center transition-all hover:scale-110"
-                    title="Copy hash"
-                  >
-                    {copied ? (
-                      <Check className="w-5 h-5 text-green-400" />
-                    ) : (
-                      <Copy className="w-5 h-5 text-green-400" />
-                    )}
-                  </button>
                 </div>
+
+                <button
+                  onClick={() => handleCopy(gameHash)}
+                  className="flex-shrink-0 w-12 h-12 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 flex items-center justify-center transition-all hover:scale-110"
+                  title="Copy hash"
+                >
+                  {copied ? (
+                    <Check className="w-5 h-5 text-green-400" />
+                  ) : (
+                    <Copy className="w-5 h-5 text-green-400" />
+                  )}
+                </button>
               </div>
 
               {/* Copy Link Button */}

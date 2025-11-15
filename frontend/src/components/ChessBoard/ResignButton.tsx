@@ -1,3 +1,4 @@
+import { resign } from '@/api'
 import { FlagIcon } from 'lucide-react'
 import { useState } from 'react'
 
@@ -10,7 +11,7 @@ export function ResignButton({ onResign }: { onResign: () => void }) {
       setTimeout(() => setConfirming(false), 3000)
     } else {
       setConfirming(false)
-      onResign()
+      resign().then(() => console.log('resigned'))
     }
   }
 
