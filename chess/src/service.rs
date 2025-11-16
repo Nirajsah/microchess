@@ -91,9 +91,7 @@ impl ChessService {
     async fn game_chain(&self) -> Option<GameChain> {
         if let Some(game_data) = self.state.game_chain.get() {
             let now = self.runtime.system_time();
-            let expiry = game_data
-                .timestamp
-                .saturating_add(TimeDelta::from_secs(300));
+            let expiry = game_data.timestamp.saturating_add(TimeDelta::from_secs(90)); // 1.30 secs MAX
 
             // If expired → return None
             if now < expiry {
@@ -149,9 +147,8 @@ impl ChessService {
             None
         }
     }
-    /*
-    async fn captured_pieces(&self) -> &Vec<Piece> {
+
+    async fn captured_pieces(&self) -> &Vec<String> {
         &self.state.board.get().captured_pieces
     }
-    */
 }

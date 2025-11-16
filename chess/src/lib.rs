@@ -81,7 +81,7 @@ pub enum Operation {
         promoted_piece: String,
     },
     Resign,
-
+    DeleteChainMetadata,
     // basic user operations
     Subscribe,
     Profile {

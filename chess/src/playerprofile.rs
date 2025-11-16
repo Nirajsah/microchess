@@ -155,4 +155,24 @@ impl PlayerProfile {
     pub fn draw(&mut self) {
         self.matches += 1;
     }
+
+    pub fn update_rating(&mut self, delta: i32, won: bool, lost: bool) {
+        self.matches += 1;
+
+        // Update win/loss counters
+        if won {
+            self.won += 1;
+        } else if lost {
+            self.lost += 1;
+        }
+
+        // Apply Elo change (can be positive or negative)
+        let new_elo = (self.elo as i32 + delta).max(0) as u32; // Prevent negative elo
+        self.elo = new_elo;
+
+        // Update all-time high if beaten
+        if self.elo > self.ath {
+            self.ath = self.elo;
+        }
+    }
 }

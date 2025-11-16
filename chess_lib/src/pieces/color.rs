@@ -2,6 +2,8 @@ use std::{fmt::Display, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
+use crate::board::piece::Piece;
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[repr(u8)]
 pub enum Color {
@@ -23,6 +25,13 @@ impl Display for Color {
 impl Color {
     pub fn opposite(self) -> Self {
         unsafe { std::mem::transmute::<u8, Color>((self as u8) ^ 1) }
+    }
+
+    pub fn pawn(self) -> Piece {
+        match self {
+            Color::White => Piece::WhitePawn,
+            Color::Black => Piece::BlackPawn,
+        }
     }
 
     pub fn index(self) -> usize {

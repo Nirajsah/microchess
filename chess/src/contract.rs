@@ -8,7 +8,7 @@ use std::str::FromStr;
 use crate::state::ChessState;
 
 use chess::{
-    leaderboard::LeaderboardManager,
+    leaderboard::{EloCalculator, LeaderboardManager},
     playerprofile::{PlayerHash, PlayerProfile, Players},
     ChessResponse, Clock, Event, EventType, GameChain, GameWrapper, InstantiationArgument, MatchId,
     MatchMetaData, MatchType, Message, Operation, TimedToken,
@@ -65,6 +65,11 @@ impl Contract for ChessContract {
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
         match operation {
+            Operation::DeleteChainMetadata => {
+                assert_ne!(self.runtime.chain_id(), self.app_chain());
+                self.state.game_chain.set(None);
+                ChessResponse::Ok
+            }
             Operation::Profile { name } => {
                 let id = self.runtime.authenticated_signer().unwrap();
                 let chain_id = self.runtime.chain_id();
@@ -524,24 +529,35 @@ impl ChessContract {
 
     pub async fn handle_match_end(&mut self, metadata: MatchMetaData) {
         assert_eq!(self.app_chain(), self.runtime.chain_id());
-        let win = 5; // will change in the future
-        let lose = 2;
+        let elo_calculator = EloCalculator::new(30.0);
 
         match metadata.match_type {
             MatchType::Random => {
                 if let Ok(Some(players)) = self.state.matches.get(&metadata.match_id).await {
                     let (mut player_1, mut player_2) = players.get_players();
 
-                    if player_1.id == metadata.winner {
-                        player_1.add(win);
-                        player_2.sub(lose);
+                    let rating_1 = player_1.elo as f64;
+                    let rating_2 = player_2.elo as f64;
+
+                    // Determine outcome: 1.0 = player_1 wins, 0.5 = draw, 0.0 = player_2 wins
+                    let outcome = if player_1.id == metadata.winner {
+                        1.0
                     } else if player_2.id == metadata.winner {
-                        player_2.add(win);
-                        player_1.sub(lose);
+                        0.0
                     } else {
-                        player_1.draw();
-                        player_2.draw();
-                    }
+                        0.5
+                    };
+
+                    let (new_rating_1, new_rating_2) =
+                        elo_calculator.calculate_new_ratings(rating_1, rating_2, outcome);
+
+                    // Calculate deltas
+                    let delta_1 = (new_rating_1.round() as i32) - (player_1.elo as i32);
+                    let delta_2 = (new_rating_2.round() as i32) - (player_2.elo as i32);
+
+                    // Update players
+                    player_1.update_rating(delta_1, outcome == 1.0, outcome == 0.0);
+                    player_2.update_rating(delta_2, outcome == 0.0, outcome == 1.0);
 
                     if let Some(leaderboard) = self.state.leaderboard_manager.get_mut() {
                         leaderboard.try_add_player(player_1.to_leaderboard());

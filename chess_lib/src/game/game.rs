@@ -24,14 +24,14 @@ pub struct Game {
     /// Game State
     pub state: GameState,
     pub winner: Option<Color>,
-    /*
     /// Captured Pieces Table
-    pub captured_pieces: Vec<Piece>,
+    pub captured_pieces: Vec<String>,
+    /*
     /// current zobrist hashing
-    pub current_hash: u64,
-    /// position_count
-    pub position_count: HashMap<u64, u32>,
-    */
+     pub current_hash: u64,
+     /// position_count
+     pub position_count: HashMap<u64, u32>,
+     */
     /// 50-Move Rule Counter
     pub halfmove_clock: u16,
     // represents full moves(increments when black makes a move)
@@ -86,6 +86,7 @@ impl Game {
             active_player: Color::White,
             state: GameState::default(),
             halfmove_clock: 0,
+            captured_pieces: vec![],
             fullmove_number: 1,
             moves: vec![],
             winner: None,
@@ -103,6 +104,7 @@ impl Game {
             halfmove_clock: 0,
             fullmove_number: 1,
             moves: vec![],
+            captured_pieces: vec![],
             winner: None,
         }
     }
@@ -412,6 +414,21 @@ impl Game {
 
         match self.make_move(mv) {
             Ok(_) => {
+                let captured_piece = match mv.move_type {
+                    MoveType::Capture(piece) => Some(piece),
+                    MoveType::PromotionCapture(_, captured) => Some(captured),
+                    MoveType::EnPassant => {
+                        // En passant captures opponent's pawn
+                        let opponent_color = self.active_player.opposite();
+                        Some(opponent_color.pawn())
+                    }
+                    MoveType::Move | MoveType::Castle | MoveType::Promotion(_) => None,
+                };
+
+                if let Some(piece) = captured_piece {
+                    self.captured_pieces.push(piece.to_string())
+                };
+
                 let hash = self.compute_hash();
                 let mut save_mv = CompleteMove {
                     from: mv.from,
@@ -541,39 +558,6 @@ impl Game {
        /// A function to insert the captured_pieces into a vec
        pub fn insert_captured_pieces(&mut self, piece: &Piece) {
            self.captured_pieces.push(*piece);
-       }
-
-       /// A function to create a move string
-       pub fn create_move_string(&mut self, color: Color, chess_move: String) {
-           match color {
-               Color::White => {
-                   if self.moves.is_empty() || self.moves.last().unwrap().black.is_some() {
-                       self.moves.push(Move {
-                           white: Some(chess_move),
-                           black: None,
-                       });
-                   } else {
-                       self.moves.last_mut().unwrap().white = Some(chess_move);
-                   }
-               }
-               Color::Black => {
-                   if let Some(last_move) = self.moves.last_mut() {
-                       if last_move.black.is_none() {
-                           last_move.black = Some(chess_move);
-                       } else {
-                           self.moves.push(Move {
-                               white: None,
-                               black: Some(chess_move),
-                           });
-                       }
-                   } else {
-                       self.moves.push(Move {
-                           white: None,
-                           black: Some(chess_move),
-                       });
-                   }
-               }
-           }
        }
 
        /// A function to switch player turn

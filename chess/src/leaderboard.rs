@@ -85,3 +85,30 @@ impl LeaderboardManager {
         self.players.iter().next_back().map(|p| p.elo)
     }
 }
+
+pub struct EloCalculator {
+    k_factor: f64,
+}
+
+impl EloCalculator {
+    pub fn new(k_factor: f64) -> Self {
+        Self { k_factor }
+    }
+
+    /// Calculate expected score for player with rating_a against rating_b
+    fn expected_score(&self, rating_a: f64, rating_b: f64) -> f64 {
+        1.0 / (1.0 + 10_f64.powf((rating_b - rating_a) / 400.0))
+    }
+
+    /// Calculate new ratings after a match
+    /// outcome: 1.0 for player_a win, 0.5 for draw, 0.0 for player_b win
+    pub fn calculate_new_ratings(&self, rating_a: f64, rating_b: f64, outcome: f64) -> (f64, f64) {
+        let expected_a = self.expected_score(rating_a, rating_b);
+        let expected_b = self.expected_score(rating_b, rating_a);
+
+        let new_rating_a = rating_a + self.k_factor * (outcome - expected_a);
+        let new_rating_b = rating_b + self.k_factor * ((1.0 - outcome) - expected_b);
+
+        (new_rating_a, new_rating_b)
+    }
+}
