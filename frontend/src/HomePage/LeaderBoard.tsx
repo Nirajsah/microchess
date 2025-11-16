@@ -29,26 +29,26 @@ const PlayerStats = ({
         {index}
       </span>
       <div className="flex justify-between w-full items-center">
-        <span className="w-full max-w-[680px] text-sm md:text-lg lg:text-xl">
+        <span className="w-full truncate max-w-[200px] md:max-w-[680px] text-xs md:text-sm lg:text-lg">
           {playerData.name ? playerData.name : playerData.id}
         </span>
-        <div className="w-full max-w-[140px] flex justify-end">
-          <span className="text-sm md:tex-xl lg:text-2xl">
+        <div className="w-full hidden max-w-[120px] sm:flex justify-end">
+          <span className="text-xs md:text-sm lg:text-lg">
             {playerData.matches}
           </span>
         </div>
-        <div className="w-full hidden max-w-[140px] md:flex justify-end">
-          <span className="text-sm md:tex-xl lg:text-2xl">
+        <div className="w-full hidden max-w-[120px] lg:flex justify-end">
+          <span className="text-xs md:text-sm lg:text-lg">
             {playerData.won}
           </span>
         </div>
-        <div className="w-full hidden max-w-[140px] md:flex justify-end">
-          <span className="text-sm md:tex-xl lg:text-2xl">
+        <div className="w-full hidden max-w-[120px] lg:flex justify-end">
+          <span className="text-xs md:text-sm lg:text-lg">
             {playerData.lost}
           </span>
         </div>
-        <div className="w-full max-w-[140px] flex justify-end">
-          <span className="text-sm md:tex-xl lg:text-2xl">
+        <div className="w-full max-w-[20px] md:max-w-[120px] flex justify-end">
+          <span className="text-xs md:text-sm lg:text-lg">
             {playerData.elo}
           </span>
         </div>
@@ -73,17 +73,12 @@ export default function LeaderBoard({
 }) {
   return (
     <div className="max-w-[1280px] mt-8 p-5 text-sm rounded-xl w-full h-full space-y-10">
-      {/** Will be used later */}
-      {/* <div className="w-full h-[300px] flex gap-5 justify-center">
-        <div className="border w-full max-w-[150px]"></div>
-        <div className="border w-full max-w-[150px]"></div>
-        <div className="border w-full max-w-[150px]"></div>
-      </div> */}
       <div className="text-center text-[40px] lg:text-[60px] my-10">
         LeaderBoard
       </div>
       <div className="">
-        <div className="w-full flex justify-between px-2 hero-background-circle">
+        {/* Header row - NOW MATCHES DATA ROW PADDING */}
+        <div className="w-full flex items-center px-3 pb-2">
           <span className="w-[50px] md:w-[60px] lg:w-[70px] text-xs md:text-sm">
             Rank
           </span>
@@ -91,16 +86,16 @@ export default function LeaderBoard({
             <span className="w-full max-w-[680px] text-xs md:text-sm">
               Player
             </span>
-            <div className="w-full max-w-[140px] flex justify-end">
+            <div className="w-full hidden max-w-[120px] sm:flex justify-end">
               <span className="text-xs md:text-sm">Matches</span>
             </div>
-            <div className="w-full hidden max-w-[140px] md:flex justify-end">
+            <div className="w-full hidden max-w-[120px] lg:flex justify-end">
               <span className="text-xs md:text-sm">Wins</span>
             </div>
-            <div className="w-full hidden max-w-[140px] md:flex justify-end">
+            <div className="w-full hidden max-w-[120px] lg:flex justify-end">
               <span className="text-xs md:text-sm">Losses</span>
             </div>
-            <div className="w-full max-w-[140px] flex justify-end">
+            <div className="w-full max-w-[120px] flex justify-end">
               <span className="text-xs md:text-sm">Elo Points</span>
             </div>
           </div>

@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import { StarBorder } from '../components/ui/star-border'
 import ShortBoard from '/public/shortboard.png'
 import { BackgroundBeamsDemo } from '@/components/ui/background-beam-demo'
-import { Skeleton } from '@/components/ui/skeleton'
 
 const BorderAnimation = () => {
   return (
@@ -26,17 +25,9 @@ const BorderAnimation = () => {
   )
 }
 
-// const Loading = () => {
-//   return (
-//     <div className="flex items-center space-x-4">
-//       <Skeleton className="h-12 bg-[#404040] opacity-55 w-14 rounded-lg mb-1 mr-1" />
-//     </div>
-//   )
-// }
-
 export default function HomePage({ gameCount }: { gameCount: number }) {
   return (
-    <div className="w-full h-full min-h-[880px] flex mt-20">
+    <div className="w-full h-full lg:min-h-[880px] flex mt-20">
       <div className="w-full h-full flex flex-col gap-2 p-2">
         <div className="flex flex-col md:flex-row gap-2 min-w-0 lg:flex-wrap overflow-hidden">
           <div className="relative w-full lg:w-[50%] h-full aspect-square bg-[#0a0a0a] flex justify-center items-center rounded-[24px] min-w-0 flex-[1_1_0%]">
