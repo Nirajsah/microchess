@@ -13,13 +13,12 @@ export default function App() {
   useEffect(() => {
     async function getLeaderboard() {
       const { data: leaderboard } = await supabase.from('leaderboard').select()
-      console.log(leaderboard)
       setLeaderboard(leaderboard)
     }
 
     async function getCount() {
-      const { data } = await supabase.from('gameCount').select().single()
-      setGameCount(data.count)
+      const { data } = await supabase.from('gameCount').select()
+      setGameCount(data![0].count)
     }
 
     getLeaderboard()
@@ -35,7 +34,7 @@ export default function App() {
           table: 'gameCount',
         },
         (payload: any) => {
-          const { eventType, new: newRow, old: oldRow } = payload
+          const { new: newRow } = payload
           setGameCount(newRow.count)
         }
       )
@@ -50,7 +49,7 @@ export default function App() {
           schema: 'public',
           table: 'leaderboard',
         },
-        (payload: any) => {
+        () => {
           getLeaderboard()
         }
       )

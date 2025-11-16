@@ -1,50 +1,50 @@
-import { Piece, Square } from "../components/ChessBoard/types.ts";
+import { Piece, Square } from '../components/ChessBoard/types.ts'
 
 export function connect_wallet(): Promise<any> {
-  if (!window.linera) throw new Error("Linera extension not found.");
+  if (!window.linera) throw new Error('Linera extension not found.')
 
   return window.linera.request({
-    type: "CONNECT_WALLET",
-  });
+    type: 'CONNECT_WALLET',
+  })
 }
 
 // Ask the wallet to assign the wallet with new chain
 export function assignChain(chainId: string, timestamp: number) {
-  (async () => {
+  ;(async () => {
     await window.linera?.request({
-      type: "ASSIGNMENT",
+      type: 'ASSIGNMENT',
       chainId: chainId,
       timestamp: timestamp,
-    });
-  })();
+    })
+  })()
 }
 
 function request(query: string): Promise<any> {
-  let APP_ID = import.meta.env.VITE_MICROCHESS_APPLICATION_ID;
+  let APP_ID = import.meta.env.VITE_MICROCHESS_APPLICATION_ID
 
-  if (!window.linera) throw new Error("Linera extension not found.");
+  if (!window.linera) throw new Error('Linera extension not found.')
 
   return window.linera.request({
-    type: "QUERY",
+    type: 'QUERY',
     applicationId: APP_ID,
     query: query,
-  });
+  })
 }
 
 export function isGameChain() {
-  return request(`{ "query": "query { isGameChain }" }`);
+  return request(`{ "query": "query { isGameChain }" }`)
 }
 
 export function getGameChainInfo() {
-  return request(`{ "query": "query { gameChain { chainId timestamp } }" }`);
+  return request(`{ "query": "query { gameChain { chainId timestamp } }" }`)
 }
 
 export function getMvString() {
-  return request(`{ "query": "query { mvString }" }`);
+  return request(`{ "query": "query { mvString }" }`)
 }
 
 export function timer() {
-  return request(`{ "query": "query { timer { white black } }" }`);
+  return request(`{ "query": "query { timer { white black } }" }`)
 }
 
 export function gameData(player: string): Promise<any> {
@@ -60,9 +60,9 @@ export function gameData(player: string): Promise<any> {
         to
       }
     }
-  }`;
-  const gqlQuery = buildGraphQLQuery(query);
-  return request(gqlQuery);
+  }`
+  const gqlQuery = buildGraphQLQuery(query)
+  return request(gqlQuery)
 }
 
 export function opponentProfile(opponent: string) {
@@ -73,9 +73,9 @@ export function opponentProfile(opponent: string) {
       matches
       ath
     }
-  }`;
-  const gqlQuery = JSON.stringify({ query: query });
-  return request(gqlQuery);
+  }`
+  const gqlQuery = JSON.stringify({ query: query })
+  return request(gqlQuery)
 }
 
 export function getProfile() {
@@ -86,58 +86,71 @@ export function getProfile() {
           won
           lost
           ath
-        } }`;
+        } }`
 
-  const gqlQuery = JSON.stringify({ query: query });
-  return request(gqlQuery);
+  const gqlQuery = JSON.stringify({ query: query })
+  return request(gqlQuery)
 }
 
 export function friendId() {
-  const query = `query { friendId }`;
-  const gqlQuery = JSON.stringify({ query: query });
-  return request(gqlQuery);
+  const query = `query { friendId }`
+  const gqlQuery = JSON.stringify({ query: query })
+  return request(gqlQuery)
+}
+
+export function capturedPiece() {
+  const query = `query { capturedPieces }`
+  const gqlQuery = JSON.stringify({ query: query })
+  return request(gqlQuery)
 }
 
 function buildGraphQLQuery(queryBody: string): string {
-  return JSON.stringify({ query: queryBody });
+  return JSON.stringify({ query: queryBody })
 }
 
 /** ---------------------------------------Mutation---------------------- */
 // Start a new game
 export function startGame() {
-  const mutation = `mutation { newGame }`;
-  let query = buildGraphQLQuery(mutation);
-  return request(query);
+  const mutation = `mutation { newGame }`
+  let query = buildGraphQLQuery(mutation)
+  return request(query)
 }
 // Request a friendly match
 export function reqFriendlyGame() {
-  const mutation = `mutation { frGame }`;
-  let query = buildGraphQLQuery(mutation);
-  return request(query);
+  const mutation = `mutation { frGame }`
+  let query = buildGraphQLQuery(mutation)
+  return request(query)
 }
 
 export function resign() {
-  const mutation = `mutation { resign }`;
-  let query = buildGraphQLQuery(mutation);
-  return request(query);
+  const mutation = `mutation { resign }`
+  let query = buildGraphQLQuery(mutation)
+  return request(query)
+}
+
+// Deletes chain metadata from user's state
+export function deleteInfo() {
+  const mutation = `mutation { deleteChainMetadata }`
+  let query = buildGraphQLQuery(mutation)
+  request(query).then((_) => console.log('chain info metadata deleted'))
 }
 
 export function gameWithToken(token: string) {
-  const mutation = `mutation { frGameHash(token: "${token}") }`;
-  let query = buildGraphQLQuery(mutation);
-  return request(query);
+  const mutation = `mutation { frGameHash(token: "${token}") }`
+  let query = buildGraphQLQuery(mutation)
+  return request(query)
 }
 
 export function updateProfile(name: string) {
-  const mutation = `mutation { profile(name: "${name}") }`;
-  let query = buildGraphQLQuery(mutation);
-  return request(query);
+  const mutation = `mutation { profile(name: "${name}") }`
+  let query = buildGraphQLQuery(mutation)
+  return request(query)
 }
 
 export function makeMove(from: string, to: string, piece: string) {
-  const mutation = `mutation { makeMove(from: "${from}", to: "${to}", piece: "${piece}") }`;
-  const gqlQuery = JSON.stringify({ query: mutation });
-  request(gqlQuery).then((res) => console.log(res));
+  const mutation = `mutation { makeMove(from: "${from}", to: "${to}", piece: "${piece}") }`
+  const gqlQuery = JSON.stringify({ query: mutation })
+  request(gqlQuery).then((res) => console.log(res))
 }
 
 export function promotePiece(
@@ -146,23 +159,23 @@ export function promotePiece(
   piece: Piece | string,
   promoted_to: Piece | string
 ) {
-  const mutation = `mutation { promotePiece(from: "${from}", to: "${to}", piece: "${piece}", promoted_to: "${promoted_to}") }`;
-  const query = buildGraphQLQuery(mutation);
-  request(query).then((res) => console.log(res));
+  const mutation = `mutation { promotePiece(from: "${from}", to: "${to}", piece: "${piece}", promoted_to: "${promoted_to}") }`
+  const query = buildGraphQLQuery(mutation)
+  request(query).then((res) => console.log(res))
 }
 
 export const storage = {
-  getTheme: () => localStorage.getItem("chess.theme"),
-  setTheme: (id: string) => localStorage.setItem("chess.theme", id),
+  getTheme: () => localStorage.getItem('chess.theme'),
+  setTheme: (id: string) => localStorage.setItem('chess.theme', id),
 
-  getPublicKey: () => localStorage.getItem("chess.public_key"),
-  setPublicKey: (key: string) => localStorage.setItem("chess.public_key", key),
+  getPublicKey: () => localStorage.getItem('chess.public_key'),
+  setPublicKey: (key: string) => localStorage.setItem('chess.public_key', key),
 
-  getSessionId: () => sessionStorage.getItem("chess.session_id"),
-  setSessionId: (id: string) => sessionStorage.setItem("chess.session_id", id),
+  getSessionId: () => sessionStorage.getItem('chess.session_id'),
+  setSessionId: (id: string) => sessionStorage.setItem('chess.session_id', id),
 
-  getGameState: () => localStorage.getItem("chess.game_state"),
+  getGameState: () => localStorage.getItem('chess.game_state'),
   setGameState: (state: string) =>
-    localStorage.setItem("chess.game_state", state),
-  removeGameState: () => localStorage.removeItem("chess.game_state"),
-};
+    localStorage.setItem('chess.game_state', state),
+  removeGameState: () => localStorage.removeItem('chess.game_state'),
+}

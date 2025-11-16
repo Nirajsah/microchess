@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { BoardType, Piece, Square } from './types'
+import { BoardType, Piece, Square, SquareToPieceMap } from './types'
 import ChessTile from './ChessTile'
 import CustomDragLayer from './CustomDragLayer'
 import { useMicroChess } from '@/context/MicroChessProvider'
@@ -141,14 +141,32 @@ export default function ChessBoard(props: BoardProps) {
 
   const selectedTheme = themes[chessSettings.theme as ThemeName]
 
+  const getSquareColor = (
+    square: Square,
+    board: SquareToPieceMap,
+    KingInCheck: string | null
+  ) => {
+    if (!KingInCheck) return null
+
+    const piece = board[square]
+
+    // Check if this square contains the king that's in check
+    if (piece === `${KingInCheck[0]}K`) {
+      // 'wK' for white king, 'bK' for black king
+      return '#ab261a' // Bright red for check
+    }
+
+    return null // No highlight
+  }
+
   const getSquareBackground = (
     square: Square,
     piece: Piece,
     number: number
   ) => {
-    // King in check - highest priority
-    if (KingInCheck === square) {
-      return '#ff4d4d' // Bright red for check
+    const checkColor = getSquareColor(square, board, KingInCheck)
+    if (checkColor) {
+      return checkColor // Return red for king in check
     }
 
     // Currently selected square
@@ -157,8 +175,11 @@ export default function ChessBoard(props: BoardProps) {
     }
 
     // Last move highlighting
-    if (activeSquare.from === square || activeSquare.to === square) {
-      return '#d5ce61' // Semi-transparent yellow for last move
+    if (activeSquare.from === square) {
+      return '#bbbc4e'
+    }
+    if (activeSquare.to === square) {
+      return '#d5ce61'
     }
 
     // Possible move with piece (capture)
@@ -212,6 +233,7 @@ export default function ChessBoard(props: BoardProps) {
             const number = fileIndex + rankIndex
 
             const bg = getSquareBackground(square as Square, piece, number)
+            console.log(bg)
 
             return (
               <div key={square}>

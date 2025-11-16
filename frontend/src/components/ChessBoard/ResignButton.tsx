@@ -2,7 +2,7 @@ import { resign } from '@/api'
 import { FlagIcon } from 'lucide-react'
 import { useState } from 'react'
 
-export function ResignButton({ onResign }: { onResign: () => void }) {
+export function ResignButton() {
   const [confirming, setConfirming] = useState(false)
 
   function handleClick() {

@@ -1,10 +1,11 @@
 import React from 'react'
-import { AlertCircle, Clock, Flag, Crown } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import Timer from './Timer'
 import CapturedPieces from './CapturedPieces'
 import { Color } from './types'
-import { opponentProfile } from '@/api'
+import { capturedPiece, opponentProfile } from '@/api'
 import { ResignButton } from './ResignButton'
+import { useWalletNotifications } from '@/hooks/useWalletNotification'
 
 interface MatchData {
   player: string
@@ -26,12 +27,25 @@ const MatchDataUI = (data: MatchData) => {
     matches: 0,
     name: null,
   })
-  const [moves, setMoves] = React.useState<string[] | null>(null)
+  const [moves, _setMoves] = React.useState<string[] | null>(null)
   const [capturedPieces, setCapturedPieces] = React.useState<string[] | null>(
     null
   )
 
-  console.log('MatchDataUI rendered with:', data)
+  const notification = useWalletNotifications()
+
+  React.useEffect(() => {
+    const getCapturedPieces = async () => {
+      try {
+        const data = await capturedPiece()
+        const res = JSON.parse(data.result).data.capturedPieces
+        setCapturedPieces(res)
+      } catch (e) {
+        console.error('failed', e)
+      }
+    }
+    getCapturedPieces()
+  }, [notification])
 
   const movePairs = React.useMemo(
     () =>
@@ -43,32 +57,6 @@ const MatchDataUI = (data: MatchData) => {
         : [],
     [moves]
   )
-
-  const getStatusColor = () => {
-    switch (game_state) {
-      case 'OnGoing':
-        return 'from-green-500/20 to-emerald-500/20 border-green-500/30'
-      case 'Checkmate':
-        return 'from-red-500/20 to-rose-500/20 border-red-500/30'
-      case 'Draw':
-        return 'from-zinc-500/20 to-gray-500/20 border-zinc-500/30'
-      default:
-        return 'from-blue-500/20 to-cyan-500/20 border-blue-500/30'
-    }
-  }
-
-  const getStatusIcon = () => {
-    switch (game_state) {
-      case 'OnGoing':
-        return <Clock className="w-6 h-6 text-green-400" />
-      case 'Checkmate':
-        return <Crown className="w-6 h-6 text-red-400" />
-      case 'Draw':
-        return <Flag className="w-6 h-6 text-zinc-400" />
-      default:
-        return <Clock className="w-6 h-6 text-blue-400" />
-    }
-  }
 
   React.useEffect(() => {
     const checkGameChain = async () => {
@@ -89,29 +77,6 @@ const MatchDataUI = (data: MatchData) => {
 
   return (
     <div className="w-full flex flex-col gap-4 h-[720px]">
-      {/* Game Status Header */}
-      {/* <div
-        className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${getStatusColor()} backdrop-blur-sm px-3 py-2 transition-all duration-300`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-              {getStatusIcon()}
-            </div>
-            <div>
-              <p className="text-sm text-zinc-400 font-medium">Game Status</p>
-              <p className="text-2xl font-bold text-white">{game_state}</p>
-            </div>
-          </div>
-          {game_state === 'OnGoing' && (
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-sm text-green-400 font-medium">Live</span>
-            </div>
-          )}
-        </div>
-      </div> */}
-
       {/* Timers and Moves Container */}
       <div className="flex-1 flex flex-col gap-3">
         {/* Opponent Timer */}
@@ -240,7 +205,7 @@ const MatchDataUI = (data: MatchData) => {
             </div>
           </div>
           {/* Resign Button  */}
-          <ResignButton onResign={() => console.log('clicked resign')} />
+          <ResignButton />
         </div>
       </div>
 
@@ -268,15 +233,11 @@ const MatchDataUI = (data: MatchData) => {
             Captured Pieces
           </h3>
         </div>
-        <div className="p-4">
-          <div className="flex flex-wrap gap-2 min-h-[60px] items-center justify-center">
-            {capturedPieces && Object.keys(capturedPieces).length > 0 ? (
-              <CapturedPieces pieces={capturedPieces} />
-            ) : (
-              <p className="text-zinc-600 text-sm">No pieces captured yet</p>
-            )}
-          </div>
-        </div>
+        {capturedPieces && Object.keys(capturedPieces).length > 0 ? (
+          <CapturedPieces pieces={capturedPieces} />
+        ) : (
+          <p className="text-zinc-600 text-sm p-3">No pieces captured yet</p>
+        )}
       </div>
     </div>
   )

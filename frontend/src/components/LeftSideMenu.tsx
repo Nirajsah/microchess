@@ -1,6 +1,5 @@
 import {
   Menu,
-  Settings,
   Palette,
   ChevronDown,
   ChevronUp,

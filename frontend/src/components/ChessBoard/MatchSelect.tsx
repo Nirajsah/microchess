@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import {
   assignChain,
+  deleteInfo,
   friendId,
   gameWithToken,
   getGameChainInfo,
@@ -34,17 +35,17 @@ const MatchSelect = () => {
     try {
       const res = await getGameChainInfo()
       const data = JSON.parse(res.result).data.gameChain
+      console.log(data)
       if (!data) {
         storage.removeGameState()
         return
       }
-      console.log('Game Chain Info:', data)
       setChainMetaData({
         chainId: data.chainId,
         timestamp: data.timestamp,
       })
       setStep('random-assign')
-      storage.removeGameState()
+      storage.setGameState('random-assign')
     } catch (error) {
       storage.removeGameState()
       console.error('Failed to start game:', error)
@@ -58,7 +59,7 @@ const MatchSelect = () => {
       const data = JSON.parse(res.result).data.friendId
       setGameHash(data)
       setStep('friendly-share')
-      storage.setGameState('friendly-loading')
+      storage.setGameState('friendly-share')
     } catch (error) {
       storage.removeGameState()
       setStep('select')
@@ -73,7 +74,7 @@ const MatchSelect = () => {
   } | null>(null)
   const [step, setStep] = useState<Step>(() => {
     const savedStep = storage.getGameState()
-    return (savedStep as Step) || 'friendly-share'
+    return (savedStep as Step) || 'select'
   })
 
   const [copied, setCopied] = useState(false)
@@ -102,10 +103,12 @@ const MatchSelect = () => {
   React.useEffect(() => {
     const pendingStep = storage.getGameState() as Step
 
-    if (pendingStep === 'random-loading') {
+    if (pendingStep === 'random-loading' || pendingStep === 'random-assign') {
       fetchChainMetaData()
     } else if (pendingStep === 'friendly-loading') {
       fetchGameHash()
+    } else if (pendingStep === 'friendly-share') {
+      fetchChainMetaData()
     }
   }, [])
 
@@ -113,7 +116,7 @@ const MatchSelect = () => {
     try {
       setStep('random-loading')
       storage.setGameState('random-loading')
-      const res = await startGame()
+      await startGame()
     } catch (error) {
       storage.removeGameState()
       console.error('Failed to start game:', error)
@@ -139,7 +142,7 @@ const MatchSelect = () => {
     if (step !== 'friendly-join' || !inputHash.trim()) return
 
     try {
-      setStep('friendly-loading')
+      setStep('random-loading')
       await gameWithToken(inputHash.trim())
       storage.setGameState('random-loading')
     } catch (error) {
@@ -156,12 +159,25 @@ const MatchSelect = () => {
     if (step === 'friendly-loading') {
       fetchGameHash()
     }
+    if (step === 'friendly-share') {
+      fetchChainMetaData()
+    }
   }, [notification])
 
   const handleStart = () => {
     if (!chainMetaData) return
     try {
-      const res = assignChain(chainMetaData.chainId, chainMetaData.timestamp)
+      assignChain(chainMetaData.chainId, chainMetaData.timestamp)
+      storage.removeGameState()
+    } catch (e) {
+      console.log(e)
+    }
+  }
+
+  const handleDeleteMetadata = () => {
+    if (!chainMetaData) return
+    try {
+      deleteInfo()
       storage.removeGameState()
     } catch (e) {
       console.log(e)
@@ -329,7 +345,7 @@ const MatchSelect = () => {
         <div className="space-y-6 animate-in fade-in duration-300">
           <BackToMenu setStep={setStep} />
 
-          <div className="rounded-2xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 p-8 space-y-6">
+          <div className="rounded-2xl bg-blue-500/10 border-blue-500/20 p-8 space-y-6">
             <div className="text-center space-y-2">
               <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
                 <Check className="w-8 h-8 text-blue-400" />
@@ -355,9 +371,16 @@ const MatchSelect = () => {
 
             <button
               onClick={handleStart}
-              className="w-full cursor-pointer bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/50"
+              className="w-full cursor-pointer bg-blue-500 text-white font-semibold py-3 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/50"
             >
               Confirm & Start Game
+            </button>
+
+            <button
+              onClick={handleDeleteMetadata}
+              className="w-full cursor-pointer text-white font-semibold underline hover:scale-105 antialiased"
+            >
+              Delete this Chain Info
             </button>
           </div>
         </div>
