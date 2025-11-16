@@ -18,9 +18,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Add wasm target
 RUN rustup target add wasm32-unknown-unknown
 
-# Install Linera binaries (Conway testnet version 0.15.3)
-RUN cargo install --locked linera-storage-service@0.15.3 && \
-    cargo install --locked linera-service@0.15.3
+# Install Linera binaries (Conway testnet version 0.15.5)
+RUN cargo install --locked linera-storage-service@0.15.5 && \
+    cargo install --locked linera-service@0.15.5
 
 # Set up working directory
 WORKDIR /app
@@ -52,7 +52,7 @@ COPY --from=builder /usr/local/cargo/bin/linera-server /usr/local/bin/
 COPY --from=builder /usr/local/cargo/bin/linera-proxy /usr/local/bin/
 
 # Copy the entire chess directory with built artifacts
-COPY --from=builder /app/chess/target/wasm32-unknown-unknown/release/chess_*.wasm ./chess/
+COPY --from=builder /app/target/wasm32-unknown-unknown/release/chess_*.wasm ./chess/
 COPY --from=builder /app/deploy.sh ./deploy.sh
 
 RUN chmod +x ./deploy.sh

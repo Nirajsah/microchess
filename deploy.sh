@@ -16,7 +16,7 @@ trap kill_processes EXIT
 echo "Setting up Linera network..."
 
 # Set environment variables
-LINERA_DIR=~/Desktop/Pro/Rust/wallet
+LINERA_DIR=/data/linera
 mkdir -p $LINERA_DIR
 
 FAUCET_URL=https://faucet.testnet-conway.linera.net/
