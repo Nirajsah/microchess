@@ -1,9 +1,13 @@
 use async_graphql::{ComplexObject, SimpleObject};
-use chess::{Clock, GameChain, GameWrapper, Player};
+use chess::{
+    leaderboard::{Leaderboard, LeaderboardManager},
+    playerprofile::{PlayerHash, PlayerProfile, Players},
+    Clock, GameChain, GameWrapper, MatchId,
+};
 use linera_sdk::{
     views::{
         linera_views::{self},
-        RegisterView, RootView,
+        MapView, RegisterView, RootView,
     },
     ViewStorageContext,
 };
@@ -16,23 +20,25 @@ pub struct ChessState {
     pub board: RegisterView<GameWrapper>,
     /// The current game clock
     pub clock: RegisterView<Clock>,
-    /// Holds Newly created game chain
-    pub game_chain: RegisterView<GameChain>,
+    /// Holds Newly created game chain, only for player_chain
+    pub game_chain: RegisterView<Option<GameChain>>,
+    /// PlayerProfile only for player_chain
+    pub profile: RegisterView<Option<PlayerProfile>>,
     /// Lobby to hold players for potential match
-    pub lobby: RegisterView<Vec<Player>>, // will be updated to include ranks.
-    // The current game players
-    // pub players: RegisterView<Option<Players>>,
-    /// Flag
-    pub game_flag: RegisterView<bool>,
+    pub lobby: RegisterView<Vec<PlayerHash>>, // will be updated to include ranks.
+    /// Count the number of games played on microchess, only for app_chain
+    pub game_count: RegisterView<u64>,
+    /// Friendly game token stored only on user's chain
+    pub game_token: RegisterView<String>,
+    /// Holds ongoing game data, only for app_chain
+    pub matches: MapView<MatchId, Players>,
+    // LeaderBoard Manager only for app_chain (max 10)
+    pub leaderboard_manager: RegisterView<Option<LeaderboardManager>>,
+    // LeaderBoard (max 10)
+    pub leaderboard: RegisterView<Vec<Leaderboard>>,
     /*
-    /// Player Requesting to play with a Friend(need a hash)
-    pub friend_lobby: MapView<FriendId, PlayerRequest>,
-    /// LeaderBoard (max 10)
-    pub leaderboard: RegisterView<Vec<PlayerProfile>>,
     /// Player Stats
     pub stats: RegisterView<PlayerProfile>,
-    // Temporary chains for individual games, by player.
-    // pub game_chains: MapView<PublicKey, BTreeSet<GameChain>>,
     // store the betting amount on temp chain.
     // pub bet_amount: RegisterView<Amount>,
     */

@@ -8,19 +8,25 @@ use std::str::FromStr;
 use crate::state::ChessState;
 
 use chess::{
-    ChessResponse, Clock, GameChain, GameWrapper, InstantiationArgument, Message, Operation, Player,
+    leaderboard::{EloCalculator, LeaderboardManager},
+    playerprofile::{PlayerHash, PlayerProfile, Players},
+    ChessResponse, Clock, Event, EventType, GameChain, GameWrapper, InstantiationArgument, MatchId,
+    MatchMetaData, MatchType, Message, Operation, TimedToken,
 };
-use chess_lib::{game::game::GameState, Result};
+use chess_lib::{game::game::GameState, ChessError, Result};
 use linera_sdk::{
     abi::WithContractAbi,
     linera_base_types::{
-        AccountOwner, Amount, ApplicationPermissions, ChainId, ChainOwnership, TimeDelta,
-        TimeoutConfig, Timestamp,
+        AccountOwner, Amount, ApplicationPermissions, ChainId, ChainOwnership, StreamUpdate,
+        TimeDelta, TimeoutConfig, Timestamp,
     },
     util::BlockingWait,
     views::{RootView, View},
     Contract, ContractRuntime,
 };
+use tracing::Instrument;
+
+const STREAM_NAME: &[u8] = b"chess";
 
 #[allow(dead_code)]
 pub struct ChessContract {
@@ -37,7 +43,7 @@ impl WithContractAbi for ChessContract {
 impl Contract for ChessContract {
     type InstantiationArgument = InstantiationArgument;
     type Message = Message;
-    type EventValue = ();
+    type EventValue = Event;
     type Parameters = ();
 
     async fn load(runtime: ContractRuntime<Self>) -> Self {
@@ -50,19 +56,124 @@ impl Contract for ChessContract {
     async fn instantiate(&mut self, _argument: Self::InstantiationArgument) {
         // will be used in future
         self.runtime.application_parameters();
+
+        if self.state.leaderboard_manager.get().is_none() {
+            let manager = LeaderboardManager::new();
+            self.state.leaderboard_manager.set(Some(manager));
+        }
     }
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
         match operation {
-            // A player makes a new game request to its own chain
-            Operation::NewGame { player } => {
-                let player = Player {
-                    chain_id: self.runtime.chain_id(),
-                    owner: player,
+            Operation::DeleteChainMetadata => {
+                assert_ne!(self.runtime.chain_id(), self.app_chain());
+                self.state.game_chain.set(None);
+                ChessResponse::Ok
+            }
+            Operation::Profile { name } => {
+                let id = self.runtime.authenticated_signer().unwrap();
+                let chain_id = self.runtime.chain_id();
+                let mut profile = PlayerProfile::new(chain_id, id, Some(name));
+                profile.encode();
+
+                self.state.profile.set(Some(profile));
+
+                ChessResponse::Ok
+            }
+            Operation::Resign => {
+                assert_ne!(self.runtime.chain_id(), self.app_chain());
+                let active_player = self.state.board.get().active_player;
+
+                assert_eq!(
+                    self.runtime.authenticated_signer(),
+                    Some(self.state.board.get().players[active_player.index()].unwrap()),
+                    "Only active player can make a move"
+                );
+                self.state
+                    .board
+                    .get_mut()
+                    .handle_resign(active_player.opposite());
+                // handle match_end
+                self.send_result();
+
+                ChessResponse::Ok
+            }
+            // we take the hash, decode it and send a req to app_chain
+            Operation::FrGameHash { token } => {
+                let id = self.runtime.authenticated_signer().unwrap();
+                let chain_id = self.runtime.chain_id();
+                let now = self.runtime.system_time();
+
+                let player: Option<PlayerHash> = if let Some(p) = self.state.profile.get() {
+                    p.hash()
+                } else {
+                    let mut p = PlayerProfile::new(chain_id, id, None);
+                    p.encode();
+                    self.state.profile.set(Some(p.clone()));
+                    p.hash()
                 };
-                let app_chain = self.app_chain();
+
+                if let Some(hash) = player {
+                    let decoded: PlayerHash = TimedToken::decode_token(&token, now).unwrap();
+                    let players = Players {
+                        player_1: decoded,
+                        player_2: hash,
+                    };
+                    self.request_friendly_match(players);
+                }
+
+                ChessResponse::Ok
+            }
+            // Create a new hash for a friendly match
+            Operation::FrGame => {
+                let id = self.runtime.authenticated_signer().unwrap();
+                let chain_id = self.runtime.chain_id();
+                let now = self.runtime.system_time();
+
+                let player: Option<PlayerHash> = if let Some(p) = self.state.profile.get() {
+                    p.hash()
+                } else {
+                    let mut p = PlayerProfile::new(chain_id, id, None);
+                    p.encode();
+                    self.state.profile.set(Some(p.clone()));
+                    p.hash()
+                };
+
+                if let Some(hash) = player {
+                    let token = TimedToken::new(now, hash).encode_token();
+                    self.state.game_token.set(token);
+                }
+
+                ChessResponse::Ok
+            }
+
+            Operation::Subscribe => {
+                let app_id = self.runtime.application_id().forget_abi();
+                let chain_id = self.app_chain();
                 self.runtime
-                    .send_message(app_chain, Message::NewGameReq { player });
+                    .subscribe_to_events(chain_id, app_id, STREAM_NAME.into());
+
+                ChessResponse::Ok
+            }
+            // A player makes a new game request to its own chain, requires player profile to be present
+            Operation::NewGame => {
+                let app_chain = self.app_chain();
+                let chain_id = self.runtime.chain_id();
+                let id = self.runtime.authenticated_signer().unwrap();
+
+                let player: Option<PlayerHash> = if let Some(p) = self.state.profile.get() {
+                    p.hash()
+                } else {
+                    let mut p = PlayerProfile::new(chain_id, id, None);
+                    p.encode();
+                    self.state.profile.set(Some(p.clone()));
+                    p.hash()
+                };
+
+                if let Some(hash) = player {
+                    self.runtime
+                        .send_message(app_chain, Message::NewGameReq { player: hash });
+                }
 
                 ChessResponse::Ok
             }
@@ -79,28 +190,43 @@ impl Contract for ChessContract {
                     "Only active player can make a move"
                 );
 
-                assert!(
-                    !clock.timed_out(block_time, active_player),
-                    "Player ran out of time."
-                );
+                if clock.timed_out(block_time, active_player) {
+                    // Mark game as over with opponent as winner
+                    let board = self.state.board.get_mut();
+                    let opponent = active_player.opposite();
+                    board.winner = Some(board.players[opponent.index()].unwrap());
+                    board.state = GameState::Ended;
+
+                    self.send_result();
+
+                    return ChessResponse::Err(ChessError::new("Timed Out"));
+                }
 
                 match self
                     .state
                     .board
                     .get_mut()
-                    .commit_move(from, to, piece, None)
+                    .commit_move(from.clone(), to.clone(), piece, None)
                 {
                     Ok(mv) => {
                         clock.make_move(block_time, active_player);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
                         if let Some(san) = mv.san {
-                            self.state.board.get_mut().moves_string.push(san);
+                            let board = self.state.board.get_mut();
+                            board.moves_string.push(san);
+                            board.add_move(from, to);
                         }
 
                         ChessResponse::Ok
                     }
-                    Err(e) => ChessResponse::Err(e),
+                    Err(e) => match e {
+                        ChessError::GameOver => {
+                            self.send_result();
+                            ChessResponse::Err(e)
+                        }
+                        _ => ChessResponse::Err(e),
+                    },
                 }
             }
             Operation::PawnPromotion {
@@ -120,28 +246,44 @@ impl Contract for ChessContract {
                     "Only active player can make a move"
                 );
 
-                assert!(
-                    !clock.timed_out(block_time, active_player),
-                    "Player ran out of time."
-                );
+                if clock.timed_out(block_time, active_player) {
+                    // Mark game as over with opponent as winner
+                    let board = self.state.board.get_mut();
+                    let opponent = active_player.opposite();
+                    board.winner = Some(board.players[opponent.index()].unwrap());
+                    board.state = GameState::Ended;
 
-                match self
-                    .state
-                    .board
-                    .get_mut()
-                    .commit_move(from, to, piece, Some(promoted_piece))
-                {
+                    self.send_result();
+
+                    return ChessResponse::Err(ChessError::new("Timed Out"));
+                }
+
+                match self.state.board.get_mut().commit_move(
+                    from.clone(),
+                    to.clone(),
+                    piece,
+                    Some(promoted_piece),
+                ) {
                     Ok(mv) => {
                         clock.make_move(block_time, active_player);
                         self.runtime
                             .assert_before(block_time.saturating_add(clock.block_delay));
 
                         if let Some(san) = mv.san {
-                            self.state.board.get_mut().moves_string.push(san);
+                            let board = self.state.board.get_mut();
+                            board.moves_string.push(san);
+                            board.add_move(from, to);
                         }
                         ChessResponse::Ok
                     }
-                    Err(e) => ChessResponse::Err(e),
+
+                    Err(e) => match e {
+                        ChessError::GameOver => {
+                            self.send_result();
+                            ChessResponse::Err(e)
+                        }
+                        _ => ChessResponse::Err(e),
+                    },
                 }
             }
         }
@@ -149,11 +291,47 @@ impl Contract for ChessContract {
 
     async fn execute_message(&mut self, message: Self::Message) {
         match message {
-            Message::Start { players, timer } => self.start_new_game(players, timer),
+            Message::Start {
+                players,
+                match_id,
+                match_type,
+                timer,
+            } => self.start_new_game(players, match_id, timer, match_type),
             Message::GameChainData { game_chain_data } => {
-                self.state.game_chain.set(game_chain_data)
+                self.state.game_chain.set(Some(game_chain_data))
             }
             Message::NewGameReq { player } => self.new_match(player),
+            Message::FriendlyGameReq { players } => self.start_friendly_match(players).await,
+            // handle updates after receiving the metadata
+            Message::MatchEnd { metadata } => self.handle_match_end(metadata).await,
+            Message::ProfileUpdate { player_hash } => {
+                if let Some(profile) = self.state.profile.get_mut() {
+                    profile.update(player_hash);
+                }
+            }
+        }
+    }
+
+    async fn process_streams(&mut self, updates: Vec<StreamUpdate>) {
+        for update in updates {
+            assert_eq!(update.stream_id.stream_name, STREAM_NAME.into());
+            assert_eq!(
+                update.stream_id.application_id,
+                self.runtime.application_id().forget_abi().into()
+            );
+            for index in update.new_indices() {
+                let event = self
+                    .runtime
+                    .read_event(update.chain_id, STREAM_NAME.into(), index);
+                match event {
+                    Event::GameCount { value } => {
+                        self.state.game_count.set(value);
+                    }
+                    Event::Leaderboard { leaderboard } => {
+                        self.state.leaderboard.set(leaderboard);
+                    }
+                }
+            }
         }
     }
 
@@ -167,33 +345,38 @@ impl ChessContract {
         self.runtime.application_creator_chain_id()
     }
 
-    /// Starting a game on a chain
-    pub fn start_new_game(&mut self, players: [AccountOwner; 2], timer: TimeDelta) {
+    /// Starting a match on game_chain
+    pub fn start_new_game(
+        &mut self,
+        players: Players,
+        match_id: MatchId,
+        timer: TimeDelta,
+        match_type: MatchType,
+    ) {
         self.state.clock.set(Clock::new(timer));
-
-        let game = self.state.board.get().new(players[0], players[1]);
-        self.state.game_flag.set(true);
+        let (player_1, player_2) = players.get_players();
+        let game = GameWrapper::new(player_1, player_2, match_id, match_type);
 
         self.state.board.set(game);
     }
 
     /// Only App chain has the right to create a new game.
-    pub fn new_match(&mut self, player: Player) {
+    pub fn new_match(&mut self, player: PlayerHash) {
         assert_eq!(self.runtime.chain_id(), self.app_chain());
 
         if let Some(lobby_player) = self.state.lobby.get_mut().pop() {
             // here we start a new game for incoming player and player sitting in the lobby
-            log::info!("players present starting a new game");
-            let players = [player.owner, lobby_player.owner];
-            match self.create_game_chain(
-                Amount::from_str("1.").unwrap(),
-                TimeDelta::from_secs(1800), // 30 mins
-                players,
-            ) {
-                Ok(game_d) => self
-                    .send_game_chain_data_2players(game_d, &[player, lobby_player])
-                    .unwrap(), // unwrap for testing
-                Err(_) => todo!(),
+            let players = Players {
+                player_1: lobby_player,
+                player_2: player,
+            };
+            let fee = Amount::from_str("1.").unwrap();
+            let match_time = TimeDelta::from_secs(900); // 15 mins
+
+            if let Ok(game_chain_data) =
+                self.create_game_chain(fee, match_time, MatchType::Random, &players)
+            {
+                self.send_game_chain_data_2players(game_chain_data, players);
             }
         } else {
             // we put the player in lobby.
@@ -209,11 +392,18 @@ impl ChessContract {
         &mut self,
         fee: Amount,
         match_time: TimeDelta,
-        players: [AccountOwner; 2],
+        match_type: MatchType,
+        players: &Players,
     ) -> Result<GameChain> {
         let timestamp: Timestamp = self.runtime.system_time();
+
+        let (player_1, player_2) = players.get_players();
+        if player_1.id == player_2.id {
+            return Err(ChessError::new("Found Players with same id, returning..."));
+        }
+
         let ownership = ChainOwnership::multiple(
-            [(players[0], 100), (players[1], 100)],
+            [(player_1.id, 100), (player_2.id, 100)],
             100,
             TimeoutConfig::default(),
         );
@@ -221,18 +411,25 @@ impl ChessContract {
         let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
         let chain_id = self.runtime.open_chain(ownership, permissions, fee);
 
+        let match_id = MatchId::encode_players(players);
+
+        if match_type == MatchType::Random {
+            self.state.matches.insert(&match_id, players.clone()).ok();
+        }
+
         self.runtime.send_message(
             chain_id,
             Message::Start {
-                players,
+                players: players.clone(),
+                match_id,
                 timer: match_time,
+                match_type,
             },
         );
 
         let game_chain = GameChain {
-            chain_id: Some(chain_id),
+            chain_id,
             timestamp,
-            created_at: timestamp,
         };
 
         Ok(game_chain)
@@ -240,100 +437,151 @@ impl ChessContract {
 
     // Method to send required chain data to players.
     // this is required, the web-client needs to assign player's wallet with new chain
-    pub fn send_game_chain_data_2players(
-        &mut self,
-        game_chain_data: GameChain,
-        players: &[Player],
-    ) -> Result<()> {
-        log::info!("sending necessary data to the players");
-        for p in players.iter() {
-            self.runtime.send_message(
-                p.chain_id,
-                Message::GameChainData {
-                    game_chain_data: game_chain_data.clone(),
-                },
-            );
-        }
-
-        Ok(())
-    }
-
-    /* /// generated hash
-    pub fn request_friendly_match(&mut self, player: PublicKey, timer: TimeDelta) -> ChessResponse {
-        assert_ne!(self.runtime.chain_id(), self.main_chain_id());
-        let points = self.state.stats.get().points;
-        let id = FriendId::create_token_id(&player.to_string(), &points)
-            .expect("Unable to generate hash");
-
-        // Todo!() Need to store and return the hash to the user.
-        let main_chain_id = self.main_chain_id();
-        let player_rank = self.state.stats.get().rank.clone();
-        let player = PlayerRequest {
-            player,
-            timer,
-            rank: player_rank,
-        };
-
-        log::info!("Hash_id: {:?}", id);
-        self.runtime
-            .send_message(main_chain_id, Message::FriendlyGame { hash: id, player });
-        ChessResponse::Ok
-    }
-
-    /// This method is used to send hash and player's PlayerRequest to the main_chain_id, requires
-    /// (game hash, and public_key)
-    pub async fn start_friendly_match(
-        &mut self,
-        player: AccountOwner,
-        hash: FriendId,
-    ) -> ChessResponse {
-        assert_ne!(self.runtime.chain_id(), self.main_chain_id());
-
-        let main_chain_id = self.main_chain_id();
-        let rank = self.state.stats.get().rank.clone();
-
-        // Timer does not matter here, as the player who generated the hash timer will be used.
-        let player = PlayerRequest {
-            player,
-            timer: TimeDelta::from_micros(0),
-            rank,
-        };
-
-        self.runtime
-            .send_message(main_chain_id, Message::FriendlyGame { hash, player });
-        ChessResponse::Ok
-    }
-
-    /// A method to send a request to the main chain to start a new chain with player's public_key
-    pub fn request_game_chain(&mut self, player: AccountOwner, timer: TimeDelta, rank: Rank) {
-        assert_ne!(self.runtime.chain_id(), self.main_chain_id());
-        let main_chain_id = self.main_chain_id();
+    pub fn send_game_chain_data_2players(&mut self, game_chain_data: GameChain, players: Players) {
+        let (player_1, player_2) = players.get_players();
         self.runtime.send_message(
-            main_chain_id,
-            Message::StartGame {
-                player,
-                timer,
-                rank,
+            player_1.chain_id,
+            Message::GameChainData {
+                game_chain_data: game_chain_data.clone(),
             },
         );
+
+        self.runtime.send_message(
+            player_2.chain_id,
+            Message::GameChainData { game_chain_data },
+        );
+        // this means a game has started on a chain, we can increase the count,
+        // in the future when a game starts on a multi-owner-chain i.e., (game_chain)
+        // we send a message from the game_chain to app_chain to update this count.
+        // or maybe, we send a final message when the game_chain is closed.
+        self.update_state_event(EventType::GameCount);
     }
-    } */
 
-    // Handles the winner stats, when a match is over, this function is called to update the
-    // leaderboard.
-    // Can only be update by the creation chain(Todo!)
-    //pub fn handle_match_over(&mut self, winner: PlayerStats) {
-    //    let last_player = self.state.bottom_player_stats();
-    //    if last_player.wins > winner.wins {
-    //        return;
-    //    }
-    //
-    //    self.state.add_player_leaderboard(winner);
-    //}
+    /// Used to update the state as well as emit an event for subscribers
+    pub fn update_state_event(&mut self, event: EventType) {
+        assert_eq!(self.app_chain(), self.runtime.chain_id());
+        *self.state.game_count.get_mut() += 1;
 
-    /// Handles the winner of the game
-    pub fn handle_winner(&mut self) {
-        let winner = self.state.board.get().winner;
-        self.state.board.get_mut().winner = winner;
+        match event {
+            EventType::GameCount => {
+                self.runtime.emit(
+                    STREAM_NAME.into(),
+                    &Event::GameCount {
+                        value: *self.state.game_count.get(),
+                    },
+                );
+            }
+            EventType::Leaderboard => {
+                if let Some(leaderboard_manager) = self.state.leaderboard_manager.get() {
+                    let leaderboard = leaderboard_manager.get_top_10_owned();
+                    self.runtime
+                        .emit(STREAM_NAME.into(), &Event::Leaderboard { leaderboard });
+                }
+            }
+        }
+    }
+
+    /// This method sends a message to app_chain with necessary details to create a new game chain for both players
+    pub fn request_friendly_match(&mut self, players: Players) -> ChessResponse {
+        let app_chain = self.app_chain();
+        assert_ne!(self.runtime.chain_id(), app_chain);
+
+        self.runtime
+            .send_message(app_chain, Message::FriendlyGameReq { players });
+
+        ChessResponse::Ok
+    }
+
+    /// Responsible for creating a chain and sending the necessary data to the players
+    pub async fn start_friendly_match(&mut self, players: Players) {
+        let app_chain = self.app_chain();
+        assert_eq!(self.runtime.chain_id(), app_chain);
+
+        let fee = Amount::from_str("1.").unwrap();
+        let match_time = TimeDelta::from_secs(900); // 15 mins
+
+        if let Ok(game_chain_data) =
+            self.create_game_chain(fee, match_time, MatchType::Friendly, &players)
+        {
+            self.send_game_chain_data_2players(game_chain_data, players)
+        }
+    }
+
+    /// Handles the winner, sending match data to app_chain.
+    pub fn send_result(&mut self) {
+        let app_chain = self.app_chain();
+        let game = self.state.board.get();
+
+        if let Some(winner) = game.winner {
+            let metadata = MatchMetaData {
+                match_id: game.match_id.clone().unwrap(),
+                match_type: game.match_type.unwrap(),
+                winner,
+            };
+            if metadata.match_type == MatchType::Friendly {
+                return;
+            }
+
+            self.runtime
+                .send_message(app_chain, Message::MatchEnd { metadata });
+        }
+    }
+
+    pub async fn handle_match_end(&mut self, metadata: MatchMetaData) {
+        assert_eq!(self.app_chain(), self.runtime.chain_id());
+        let elo_calculator = EloCalculator::new(30.0);
+
+        match metadata.match_type {
+            MatchType::Random => {
+                if let Ok(Some(players)) = self.state.matches.get(&metadata.match_id).await {
+                    let (mut player_1, mut player_2) = players.get_players();
+
+                    let rating_1 = player_1.elo as f64;
+                    let rating_2 = player_2.elo as f64;
+
+                    // Determine outcome: 1.0 = player_1 wins, 0.5 = draw, 0.0 = player_2 wins
+                    let outcome = if player_1.id == metadata.winner {
+                        1.0
+                    } else if player_2.id == metadata.winner {
+                        0.0
+                    } else {
+                        0.5
+                    };
+
+                    let (new_rating_1, new_rating_2) =
+                        elo_calculator.calculate_new_ratings(rating_1, rating_2, outcome);
+
+                    // Calculate deltas
+                    let delta_1 = (new_rating_1.round() as i32) - (player_1.elo as i32);
+                    let delta_2 = (new_rating_2.round() as i32) - (player_2.elo as i32);
+
+                    // Update players
+                    player_1.update_rating(delta_1, outcome == 1.0, outcome == 0.0);
+                    player_2.update_rating(delta_2, outcome == 0.0, outcome == 1.0);
+
+                    if let Some(leaderboard) = self.state.leaderboard_manager.get_mut() {
+                        leaderboard.try_add_player(player_1.to_leaderboard());
+                        leaderboard.try_add_player(player_2.to_leaderboard());
+                    }
+
+                    if let Some(player_hash) = player_1.encode() {
+                        self.runtime.send_message(
+                            player_1.chain_id,
+                            Message::ProfileUpdate { player_hash },
+                        );
+                    }
+                    if let Some(player_hash) = player_2.encode() {
+                        self.runtime.send_message(
+                            player_2.chain_id,
+                            Message::ProfileUpdate { player_hash },
+                        );
+                    }
+                }
+            }
+            MatchType::Friendly => (),
+        }
+
+        let _ = self.state.matches.remove(&metadata.match_id);
+        self.update_state_event(EventType::Leaderboard);
     }
 }

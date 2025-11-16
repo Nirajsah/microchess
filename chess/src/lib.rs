@@ -2,16 +2,26 @@
 
 use std::ops::{Deref, DerefMut};
 
-use async_graphql::{InputObject, Request, Response, SimpleObject};
-use chess_lib::{game::game::Game, pieces::Color, ChessError, Result};
+use async_graphql::{Enum, InputObject, Request, Response, SimpleObject};
+use base64::{engine::general_purpose, Engine};
+use chess_lib::{
+    game::game::{Game, GameState},
+    pieces::Color,
+    ChessError,
+};
+use leaderboard::Leaderboard;
+use playerprofile::{PlayerHash, PlayerInfo, PlayerProfile};
 use serde::{Deserialize, Serialize};
 pub struct ChessAbi;
+pub mod leaderboard;
+pub mod playerprofile;
 use linera_sdk::{
     abi::{ContractAbi, ServiceAbi},
     graphql::GraphQLMutationRoot,
     linera_base_types::{AccountOwner, ChainId, TimeDelta, Timestamp},
-    ToBcsBytes,
 };
+
+use crate::playerprofile::Players;
 
 impl ContractAbi for ChessAbi {
     type Operation = Operation;
@@ -36,39 +46,10 @@ pub struct InstantiationArgument {
     pub block_delay: TimeDelta,
 }
 
-//#[derive(Clone, Debug, Default, Deserialize, Serialize, SimpleObject)]
-//pub struct PlayerStats {
-//    pub player_id: String,
-//    pub games_played: u32,
-//    pub wins: u32,
-//    pub losses: u32,
-//    pub draws: u32,
-//    pub win_rate: f32,
-//}
-
-#[derive(
-    Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Ord, PartialOrd, SimpleObject, InputObject,
-)]
-#[graphql(input_name = "FriendIdInput")]
-pub struct FriendId {
-    pub id: String,
-}
-
-impl FriendId {
-    pub fn create_token_id(player_key: &String, points: &u32) -> Result<FriendId> {
-        use base64::engine::{general_purpose::STANDARD_NO_PAD, Engine as _};
-        use sha3::Digest as _;
-
-        let mut hasher = sha3::Sha3_256::new();
-        hasher.update(player_key.to_bcs_bytes().unwrap());
-        hasher.update(points.to_bcs_bytes().unwrap());
-
-        let id = hasher.finalize().to_vec();
-
-        let token_id = STANDARD_NO_PAD.encode(id);
-
-        Ok(FriendId { id: token_id })
-    }
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Enum)]
+pub enum MatchType {
+    Random,
+    Friendly,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,9 +61,14 @@ pub enum ChessResponse {
 #[derive(Debug, Deserialize, Serialize, Clone, GraphQLMutationRoot)]
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
-    NewGame {
-        player: AccountOwner,
+    // setup operations
+    NewGame,
+    FrGame,
+    FrGameHash {
+        token: String,
     },
+
+    // match operations
     MakeMove {
         from: String,
         to: String,
@@ -94,78 +80,128 @@ pub enum Operation {
         piece: String,
         promoted_piece: String,
     },
-    /* Resign,
-    /// Start the game on a temporary chain
-    StartGame {
-        /// The `Owner` controlling player 1 and 2, respectively.
-        players: [AccountOwner; 2],
-        /// A small amount to cover the fees for the game, on the new chain
-        amount: Amount,
-        /// Game's total time (~15 mins)
-        match_time: TimeDelta,
+    Resign,
+    DeleteChainMetadata,
+    // basic user operations
+    Subscribe,
+    Profile {
+        name: String,
     },
-    RequestGame {
-        player: AccountOwner,
-        timer: TimeDelta,
-        rank: Rank,
-    },
-    FriendlyGame {
-        player: AccountOwner,
-        timer: TimeDelta,
-    },
-    StartFriendlyGame {
-        player: AccountOwner,
-        hash: FriendId,
-    }, */
 }
-//     /// The `Owner` controlling player 1 and 2, respectively.
-//     pub players: [Owner; 2],
-//     /// The initial time each player has to think about their turns.
-//     pub start_time: TimeDelta,
-//
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Message {
+    // game_chain receiving data to start a new game
     Start {
-        players: [AccountOwner; 2],
+        match_id: MatchId,
+        players: Players,
         timer: TimeDelta,
+        match_type: MatchType,
     },
+    // app_chain receiving player to put in lobby or start a game.
     NewGameReq {
-        player: Player,
+        player: PlayerHash,
     },
+    // receiving game_chain data from the app_chain
     GameChainData {
         game_chain_data: GameChain,
-    }, /*
-       StartGame {
-           player: PublicKey,
-           timer: TimeDelta,
-           rank: Rank,
-       },
-       FriendlyGame {
-           hash: FriendId,
-           player: PlayerRequest,
-       }, */
+    },
+    // app_chain receiving both players details to start a friendly match
+    FriendlyGameReq {
+        players: Players,
+    },
+    // MatchMetadata from the game_chain to the app_chain
+    MatchEnd {
+        metadata: MatchMetaData,
+    },
+    // app_chain sends points update to the players
+    ProfileUpdate {
+        player_hash: PlayerHash,
+    },
 }
 
-/* #[derive(
-    Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject, InputObject,
-)]
-pub struct PlayerRequest {
-    pub player: AccountOwner,
-    pub timer: TimeDelta,
-    pub rank: Rank,
-} */
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
-pub struct Player {
-    pub owner: AccountOwner,
-    pub chain_id: ChainId,
+// match duration could be added
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MatchMetaData {
+    pub match_id: MatchId,
+    pub winner: AccountOwner,
+    pub match_type: MatchType,
 }
 
-/* #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
-pub struct Players {
+#[derive(Clone, Serialize, Deserialize, Debug, SimpleObject, InputObject)]
+pub struct MatchId {
+    value: String,
+}
 
-}; */
+impl MatchId {
+    pub fn encode_players(players: &Players) -> Self {
+        let bytes = bincode::serialize(players).unwrap();
+        let value = general_purpose::STANDARD.encode(bytes);
+
+        MatchId { value }
+    }
+
+    pub fn decode_players(&self) -> Option<Players> {
+        let bytes = general_purpose::STANDARD.decode(&self.value).unwrap();
+        let players: Players = bincode::deserialize(&bytes).unwrap();
+
+        Some(players)
+    }
+}
+
+const TOKEN_TIME: u64 = 300; // 300 seconds = 5 minutes
+
+// Friendly hash active for 5 minutes since creation
+#[derive(Serialize, Deserialize, Debug, SimpleObject)]
+pub struct TimedToken {
+    player: PlayerHash,
+    expires_at: Timestamp,
+}
+
+impl TimedToken {
+    pub fn new(now: Timestamp, player: PlayerHash) -> Self {
+        Self {
+            player,
+            expires_at: now.saturating_add(TimeDelta::from_secs(TOKEN_TIME)),
+        }
+    }
+
+    // Encode the token into a base64 string
+    pub fn encode_token(&self) -> String {
+        let bytes = bincode::serialize(self).unwrap();
+        general_purpose::STANDARD.encode(bytes)
+    }
+
+    // Decode the base64 string back into a token
+    pub fn decode_token(encoded: &str, now: Timestamp) -> Option<PlayerHash> {
+        let bytes = general_purpose::STANDARD.decode(encoded).ok()?;
+        let timed_token: TimedToken = bincode::deserialize(&bytes).ok()?;
+
+        if now <= timed_token.expires_at {
+            Some(timed_token.player)
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum Event {
+    GameCount { value: u64 },
+    Leaderboard { leaderboard: Vec<Leaderboard> },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum EventType {
+    GameCount,
+    Leaderboard,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
+pub struct LastMove {
+    pub from: String,
+    pub to: String,
+}
 
 #[derive(Clone, Default, Serialize, Deserialize, SimpleObject)]
 pub struct GameWrapper {
@@ -175,17 +211,40 @@ pub struct GameWrapper {
     pub players: [Option<AccountOwner>; 2],
     pub winner: Option<AccountOwner>,
     pub moves_string: Vec<String>,
+    pub last_move: Option<LastMove>,
+    pub match_id: Option<MatchId>,
+    pub players_profile: [Option<PlayerProfile>; 2],
+    pub match_type: Option<MatchType>,
 }
 
 impl GameWrapper {
-    pub fn new(&self, white: AccountOwner, black: AccountOwner) -> Self {
+    pub fn new(
+        white: PlayerProfile,
+        black: PlayerProfile,
+        match_id: MatchId,
+        match_type: MatchType,
+    ) -> Self {
         Self {
             inner: Game::new(),
             initalized: true,
-            players: [Some(white), Some(black)],
+            players: [Some(white.id), Some(black.id)],
             winner: None,
             moves_string: Vec::with_capacity(256),
+            last_move: None,
+            match_id: Some(match_id),
+            players_profile: [Some(white), Some(black)],
+            match_type: Some(match_type),
         }
+    }
+
+    pub fn add_move(&mut self, from: String, to: String) {
+        self.last_move = Some(LastMove { from, to });
+    }
+
+    pub fn get_profile_info_by_color(&self, color: Color) -> Option<PlayerInfo> {
+        self.players_profile[color.index()]
+            .as_ref()
+            .map(|profile| profile.info())
     }
 
     pub fn get_color_by_account(&self, account: &AccountOwner) -> Option<Color> {
@@ -193,6 +252,15 @@ impl GameWrapper {
             .iter()
             .position(|p| p.as_ref() == Some(account))
             .map(|i| if i == 0 { Color::White } else { Color::Black })
+    }
+
+    pub fn handle_resign(&mut self, opponent: Color) {
+        if self.inner.state == GameState::Resign {
+            return;
+        };
+        self.inner.state = GameState::Resign;
+        let winner = self.players[opponent.index()];
+        self.winner = winner;
     }
 }
 
@@ -213,15 +281,12 @@ impl DerefMut for GameWrapper {
 /// The ID and timestamp of a temporary chain for a single game.
 ///
 /// Register View needs this struct to impl Default trait. but ChainId does not, we use Option<ChainId<ChainId>
-#[derive(
-    Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject)]
 pub struct GameChain {
     /// The Timestamp of the `OpenChain` message that created the chain.
     pub timestamp: Timestamp,
     /// The ID of the temporary game chain itself.
-    pub chain_id: Option<ChainId>,
-    pub created_at: Timestamp,
+    pub chain_id: ChainId,
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]

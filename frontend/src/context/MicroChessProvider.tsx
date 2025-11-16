@@ -1,6 +1,6 @@
 import React from 'react'
 import { ThemeName } from '../components/ChessBoard/theme'
-import { storage } from '@/components/ChessBoard/utils'
+import { storage } from '@/api'
 
 type MicroChessSettings = {
   theme: ThemeName

@@ -5,7 +5,11 @@ mod state;
 use std::sync::Arc;
 
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
-use chess::{GameChain, Operation, PlayersTime};
+use chess::{
+    leaderboard::Leaderboard,
+    playerprofile::{PlayerInfo, PlayerProfile},
+    GameChain, LastMove, Operation, PlayersTime,
+};
 use linera_sdk::{
     abi::WithServiceAbi,
     graphql::GraphQLMutationRoot,
@@ -60,6 +64,7 @@ struct GameData {
     opponent: AccountOwner, // opponent player id
     game_state: String,     // State of the Game, NotStarted, OnGoing, StaleMate or CheckMate
     winner: Option<AccountOwner>,
+    last_move: Option<LastMove>,
 }
 
 #[Object]
@@ -71,6 +76,7 @@ impl ChessService {
         let opponent = game.players[color.opposite().index()].unwrap();
         let game_state = game.state.to_string();
         let winner = game.winner;
+        let last_move = game.last_move.clone();
 
         GameData {
             fen,
@@ -78,27 +84,34 @@ impl ChessService {
             opponent,
             game_state,
             winner,
+            last_move,
         }
     }
 
     async fn game_chain(&self) -> Option<GameChain> {
-        let game_data = self.state.game_chain.get();
+        if let Some(game_data) = self.state.game_chain.get() {
+            let now = self.runtime.system_time();
+            let expiry = game_data.timestamp.saturating_add(TimeDelta::from_secs(90)); // 1.30 secs MAX
 
-        let now = self.runtime.system_time();
-        let expiry = game_data
-            .created_at
-            .saturating_add(TimeDelta::from_secs(300));
-
-        // If expired → return None
-        if now > expiry {
-            None
+            // If expired → return None
+            if now < expiry {
+                Some(game_data.clone())
+            } else {
+                None
+            }
         } else {
-            Some(game_data.clone())
+            None
         }
     }
 
+    async fn opponent_profile(&self, opponent: AccountOwner) -> Option<PlayerInfo> {
+        let game = self.state.board.get();
+        let color = game.get_color_by_account(&opponent).unwrap();
+        self.state.board.get().get_profile_info_by_color(color)
+    }
+
     async fn is_game_chain(&self) -> bool {
-        *self.state.game_flag.get()
+        self.state.board.get().match_id.is_some()
     }
 
     async fn mv_string(&self) -> &Vec<String> {
@@ -115,18 +128,27 @@ impl ChessService {
         clock.time_left_for_players(block_time, active_player)
     }
 
-    /*
-    async fn captured_pieces(&self) -> &Vec<Piece> {
+    async fn count(&self) -> &u64 {
+        self.state.game_count.get()
+    }
+
+    async fn friend_id(&self) -> &str {
+        self.state.game_token.get()
+    }
+
+    async fn leaderboard(&self) -> &Vec<Leaderboard> {
+        self.state.leaderboard.get()
+    }
+
+    async fn profile(&self) -> Option<&PlayerProfile> {
+        if let Some(profile) = self.state.profile.get() {
+            Some(profile)
+        } else {
+            None
+        }
+    }
+
+    async fn captured_pieces(&self) -> &Vec<String> {
         &self.state.board.get().captured_pieces
     }
-    async fn timer(&self) -> &Clock {
-        &self.state.clock.get()
-    }
-    async fn time_left(&self) -> PlayerTime {
-        self.state.clock.get().time_left_for_player()
-    }
-    async fn get_leaderboard(&self) -> Vec<PlayerStats> {
-        self.state.get_leaderboard()
-    }
-    */
 }

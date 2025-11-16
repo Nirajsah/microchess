@@ -32,7 +32,6 @@ linera --with-wallet 1 wallet init --faucet $FAUCET_URL
 
 INFO_1=($(linera --with-wallet 1 wallet request-chain --faucet $FAUCET_URL))
 CHAIN_1="${INFO_1[0]}"
-OWNER_1="${INFO_1[3]}"
 
 cargo build -p chess --release --target wasm32-unknown-unknown 
 

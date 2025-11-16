@@ -25,13 +25,13 @@ const BorderAnimation = () => {
   )
 }
 
-export default function HomePage() {
+export default function HomePage({ gameCount }: { gameCount: number }) {
   return (
-    <div className="w-full h-full min-h-[880px] flex mt-20">
+    <div className="w-full h-full lg:min-h-[880px] flex mt-20">
       <div className="w-full h-full flex flex-col gap-2 p-2">
         <div className="flex flex-col md:flex-row gap-2 min-w-0 lg:flex-wrap overflow-hidden">
           <div className="relative w-full lg:w-[50%] h-full aspect-square bg-[#0a0a0a] flex justify-center items-center rounded-[24px] min-w-0 flex-[1_1_0%]">
-            <div className="absolute exact-1024 z-10 bg-transparent backdrop-blur-lg w-[calc(70%+1.5rem)] h-[calc(20%+1.5rem)] md:w-[calc(72%+0.7rem)] md:h-[calc(22%+0.8rem)]"></div>
+            <div className="absolute exact-1024 z-10 bg-transparent backdrop-blur-lg w-[calc(70%+0.85rem)] h-[calc(20%+0.9rem)] md:w-[calc(72%+1rem)] md:h-[calc(22%+1.2rem)]"></div>
             <div className="z-20 flex items-center justify-center">
               <span className="text-2xl md:text-4xl lg:text-5xl xl:text-[58px] font-semibold text-white">
                 MicroChess
@@ -171,7 +171,7 @@ export default function HomePage() {
               Matches Played
             </div>
             <div className="text-lg sm:text-xl md:text-3xl lg:text-[48px] lg:leading-[64px] self-end">
-              10000000
+              {gameCount}
             </div>
           </div>
           <div className="hidden lg:flex relative w-1/3 bg-gradient-to-r from-[#2146ed6e] to-[#3769f1fc] rounded-[30px] h-full">
