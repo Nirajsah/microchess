@@ -233,7 +233,6 @@ export default function ChessBoard(props: BoardProps) {
             const number = fileIndex + rankIndex
 
             const bg = getSquareBackground(square as Square, piece, number)
-            console.log(bg)
 
             return (
               <div key={square}>
