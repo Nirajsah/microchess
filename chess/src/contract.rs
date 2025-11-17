@@ -73,11 +73,15 @@ impl Contract for ChessContract {
             Operation::Profile { name } => {
                 let id = self.runtime.authenticated_signer().unwrap();
                 let chain_id = self.runtime.chain_id();
-                let mut profile = PlayerProfile::new(chain_id, id, Some(name));
-                profile.encode();
 
-                self.state.profile.set(Some(profile));
-
+                if let Some(player) = self.state.profile.get_mut() {
+                    player.name = Some(name);
+                } else {
+                    // Create new profile only if one doesn't exist
+                    let mut profile = PlayerProfile::new(chain_id, id, Some(name));
+                    profile.encode();
+                    self.state.profile.set(Some(profile));
+                }
                 ChessResponse::Ok
             }
             Operation::Resign => {
