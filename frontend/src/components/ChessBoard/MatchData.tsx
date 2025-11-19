@@ -3,7 +3,7 @@ import { AlertCircle } from 'lucide-react'
 import Timer from './Timer'
 import CapturedPieces from './CapturedPieces'
 import { Color } from './types'
-import { capturedPiece, opponentProfile } from '@/api'
+import { capturedPiece, getMvString, opponentProfile } from '@/api'
 import { ResignButton } from './ResignButton'
 import { useWalletNotifications } from '@/hooks/useWalletNotification'
 
@@ -27,7 +27,7 @@ const MatchDataUI = (data: MatchData) => {
     matches: 0,
     name: null,
   })
-  const [moves, _setMoves] = React.useState<string[] | null>(null)
+  const [moves, setMoves] = React.useState<string[] | null>(null)
   const [capturedPieces, setCapturedPieces] = React.useState<string[] | null>(
     null
   )
@@ -44,7 +44,17 @@ const MatchDataUI = (data: MatchData) => {
         console.error('failed', e)
       }
     }
+    const getMoves = async () => {
+      try {
+        const data = await getMvString()
+        const res = JSON.parse(data.result).data.mvString
+        setMoves(res)
+      } catch (e) {
+        console.error('failed', e)
+      }
+    }
     getCapturedPieces()
+    getMoves()
   }, [notification])
 
   const movePairs = React.useMemo(
