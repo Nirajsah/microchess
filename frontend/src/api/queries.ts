@@ -1,3 +1,4 @@
+import { useWalletStore } from '@/store/wallet.ts'
 import { Piece, Square } from '../components/ChessBoard/types.ts'
 
 export function connect_wallet(): Promise<any> {
@@ -22,13 +23,27 @@ export function assignChain(chainId: string, timestamp: number) {
 function request(query: string): Promise<any> {
   let APP_ID = import.meta.env.VITE_MICROCHESS_APPLICATION_ID
 
-  if (!window.linera) throw new Error('Linera extension not found.')
+  const ready = useWalletStore.getState().ready
+  const requestAsync = useWalletStore.getState().requestAsync
 
-  return window.linera.request({
+  if (!ready) {
+    console.log('Server NOT READY!')
+    return Promise.reject('Server not ready')
+  }
+
+  return requestAsync({
     type: 'QUERY',
     applicationId: APP_ID,
     query: query,
   })
+
+  // if (!window.linera) throw new Error('Linera extension not found.')
+
+  // return window.linera.request({
+  //   type: 'QUERY',
+  //   applicationId: APP_ID,
+  //   query: query,
+  // })
 }
 
 export function isGameChain() {
@@ -86,6 +101,7 @@ export function getProfile() {
           won
           lost
           ath
+          chainId
         } }`
 
   const gqlQuery = JSON.stringify({ query: query })
@@ -150,7 +166,7 @@ export function updateProfile(name: string) {
 export function makeMove(from: string, to: string, piece: string) {
   const mutation = `mutation { makeMove(from: "${from}", to: "${to}", piece: "${piece}") }`
   const gqlQuery = JSON.stringify({ query: mutation })
-  request(gqlQuery).then((res) => console.log(res))
+  request(gqlQuery).then((p) => console.log(p))
 }
 
 export function promotePiece(
