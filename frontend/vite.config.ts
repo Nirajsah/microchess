@@ -6,11 +6,18 @@ import topLevelAwait from 'vite-plugin-top-level-await'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  server: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
       '@assets': resolve(__dirname, 'src/assets'),
       '@wasm': resolve(__dirname, 'wasm'),
+      croissant: resolve(__dirname, './croissant'),
     },
   },
   plugins: [

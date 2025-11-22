@@ -27,5 +27,5 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src", "codegen.ts"]
+  "include": ["src", "codegen.ts", "croissant"]
 }

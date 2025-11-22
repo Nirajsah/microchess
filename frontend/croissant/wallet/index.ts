@@ -1,0 +1,181 @@
+import * as wasm from '../linera_web'
+import { WasmManager } from './wasmManager'
+import { ClientManager } from './clientManager'
+import { WalletManager } from './walletManager'
+
+type Result<T> =
+  | { success: true; result: T }
+  | { success: false; error: string }
+
+type OpType = 'CREATE_WALLET' | 'CLAIM_CHAIN'
+type FaucetHandler = (faucet: wasm.Faucet) => Promise<Result<string>>
+
+export type Request = {
+  type: 'QUERY' | 'CONNECT_WALLET' | 'ASSIGNMENT'
+  applicationId: string
+  query: string
+}
+
+export type GuardedHandler = [
+  (message: any) => message is any, // guard
+  (message: any, wrap: (data: any, success?: boolean) => void) => Promise<void>,
+]
+
+export class Server {
+  wasmInstance: typeof wasm | null = null
+  static instance: Server | null = null
+
+  private client: ClientManager = ClientManager.instance
+  private wallet: WalletManager = WalletManager.instance
+
+  public onNotification: ((data: any) => void) | null = null
+
+  constructor() {}
+
+  faucetHandlers: Record<OpType, FaucetHandler> = {
+    CREATE_WALLET: async (faucet) => {
+      const wallet = await faucet.createWallet()
+      this.wallet.create(wallet)
+
+      let chainId = await faucet.claimChain(
+        wallet,
+        this.wallet.getSigner().address()
+      )
+
+      return { success: true, result: chainId }
+    },
+    CLAIM_CHAIN: async (faucet) => {
+      return {
+        success: true,
+        result: await faucet.claimChain(
+          this.wallet.getWallet(),
+          this.wallet.getSigner().address()
+        ),
+      }
+    },
+  }
+
+  private async faucetAction(op: OpType): Promise<Result<string>> {
+    // const FAUCET_URL = 'http://localhost:8080'
+    const FAUCET_URL = 'https://faucet.testnet-conway.linera.net/'
+    const faucet = new wasm.Faucet(FAUCET_URL)
+    const handler = this.faucetHandlers[op]
+    if (!handler) return { success: false, error: 'Invalid operation' }
+    try {
+      const result = await handler.call(this, faucet)
+      await this.initClient() // Initialize client after faucet action
+      return result
+    } catch (err) {
+      return { success: false, error: `${err}` }
+    }
+  }
+
+  private async initClient() {
+    if (!this.wallet.getWallet() || !this.wallet.getSigner()) {
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300)) // just for a small delay, might not have any impact.
+    try {
+      // Initialize a fresh one
+      await this.client.init(
+        this.wasmInstance!,
+        this.wallet.getWallet(),
+        this.wallet.getSigner()
+      )
+
+      await this.wallet.reInitWallet() // reinitialize wallet after client init
+
+      this.client.onNotificationCallback = this.onNotification
+    } catch (error) {
+      await this.wallet.reInitWallet() // reinitialize wallet after client init
+      console.warn('Failed to initialize client:', error)
+      throw error
+    }
+  }
+
+  private async initWallet() {
+    // Inject the wasm instance into your wallet manager
+    this.wallet.setWasmInstance(this.wasmInstance!)
+    // Now wallet manager can safely load or create wallets
+    try {
+      await this.wallet.load()
+    } catch (err) {
+      return // we don't need to return error here
+    }
+  }
+
+  private async run() {
+    await WasmManager.init()
+    this.wasmInstance = WasmManager.instance
+
+    // this.setupPortConnections()
+    await this.initWallet()
+    await this.initClient()
+  }
+
+  private async _handleQueryApplicationRequest(query: any) {
+    try {
+      const result = await this.client.query(query)
+      return result
+    } catch (err) {
+      return err
+    }
+  }
+
+  private async _handleSetDefaultChain(chainId: string) {
+    try {
+      const result = await this.wallet.setDefaultChain(chainId)
+      // reinitialize client after setting default chain
+      await this.client.cleanup()
+      await this.initClient()
+      return result
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // TODO: use wallet manager to assign chain
+  private async _handleAssignment(body: any) {
+    try {
+      const result = await this.wallet.assign(body) // assign chain in wallet manager, this will also reinitialize wallet
+      // reinitialize client after assignment
+      await this.client.cleanup()
+      await this.initClient()
+      return result
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  async create(): Promise<void> {
+    this.faucetAction('CREATE_WALLET')
+  }
+
+  async request(req: Request): Promise<Result<string>> {
+    const res = await this._handleQueryApplicationRequest(req)
+    return { success: true, result: res as string }
+  }
+
+  async assign(data: {
+    chainId: string
+    timestamp: string
+  }): Promise<Result<string>> {
+    const res = await this._handleAssignment(data)
+    return { success: true, result: res as string }
+  }
+
+  async setDefault(chainId: string): Promise<Result<string>> {
+    const res = await this._handleSetDefaultChain(chainId)
+    return { success: true, result: res as string }
+  }
+
+  static async init(fn: (data: any) => void): Promise<Server> {
+    if (!Server.instance) {
+      const server = new Server()
+      server.onNotification = fn
+      await server.run()
+      Server.instance = server
+    }
+    return Server.instance
+  }
+}
