@@ -60,7 +60,7 @@ export default function ChessTile(props: ChessTileProps) {
           }}
           src={pieceImages[piece]}
           alt={piece}
-          className="w-[80%] h-[80%] object-contain select-none"
+          className="w-[70%] h-[70%] object-contain select-none"
           onMouseDown={props.handleMouseDown}
           draggable={false}
         />

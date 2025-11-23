@@ -13,7 +13,7 @@ import {
 import { RightSideMenu } from './RightSideMenu'
 import ChessBoard from './ChessBoard'
 import Navbar from './Navbar'
-import { LeftSideMenu } from '../LeftSideMenu'
+import LeftMenu from '../LeftSideMenu'
 import { useWalletNotifications } from '@/hooks/useWalletNotification'
 import { useChessWasm } from '@/hooks/useWasm'
 import { gameData, timer } from '@/api'
@@ -172,7 +172,7 @@ const CBoard = () => {
 
   return (
     <div className="w-full min-h-full relative bg-[#0a0a0a]">
-      <LeftSideMenu />
+      <LeftMenu />
       <Navbar />
       <div className="flex flex-col items-center p-3">
         <div className="flex flex-col lg:flex-row gap-4 w-full justify-center items-center">

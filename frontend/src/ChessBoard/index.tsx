@@ -7,7 +7,7 @@ import {
   PromoteData,
   Square,
 } from '../components/ChessBoard/types'
-import { RightSideMenu } from '../components/ChessBoard/RightSideMenu'
+import { RightSideMenu } from './RightSideMenu'
 import { useBoard } from '@/store/board'
 import Board from './Board'
 import { capturedPiece, makeMove } from '@/api'
@@ -15,6 +15,8 @@ import { PlayerInfo } from './PlayerInfo'
 import { GameControls } from './GameControls'
 
 import { useWalletStore } from '@/store/wallet'
+import Navbar from '@/components/ChessBoard/Navbar'
+import LeftMenu from '@/components/LeftSideMenu'
 
 const ChessBoard = () => {
   const { state: board, initDefaultAsync, localMakeMove } = useBoard((s) => s)
@@ -101,64 +103,67 @@ const ChessBoard = () => {
     )
   }
 
-  // Inside ChessBoard component
   return (
-    <div className="relative min-h-full w-full flex justify-center items-center bg-[#161616] gap-4">
-      <div className="w-full max-w-[720px] bg-[#262626] p-2.5 rounded-[18px]">
-        {board.color && board.timer && (
-          <div className="w-full flex justify-between">
-            <div className="w-full pt-0 pb-2.5">
-              <PlayerInfo
-                isOpponent
-                id={board.opponent}
-                timer={
-                  board.color === 'White'
-                    ? board.timer.black
-                    : board.timer.white
-                }
-                isActive={
-                  board.color === 'White'
-                    ? board.player_turn === 'b'
-                    : board.player_turn === 'w'
-                }
-              />
+    <div className="relative min-h-full w-full bg-[#161616]">
+      <LeftMenu />
+      <Navbar />
+      <div className="flex justify-center items-center gap-4">
+        <div className="w-full max-w-[720px] bg-[#262626] p-2.5 rounded-[18px]">
+          {board.color && board.timer && (
+            <div className="w-full flex justify-between">
+              <div className="w-full pt-0 pb-2.5">
+                <PlayerInfo
+                  isOpponent
+                  id={board.opponent}
+                  timer={
+                    board.color === 'White'
+                      ? board.timer.black
+                      : board.timer.white
+                  }
+                  isActive={
+                    board.color === 'White'
+                      ? board.player_turn === 'b'
+                      : board.player_turn === 'w'
+                  }
+                />
+              </div>
             </div>
+          )}
+          <div className="w-full relative max-w-[720px] rounded-md">
+            {renderSquare()}
           </div>
-        )}
-        <div className="w-full relative max-w-[720px] rounded-md">
-          {renderSquare()}
+          {board.color && board.timer && (
+            <div className="w-full flex justify-between">
+              <div className="w-full pb-0 pt-2.5">
+                <PlayerInfo
+                  id={board.color}
+                  timer={
+                    board.color === 'White'
+                      ? board.timer.white
+                      : board.timer.black
+                  }
+                  isActive={
+                    board.color === 'White'
+                      ? board.player_turn === 'w'
+                      : board.player_turn === 'b'
+                  }
+                />
+              </div>
+            </div>
+          )}
         </div>
-        {board.color && board.timer && (
-          <div className="w-full flex justify-between">
-            <div className="w-full pb-0 pt-2.5">
-              <PlayerInfo
-                id={board.color}
-                timer={
-                  board.color === 'White'
-                    ? board.timer.white
-                    : board.timer.black
-                }
-                isActive={
-                  board.color === 'White'
-                    ? board.player_turn === 'w'
-                    : board.player_turn === 'b'
-                }
-              />
-            </div>
+        <div className="flex flex-col h-full justify-center w-full max-w-[400px]">
+          <div className="w-full h-full flex-1 rounded-[18px]">
+            <RightSideMenu
+              player={board.player_turn || '-'}
+              color={board.color}
+              checkStatus={board.KingInCheck}
+              opponentId={board.opponent}
+              game_state={board.game_state}
+              timer={board.timer}
+              setIsGameChain={setIsGameChain}
+            />
           </div>
-        )}
-      </div>
-      <div className="flex flex-col h-full justify-center w-full max-w-[400px]">
-        <div className="w-full flex-1 max-h-[400px] rounded-[18px]">
-          <RightSideMenu
-            player={board.player_turn || '-'}
-            color={board.color}
-            checkStatus={board.KingInCheck}
-            opponentId={board.opponent}
-            game_state={board.game_state}
-            timer={board.timer}
-            setIsGameChain={setIsGameChain}
-          />
         </div>
       </div>
     </div>

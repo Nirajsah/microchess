@@ -208,11 +208,6 @@ const MatchSelect = () => {
     setStep('select')
     storage.removeGameState()
   }
-
-  const handleFetch = () => {
-    fetchGameHash()
-  }
-
   return (
     <div className="h-full w-full max-w-2xl mx-auto">
       {/* Selection Screen */}
@@ -302,8 +297,6 @@ const MatchSelect = () => {
               <span className="px-4 text-zinc-500"></span>
             </div>
           </div>
-
-          <button onClick={handleFetch}>Fetch</button>
 
           <button
             onClick={() => setStep('friendly-join')}

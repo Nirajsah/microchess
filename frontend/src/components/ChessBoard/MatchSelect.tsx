@@ -208,7 +208,7 @@ const MatchSelect = () => {
   }
 
   return (
-    <div className="h-full w-full max-w-2xl mx-auto">
+    <div className="h-full border flex w-full max-w-2xl mx-auto">
       {/* Selection Screen */}
       {step === 'select' && (
         <div className="space-y-4 animate-in fade-in duration-300">

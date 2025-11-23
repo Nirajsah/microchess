@@ -84,9 +84,9 @@ const MatchDataUI = (data: MatchData) => {
   }, [opponentId])
 
   return (
-    <div className="w-full flex flex-col gap-4 h-full bg-[#262626] rounded-xl">
+    <div className="w-full h-full flex flex-col gap-4 bg-[#262626] rounded-xl">
       {/* Move History */}
-      <div className="flex-1 rounded-xl border border-zinc-800 overflow-hidden flex flex-col min-h-0">
+      <div className="flex-1 rounded-xl border border-zinc-800 overflow-hidden flex flex-col min-h-full">
         <div className="border-b border-zinc-800 backdrop-blur-sm">
           <table className="w-full">
             <thead>

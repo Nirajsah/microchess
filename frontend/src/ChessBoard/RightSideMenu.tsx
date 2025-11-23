@@ -71,11 +71,12 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
   const whitePieces = capturedPieces?.filter((p) => p.startsWith('w')) || []
 
   return (
-    <div className="h-full w-full">
-      {(matchData.game_state !== 'Resign' && matchData.color === 'White') ||
-      (matchData.game_state !== 'Resign' && matchData.color === 'Black') ? (
-        <div className="w-full h-full">
+    <div className="w-full h-[400px] flex justify-center items-center">
+      {matchData.game_state !== 'Resign' &&
+      (matchData.color === 'White' || matchData.color === 'Black') ? (
+        <div className="w-full h-full flex flex-col">
           {capturedPieces && <PieceRow pieces={blackPieces} />}
+
           {playMatch && (
             <GameControls
               onStart={() => console.log('Start')}
@@ -86,13 +87,18 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
               onStop={() => console.log('Stop')}
             />
           )}
-          <MatchDataUI {...matchData} />
+
+          <div className="w-full flex-1 overflow-hidden">
+            <MatchDataUI {...matchData} />
+          </div>
+
           {capturedPieces && <PieceRow pieces={whitePieces} />}
         </div>
       ) : (
-        <MatchSelect />
+        <div className="">
+          <MatchSelect />
+        </div>
       )}
-      {/* Captured White Pieces (Captured by Black) */}
     </div>
   )
 }
