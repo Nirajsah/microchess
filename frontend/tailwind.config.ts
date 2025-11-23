@@ -29,7 +29,8 @@ export default {
         'train-right-to-center': 'trainRightToCenter 8s linear forwards',
         'train-bottom-to-center': 'trainBottomToCenter 8s linear forwards',
         'train-left-to-center': 'trainLeftToCenter 8s linear forwards',
-        'star-movement-bottom': 'star-movement-bottom linear infinite alternate',
+        'star-movement-bottom':
+          'star-movement-bottom linear infinite alternate',
         'star-movement-top': 'star-movement-top linear infinite alternate',
       },
       keyframes: {
@@ -89,5 +90,5 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [require('tailwindcss-animate')],
 }
