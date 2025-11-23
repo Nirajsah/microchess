@@ -18,7 +18,7 @@ export type Request = {
 
 export type GuardedHandler = [
   (message: any) => message is any, // guard
-  (message: any, wrap: (data: any, success?: boolean) => void) => Promise<void>,
+  (message: any, wrap: (data: any, success?: boolean) => void) => Promise<void>
 ]
 
 export class Server {
@@ -35,6 +35,8 @@ export class Server {
   faucetHandlers: Record<OpType, FaucetHandler> = {
     CREATE_WALLET: async (faucet) => {
       const wallet = await faucet.createWallet()
+
+      this.wallet.setWasmInstance(this.wasmInstance!) // Now wallet manager can safely load or create wallets
       this.wallet.create(wallet)
 
       let chainId = await faucet.claimChain(
@@ -55,7 +57,7 @@ export class Server {
     },
   }
 
-  private async faucetAction(op: OpType): Promise<Result<string>> {
+  private async _faucetAction(op: OpType): Promise<Result<string>> {
     // const FAUCET_URL = 'http://localhost:8080'
     const FAUCET_URL = 'https://faucet.testnet-conway.linera.net/'
     const faucet = new wasm.Faucet(FAUCET_URL)
@@ -63,14 +65,14 @@ export class Server {
     if (!handler) return { success: false, error: 'Invalid operation' }
     try {
       const result = await handler.call(this, faucet)
-      await this.initClient() // Initialize client after faucet action
+      await this._initClient() // Initialize client after faucet action
       return result
     } catch (err) {
       return { success: false, error: `${err}` }
     }
   }
 
-  private async initClient() {
+  private async _initClient() {
     if (!this.wallet.getWallet() || !this.wallet.getSigner()) {
       return
     }
@@ -82,6 +84,7 @@ export class Server {
         this.wallet.getWallet(),
         this.wallet.getSigner()
       )
+      console.log('client initialized....')
 
       await this.wallet.reInitWallet() // reinitialize wallet after client init
 
@@ -93,8 +96,8 @@ export class Server {
     }
   }
 
-  private async initWallet() {
-    // Inject the wasm instance into your wallet manager
+  private async _initWallet() {
+    // Inject the wasm instance into wallet manager
     this.wallet.setWasmInstance(this.wasmInstance!)
     // Now wallet manager can safely load or create wallets
     try {
@@ -104,13 +107,9 @@ export class Server {
     }
   }
 
-  private async run() {
+  private async setup() {
     await WasmManager.init()
     this.wasmInstance = WasmManager.instance
-
-    // this.setupPortConnections()
-    await this.initWallet()
-    await this.initClient()
   }
 
   private async _handleQueryApplicationRequest(query: any) {
@@ -127,7 +126,7 @@ export class Server {
       const result = await this.wallet.setDefaultChain(chainId)
       // reinitialize client after setting default chain
       await this.client.cleanup()
-      await this.initClient()
+      await this._initClient()
       return result
     } catch (err) {
       console.error(err)
@@ -140,15 +139,30 @@ export class Server {
       const result = await this.wallet.assign(body) // assign chain in wallet manager, this will also reinitialize wallet
       // reinitialize client after assignment
       await this.client.cleanup()
-      await this.initClient()
+      await this._initClient()
       return result
     } catch (err) {
       console.error(err)
     }
   }
 
-  async create(): Promise<void> {
-    this.faucetAction('CREATE_WALLET')
+  async JsWallet(): Promise<string> {
+    try {
+      return await this.wallet.getJsWallet()
+    } catch {
+      return 'Failed to get wallet'
+    }
+  }
+
+  async create(fn: (data: any) => void): Promise<void> {
+    this.onNotification = fn
+    await this._faucetAction('CREATE_WALLET')
+  }
+
+  async initClient(fn: (data: any) => void): Promise<void> {
+    this.onNotification = fn
+    await this._initWallet()
+    await this._initClient()
   }
 
   async request(req: Request): Promise<Result<string>> {
@@ -169,11 +183,10 @@ export class Server {
     return { success: true, result: res as string }
   }
 
-  static async init(fn: (data: any) => void): Promise<Server> {
+  static async init(): Promise<Server> {
     if (!Server.instance) {
       const server = new Server()
-      server.onNotification = fn
-      await server.run()
+      await server.setup()
       Server.instance = server
     }
     return Server.instance

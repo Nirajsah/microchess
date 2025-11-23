@@ -41,10 +41,6 @@ export class ClientManager {
       throw new Error('Missing wasmInstance, wallet, or signer')
     }
 
-    // if (this.client) {
-    //   console.log('Client already exists, but creating new one anyway')
-    // }
-
     try {
       console.log('trying..', wallet, signer, skipBlockSync)
       const client = await new wasmInstance.Client(
