@@ -8,6 +8,8 @@
     --foreground: 0 0% 100%; /* white */
     --muted: 240 4.8% 95.9%;
     --border: 240 5.9% 90%;
+
+    --radius: 0.5rem;
   }
 
   .dark {
@@ -15,16 +17,11 @@
     --foreground: 0 0% 98%;
     --muted: #18181b;
     --border: #27272a;
+
+    --radius: 0.5rem;
   }
 }
 
-/* html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-} */
 html,
 body,
 #root {
@@ -32,6 +29,16 @@ body,
   height: 100%;
   margin: 0;
   padding: 0;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
 @media (width: 1024px) {
@@ -239,16 +246,6 @@ body,
   height: 100%;
   background-color: #2e7d3287;
   z-index: -1; /* Put the shadow behind the main div */
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
-/* Hide scrollbar for IE, Edge, and Firefox */
-.scrollbar-hide {
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
 }
 
 .highlight-tile {
