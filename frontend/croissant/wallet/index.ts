@@ -11,15 +11,10 @@ type OpType = 'CREATE_WALLET' | 'CLAIM_CHAIN'
 type FaucetHandler = (faucet: wasm.Faucet) => Promise<Result<string>>
 
 export type Request = {
-  type: 'QUERY' | 'CONNECT_WALLET' | 'ASSIGNMENT'
+  type: 'QUERY'
   applicationId: string
   query: string
 }
-
-export type GuardedHandler = [
-  (message: any) => message is any, // guard
-  (message: any, wrap: (data: any, success?: boolean) => void) => Promise<void>
-]
 
 export class Server {
   wasmInstance: typeof wasm | null = null
@@ -58,8 +53,8 @@ export class Server {
   }
 
   private async _faucetAction(op: OpType): Promise<Result<string>> {
-    // const FAUCET_URL = 'http://localhost:8080'
-    const FAUCET_URL = 'https://faucet.testnet-conway.linera.net/'
+    const FAUCET_URL = 'http://localhost:8079'
+    // const FAUCET_URL = 'https://faucet.testnet-conway.linera.net/'
     const faucet = new wasm.Faucet(FAUCET_URL)
     const handler = this.faucetHandlers[op]
     if (!handler) return { success: false, error: 'Invalid operation' }
@@ -84,10 +79,8 @@ export class Server {
         this.wallet.getWallet(),
         this.wallet.getSigner()
       )
-      console.log('client initialized....')
 
       await this.wallet.reInitWallet() // reinitialize wallet after client init
-
       this.client.onNotificationCallback = this.onNotification
     } catch (error) {
       await this.wallet.reInitWallet() // reinitialize wallet after client init

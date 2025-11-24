@@ -75,8 +75,6 @@ export class WalletManager {
 
       this.wallet = wallet!
       this.signer = signer!
-
-      console.log('Wallet loaded successfully', this.wallet, this.signer)
     } catch (error) {
       throw new Error('Failed to read wallet')
     }
@@ -132,14 +130,11 @@ export class WalletManager {
   }
 
   cleanup() {
-    console.log('cleanup was called for wallet', this.wallet)
     try {
       this.wallet?.free()
     } catch (e) {
       console.error('failed to free wallet', e)
     }
-
-    console.log('cleanup was called after for wallet', this.wallet)
     this.wallet = null
   }
 }

@@ -3,7 +3,7 @@ import type { Signer } from '../signer/signer'
 import type * as wasmType from '../linera_web'
 
 export type Request = {
-  type: 'QUERY' | 'CONNECT_WALLET' | 'ASSIGNMENT'
+  type: 'QUERY'
   applicationId: string
   query: string
 }
@@ -33,7 +33,6 @@ export class ClientManager {
     skipBlockSync = false
   ): Promise<Client> {
     if (this.client) {
-      console.log('Client already exists, but creating new one anyway')
       return this.client
     }
 
@@ -42,7 +41,6 @@ export class ClientManager {
     }
 
     try {
-      console.log('trying..', wallet, signer, skipBlockSync)
       const client = await new wasmInstance.Client(
         wallet,
         signer,
@@ -73,7 +71,6 @@ export class ClientManager {
         // Notify subscribers safely
         if (this.onNotificationCallback) {
           try {
-            console.log('calling notification handler')
             this.onNotificationCallback(parsed)
           } catch (callbackErr) {
             console.error('❌ Notification callback failed:', callbackErr)
@@ -163,8 +160,6 @@ export class ClientManager {
 
   /** Cleanup resources */
   async cleanup() {
-    console.log('Cleanup called, current client:', this.client)
-
     if (this.client) {
       try {
         this.client.stop()
