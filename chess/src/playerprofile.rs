@@ -127,7 +127,13 @@ impl PlayerProfile {
     }
 
     pub fn update(&mut self, new_hash: PlayerHash) {
-        *self = new_hash.decode()
+        let updated = new_hash.decode();
+
+        self.elo = updated.elo;
+        self.matches = updated.matches;
+        self.won = updated.won;
+        self.lost = updated.lost;
+        self.ath = updated.ath;
     }
 
     // When player loses
