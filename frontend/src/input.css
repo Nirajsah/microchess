@@ -31,14 +31,26 @@ body,
   padding: 0;
 }
 
-.no-scrollbar::-webkit-scrollbar {
+/* Hide scrollbars for Webkit browsers (Chrome, Safari, Opera) */
+body::-webkit-scrollbar,
+html::-webkit-scrollbar {
   display: none;
 }
 
-/* Hide scrollbar for IE, Edge and Firefox */
+/* Hide scrollbars for Firefox */
+body,
+html {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
 .no-scrollbar {
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 @media (width: 1024px) {
@@ -173,7 +185,8 @@ body,
   height: 100%;
   pointer-events: none;
   box-shadow: 0 -28px 84px -24px #e2e8ff1f inset;
-  background: radial-gradient(
+  background:
+    radial-gradient(
       103.78% 100% at 50% 0%,
       rgba(118, 146, 255, 0) 80.55%,
       rgba(122, 150, 255, 0.04) 100%

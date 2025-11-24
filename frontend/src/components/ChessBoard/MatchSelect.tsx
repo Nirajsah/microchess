@@ -11,7 +11,6 @@ import {
   ArrowLeft,
 } from 'lucide-react'
 import {
-  assignChain,
   deleteInfo,
   friendId,
   gameWithToken,
@@ -20,7 +19,7 @@ import {
   startGame,
   storage,
 } from '@/api'
-import { useWalletNotifications } from '@/hooks/useWalletNotification'
+import { useWalletStore } from '@/store/wallet'
 
 const MatchSelect = () => {
   type Step =
@@ -66,7 +65,7 @@ const MatchSelect = () => {
     }
   }
 
-  const notification = useWalletNotifications()
+  const notification = useWalletStore((s) => s.notification)
 
   const [chainMetaData, setChainMetaData] = React.useState<{
     chainId: string
@@ -167,7 +166,7 @@ const MatchSelect = () => {
   const handleStart = () => {
     if (!chainMetaData) return
     try {
-      assignChain(chainMetaData.chainId, chainMetaData.timestamp)
+      // assignChain(chainMetaData.chainId, chainMetaData.timestamp)
       storage.removeGameState()
     } catch (e) {
       console.log(e)

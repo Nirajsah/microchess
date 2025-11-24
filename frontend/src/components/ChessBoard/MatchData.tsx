@@ -1,11 +1,9 @@
 import React from 'react'
 import { AlertCircle } from 'lucide-react'
-import Timer from './Timer'
-import CapturedPieces from './CapturedPieces'
 import { Color } from './types'
 import { capturedPiece, getMvString, opponentProfile } from '@/api'
 import { ResignButton } from './ResignButton'
-import { useWalletNotifications } from '@/hooks/useWalletNotification'
+import { useWalletStore } from '@/store/wallet'
 
 interface MatchData {
   player: string
@@ -32,7 +30,7 @@ const MatchDataUI = (data: MatchData) => {
     null
   )
 
-  const notification = useWalletNotifications()
+  const notification = useWalletStore((s) => s.notification)
 
   React.useEffect(() => {
     const getCapturedPieces = async () => {
@@ -86,169 +84,74 @@ const MatchDataUI = (data: MatchData) => {
   }, [opponentId])
 
   return (
-    <div className="w-full flex flex-col gap-4 h-[720px]">
-      {/* Timers and Moves Container */}
-      <div className="flex-1 flex flex-col gap-3">
-        {/* Opponent Timer */}
-        <div className="relative group">
-          <div
-            className={`rounded-xl border transition-all duration-300 ${
-              color === 'White'
-                ? player === 'b'
-                  ? 'bg-gradient-to-r from-zinc-800 to-zinc-900 border-amber-500/50 shadow-lg shadow-amber-500/20'
-                  : 'bg-zinc-900/50 border-zinc-800'
-                : player === 'w'
-                ? 'bg-gradient-to-r from-zinc-800 to-zinc-900 border-amber-500/50 shadow-lg shadow-amber-500/20'
-                : 'bg-zinc-900/50 border-zinc-800'
-            }`}
-          >
-            <div className="flex items-center justify-between p-2.5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center text-2xl">
-                  {color === 'White' ? '♚' : '♔'}
-                </div>
-                <div>
-                  <p className="text-md font-medium truncate max-w-[200px]">
-                    {opponent.name ? opponent.name : opponentId}
-                  </p>
-                  <p className="text-xs text-zinc-400">Opponent</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-3xl font-mono font-bold text-white">
-                  <Timer
-                    initialTime={color === 'White' ? timer.black : timer.white}
-                    isActive={
-                      color === 'White' ? player === 'b' : player === 'w'
-                    }
-                    isStarted={game_state === 'OnGoing'}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="w-full flex flex-col gap-4 h-full bg-[#262626] rounded-xl">
+      {/* Move History */}
+      <div className="flex-1 rounded-xl border border-zinc-800 overflow-hidden flex flex-col min-h-0">
+        <div className="border-b border-zinc-800 backdrop-blur-sm">
+          <table className="w-full">
+            <thead>
+              <tr className="text-zinc-400 text-sm font-medium">
+                <th className="w-[20%] text-center px-2 py-2">#</th>
+                <th className="w-[40%] text-center px-2 py-2">White</th>
+                <th className="w-[40%] text-center px-2 py-2">Black</th>
+              </tr>
+            </thead>
+          </table>
         </div>
-
-        {/* Move History */}
-        <div className="flex-1 rounded-2xl border border-zinc-800 bg-gradient-to-b from-zinc-900/50 to-zinc-950/50 overflow-hidden">
-          <div className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm">
-            <table className="w-full">
-              <thead>
-                <tr className="text-zinc-400 text-sm font-medium">
-                  <th className="w-[25%] text-left px-4 py-3">#</th>
-                  <th className="w-[37.5%] text-left px-4 py-3">White</th>
-                  <th className="w-[37.5%] text-left px-4 py-3">Black</th>
-                </tr>
-              </thead>
-            </table>
-          </div>
-          <div className="h-[220px] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-            <table className="w-full">
-              <tbody>
-                {moves && movePairs.length > 0 ? (
-                  movePairs.map((move: any, index) => (
-                    <tr
-                      key={index}
-                      className="group hover:bg-zinc-800/30 transition-colors border-b border-zinc-800/30 last:border-0"
-                    >
-                      <td className="w-[25%] px-4 py-0.5 text-zinc-500 font-medium text-sm">
-                        {index + 1}
-                      </td>
-                      <td className="w-[37.5%] px-4 py-0.5">
-                        <span className="text-white font-mono text-sm group-hover:text-blue-400 transition-colors">
-                          {move.white || '—'}
-                        </span>
-                      </td>
-                      <td className="w-[37.5%] px-4 py-0.5">
-                        <span className="text-white font-mono text-sm group-hover:text-blue-400 transition-colors">
-                          {move.black || '—'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="text-center py-8 text-zinc-500">
-                      No moves yet
+        <div className="overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent flex-1">
+          <table className="w-full">
+            <tbody>
+              {moves && movePairs.length > 0 ? (
+                movePairs.map((move: any, index) => (
+                  <tr
+                    key={index}
+                    className="group hover:bg-zinc-800/30 transition-colors border-b border-zinc-800/30 last:border-0"
+                  >
+                    <td className="w-[20%] px-2 py-1 text-zinc-500 font-medium text-sm text-center bg-zinc-900/20">
+                      {index + 1}
+                    </td>
+                    <td className="w-[40%] px-2 py-1 text-center">
+                      <span className="text-zinc-300 font-mono text-sm group-hover:text-white transition-colors">
+                        {move.white || '—'}
+                      </span>
+                    </td>
+                    <td className="w-[40%] px-2 py-1 text-center">
+                      <span className="text-zinc-300 font-mono text-sm group-hover:text-white transition-colors">
+                        {move.black || '—'}
+                      </span>
                     </td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Player Timer */}
-        <div className="relative group flex items-center gap-2">
-          <div
-            className={`rounded-xl border transition-all duration-300 flex-1 ${
-              color === 'White'
-                ? player === 'w'
-                  ? 'bg-gradient-to-r from-zinc-800 to-zinc-900 border-amber-500/50 shadow-lg shadow-amber-500/20'
-                  : 'bg-zinc-900/50 border-zinc-800'
-                : player === 'b'
-                ? 'bg-gradient-to-r from-zinc-800 to-zinc-900 border-amber-500/50 shadow-lg shadow-amber-500/20'
-                : 'bg-zinc-900/50 border-zinc-800'
-            }`}
-          >
-            <div className="flex items-center justify-between p-2.5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center text-2xl">
-                  {color === 'White' ? '♔' : '♚'}
-                </div>
-                <div>
-                  <p className="text-xs text-zinc-500 font-medium">{color}</p>
-                  <p className="text-sm text-zinc-400">You</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-3xl font-mono font-bold text-white">
-                  <Timer
-                    initialTime={color === 'White' ? timer.white : timer.black}
-                    isActive={
-                      color === 'White' ? player === 'w' : player === 'b'
-                    }
-                    isStarted={game_state === 'OnGoing'}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-          {/* Resign Button  */}
-          <ResignButton />
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="text-center py-8 text-zinc-500">
+                    No moves yet
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
       {/* Check Status Alert */}
       {checkStatus && (
-        <div className="rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 p-4 animate-in fade-in duration-300">
+        <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 animate-in fade-in duration-300">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-              <AlertCircle className="w-5 h-5 text-amber-400" />
-            </div>
+            <AlertCircle className="w-5 h-5 text-amber-500" />
             <div>
-              <p className="font-semibold text-amber-200">King in Check!</p>
-              <p className="text-sm text-amber-300/80">
-                {checkStatus.toUpperCase()} king is under attack
+              <p className="font-medium text-amber-200 text-sm">Check!</p>
+              <p className="text-xs text-amber-500/80">
+                {checkStatus} is under attack
               </p>
             </div>
           </div>
         </div>
       )}
-
-      {/* Captured Pieces */}
-      <div className="rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900/50 to-zinc-950/50 overflow-hidden">
-        <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
-          <h3 className="text-sm font-semibold text-zinc-300">
-            Captured Pieces
-          </h3>
-        </div>
-        {capturedPieces && Object.keys(capturedPieces).length > 0 ? (
-          <CapturedPieces pieces={capturedPieces} />
-        ) : (
-          <p className="text-zinc-600 text-sm p-3">No pieces captured yet</p>
-        )}
-      </div>
+      {/* Player Info & Resign */}
+      {/* <div className="flex gap-2">
+        <ResignButton />
+      </div> */}
     </div>
   )
 }

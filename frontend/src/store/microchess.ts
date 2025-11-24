@@ -1,15 +1,35 @@
 import { create } from 'zustand'
 
-type Settings = {
+type Profile = {
+  id: string
+  name: string
+  elo: number
+  matches: number
+  won: number
+  lost: number
+  ath: number
+}
+
+type UserSettings = {
   showProfile: boolean
   walletExists: boolean
   updateShowProfile: () => void
   updateWalletExists: () => void
+
+  userProfile: Profile | null
+  setUserProfile: (data: any) => void
 }
 
-export const useChessStore = create<Settings>((set) => ({
+export const useUserStore = create<UserSettings>((set) => ({
   showProfile: false,
   walletExists: false,
+  userProfile: null,
+
+  setUserProfile: (data: any) => {
+    set(() => ({
+      userProfile: data,
+    }))
+  },
 
   updateShowProfile: () => {
     set((state) => ({

@@ -20,13 +20,7 @@ import LeftMenu from '@/components/LeftSideMenu'
 
 const ChessBoard = () => {
   const { state: board, initDefaultAsync, localMakeMove } = useBoard((s) => s)
-
-  const initAsync = useWalletStore((s) => s.initAsync)
   const notification = useWalletStore((s) => s.notification)
-
-  React.useEffect(() => {
-    initAsync()
-  }, [])
 
   React.useEffect(() => {
     console.log('notification', notification)
@@ -36,7 +30,7 @@ const ChessBoard = () => {
   const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
 
   React.useEffect(() => {
-    initDefaultAsync()
+    initDefaultAsync() // init board wasm
   }, [])
 
   React.useEffect(() => {
@@ -49,7 +43,9 @@ const ChessBoard = () => {
         console.error('failed', e)
       }
     }
-    getCapturedPieces()
+    if (isGameChain) {
+      getCapturedPieces()
+    }
   }, [notification, board.lastMove])
 
   function localMove(selectedSquare: Square, to_square: Square, piece: Piece) {

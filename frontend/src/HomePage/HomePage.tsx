@@ -27,7 +27,7 @@ const BorderAnimation = () => {
 
 export default function HomePage({ gameCount }: { gameCount: number }) {
   return (
-    <div className="w-full h-full lg:min-h-[880px] flex mt-20">
+    <div className="w-full h-full lg:min-h-[880px] flex mt-20 px-2 md:px-6 lg:px-10">
       <div className="w-full h-full flex flex-col gap-2 p-2">
         <div className="flex flex-col md:flex-row gap-2 min-w-0 lg:flex-wrap overflow-hidden">
           <div className="relative w-full lg:w-[50%] h-full aspect-square bg-[#0a0a0a] flex justify-center items-center rounded-[24px] min-w-0 flex-[1_1_0%]">

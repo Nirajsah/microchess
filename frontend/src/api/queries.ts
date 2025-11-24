@@ -1,24 +1,24 @@
 import { useWalletStore } from '@/store/wallet.ts'
 import { Piece, Square } from '../components/ChessBoard/types.ts'
 
-export function connect_wallet(): Promise<any> {
-  if (!window.linera) throw new Error('Linera extension not found.')
+// export function connect_wallet(): Promise<any> {
+//   if (!window.linera) throw new Error('Linera extension not found.')
 
-  return window.linera.request({
-    type: 'CONNECT_WALLET',
-  })
-}
+//   return window.linera.request({
+//     type: 'CONNECT_WALLET',
+//   })
+// }
 
-// Ask the wallet to assign the wallet with new chain
-export function assignChain(chainId: string, timestamp: number) {
-  ;(async () => {
-    await window.linera?.request({
-      type: 'ASSIGNMENT',
-      chainId: chainId,
-      timestamp: timestamp,
-    })
-  })()
-}
+// // Ask the wallet to assign the wallet with new chain
+// export function assignChain(chainId: string, timestamp: number) {
+//   ;(async () => {
+//     await window.linera?.request({
+//       type: 'ASSIGNMENT',
+//       chainId: chainId,
+//       timestamp: timestamp,
+//     })
+//   })()
+// }
 
 function request(query: string): Promise<any> {
   let APP_ID = import.meta.env.VITE_MICROCHESS_APPLICATION_ID
@@ -102,6 +102,7 @@ export function getProfile() {
           lost
           ath
           chainId
+          id
         } }`
 
   const gqlQuery = JSON.stringify({ query: query })

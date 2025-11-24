@@ -13,6 +13,7 @@ type WalletStore = {
   ready: boolean
   notification: any
   walletExists: boolean
+  JsWallet: string | null
 
   initAsync: () => Promise<void>
   requestAsync: (req: Request) => Promise<void>
@@ -24,7 +25,7 @@ type WalletStore = {
     timestamp: string
   }) => Promise<void>
   setDefaultAsync: (chainId: string) => Promise<void>
-  getJsWalletAsync: () => Promise<string>
+  getJsWalletAsync: () => Promise<void>
 }
 
 export const useWalletStore = create<WalletStore>((set, get) => ({
@@ -32,6 +33,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   ready: false,
   notification: null,
   walletExists: false,
+  JsWallet: null,
 
   getJsWalletAsync: async () => {
     const { walletExists, server } = get()
@@ -39,7 +41,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     if (!walletExists || !server) return
     try {
       const wallet = await server.JsWallet()
-      return wallet
+      set({ JsWallet: wallet })
     } catch (e: any) {
       return e
     }

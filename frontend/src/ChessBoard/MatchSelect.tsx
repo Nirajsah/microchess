@@ -11,7 +11,6 @@ import {
   ArrowLeft,
 } from 'lucide-react'
 import {
-  assignChain,
   deleteInfo,
   friendId,
   gameWithToken,
@@ -169,7 +168,7 @@ const MatchSelect = () => {
   const handleStart = () => {
     if (!chainMetaData) return
     try {
-      assignChain(chainMetaData.chainId, chainMetaData.timestamp)
+      // assignChain(chainMetaData.chainId, chainMetaData.timestamp)
       storage.removeGameState()
     } catch (e) {
       console.log(e)

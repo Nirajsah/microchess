@@ -1,17 +1,30 @@
-import { Copy, RefreshCw } from 'lucide-react'
-import { useRef } from 'react'
+import { Convert } from '@/lib/chainsType'
+import { useWalletStore } from '@/store/wallet'
+import { ChevronLeft, ChevronRight, Copy, RefreshCw } from 'lucide-react'
+import React, { useRef } from 'react'
 
 export function MockChainCarousel() {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const rawWallet = useWalletStore((s) => s.JsWallet)
 
-  // Mock chain data
-  const chains = [
-    { chainId: 'CHAIN-001', owner: '0x1234567890abcdef' },
-    { chainId: 'CHAIN-002', owner: '0xaabbccddeeff1122' },
-  ]
+  const walletData = React.useMemo(() => {
+    if (!rawWallet) return null
+    try {
+      const wallet = Convert.toWallet(rawWallet)
+      return {
+        chains: Object.values(wallet.chains),
+        defaultChain: wallet.defaultChain,
+      }
+    } catch (e) {
+      console.error('Failed to parse wallet:', e)
+      return null
+    }
+  }, [rawWallet])
+
+  const chains = walletData?.chains || null
+  const defaultChain = walletData?.defaultChain || ''
 
   const balance = 123.45
-  const defaultChain = 'CHAIN-001'
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -22,21 +35,59 @@ export function MockChainCarousel() {
     console.log('Setting default:', chainId)
   }
 
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollRef.current) {
+      const { current } = scrollRef
+      const scrollAmount = current.clientWidth * 0.95
+      current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth',
+      })
+    }
+  }
+
+  // 3. Loading State: If no chains data, show Loading immediately
+  if (!chains) {
+    return (
+      <div className="w-full h-[250px] flex items-center justify-center text-white">
+        <span className="animate-pulse">Loading Wallet...</span>
+      </div>
+    )
+  }
+
+  // 4. Render Carousel
   return (
-    <div className="w-full h-[220px] max-w-full">
+    <div className="relative w-full h-[250px] max-w-full group">
+      {/* Navigation Buttons (Absolute Positioned) */}
+      <button
+        onClick={() => scroll('left')}
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-0 group-hover:opacity-100 disabled:opacity-0 m-2"
+        aria-label="Scroll left"
+      >
+        <ChevronLeft size={20} />
+      </button>
+
+      <button
+        onClick={() => scroll('right')}
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-0 group-hover:opacity-100 disabled:opacity-0 m-2"
+        aria-label="Scroll right"
+      >
+        <ChevronRight size={20} />
+      </button>
+
+      {/* Scroll Container */}
       <div
         ref={scrollRef}
         style={{
-          overflowX: 'auto',
-          scrollBehavior: 'smooth',
-          overscrollBehavior: 'contain',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
         }}
-        className="flex h-full overflow-x-auto scroll-smooth snap-x snap-mandatory no-scrollbar gap-2"
+        className="flex w-full h-full overflow-x-auto scroll-smooth snap-x snap-mandatory no-scrollbar gap-2"
       >
         {chains.map((chain, i) => (
           <div
             key={i}
-            className="relative snap-center min-w-[95%] w-full h-full text-white overflow-hidden rounded-xl"
+            className="relative snap-center min-w-[95%] w-full h-full text-white overflow-hidden rounded-xl shrink-0"
           >
             {/* Background Card Shape */}
             <svg
@@ -53,13 +104,11 @@ export function MockChainCarousel() {
 
             {/* Content */}
             <div className="absolute w-full min-h-[200px] inset-0 flex flex-col justify-between z-10 text-white">
-              {/* Top content */}
-              <div className="px-6 pt-6">
+              <div className="px-5 py-4">
                 <div className="text-xs text-rose-300">Linera</div>
                 <div className="text-[40px] font-bold">{balance}</div>
               </div>
 
-              {/* Chain details */}
               <div className="flex w-full mt-4 p-2 flex-col justify-between items-start text-xs">
                 <span className="flex items-center gap-2 px-2 py-1 rounded-full text-sm w-full min-w-0">
                   <span className="truncate">ChainId: {chain.chainId}</span>
@@ -79,7 +128,6 @@ export function MockChainCarousel() {
                 </span>
               </div>
 
-              {/* Default button */}
               {defaultChain === chain.chainId ? (
                 <button
                   disabled
