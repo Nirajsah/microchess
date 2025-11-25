@@ -1,10 +1,23 @@
 import React from 'react'
 import { Trophy, Target, Edit2, Check, X, ThumbsUpIcon } from 'lucide-react'
 import { useUserStore } from '@/store/microchess'
+import { getMatchHistory } from '@/api'
 
 const Skeleton = ({ className }: { className: string }) => (
   <div className={`animate-pulse bg-zinc-800/60 rounded-md ${className}`} />
 )
+
+type MatchHistory = {
+  you: {
+    id: string
+    name: string | null
+  }
+  opponent: {
+    id: string
+    name: string | null
+  }
+  blobHash: string
+}
 
 const formatElo = (elo?: number) => elo ?? 0
 const formatNumber = (num?: number) => num ?? 0
@@ -15,6 +28,19 @@ export const PlayerProfile = () => {
   const [activeTab, setActiveTab] = React.useState<'stats' | 'matches'>('stats')
   const [isEditingName, setIsEditingName] = React.useState(false)
   const [tempName, setTempName] = React.useState('')
+  const [matcheHistory, setMatchHistory] = React.useState<MatchHistory[]>([
+    {
+      you: {
+        id: '',
+        name: '',
+      },
+      opponent: {
+        id: '',
+        name: '',
+      },
+      blobHash: '',
+    },
+  ])
 
   const user = React.useMemo(() => {
     return {
@@ -29,13 +55,13 @@ export const PlayerProfile = () => {
     }
   }, [profile])
 
-  // Mock match history data (replace with real history if available in profile)
-  const matches = [
-    { id: 1, result: 'Win', opponent: 'Alice', eloGain: '+12' },
-    { id: 2, result: 'Loss', opponent: 'Bob', eloGain: '-8' },
-    { id: 3, result: 'Win', opponent: 'Carlos', eloGain: '+10' },
-    { id: 4, result: 'Win', opponent: 'David', eloGain: '+15' },
-  ]
+  React.useEffect(() => {
+    const fetchMatches = async () => {
+      const data = await getMatchHistory()
+      setMatchHistory(JSON.parse(data.result).data.matchHistoryAll)
+    }
+    fetchMatches()
+  }, [profile])
 
   const handleSaveName = () => {
     setIsEditingName(false)
@@ -213,22 +239,26 @@ export const PlayerProfile = () => {
               <Skeleton className="h-[66px] w-full rounded-lg" />
             </>
           ) : (
-            matches.map((m) => (
+            matcheHistory.map((m: MatchHistory, index) => (
               <div
-                key={m.id}
+                key={index}
                 className="flex justify-between items-center p-3 rounded-lg bg-zinc-800/40 border border-zinc-700/40"
               >
                 <div>
-                  <p className="font-medium">{m.result}</p>
-                  <p className="text-sm text-zinc-400">vs {m.opponent}</p>
+                  <p className="font-medium truncate max-w-[300px]">
+                    {m.you.id}
+                  </p>
+                  <p className="text-sm text-zinc-400 truncate max-w-[300px]">
+                    vs {m.opponent.id}
+                  </p>
                 </div>
-                <span
+                {/* <span
                   className={`text-sm font-semibold ${
                     m.result === 'Win' ? 'text-green-400' : 'text-red-400'
                   }`}
                 >
                   {m.eloGain}
-                </span>
+                </span> */}
               </div>
             ))
           )}

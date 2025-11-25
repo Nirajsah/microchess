@@ -109,6 +109,25 @@ export function getProfile() {
   return request(gqlQuery)
 }
 
+export function getMatchHistory() {
+  const query = `query {
+    matchHistoryAll {
+      you {
+        id
+        name
+      }
+      opponent {
+        id
+        name	
+      }
+      blobHash
+    }
+  }`
+
+  const gqlQuery = JSON.stringify({ query: query })
+  return request(gqlQuery)
+}
+
 export function friendId() {
   const query = `query { friendId }`
   const gqlQuery = JSON.stringify({ query: query })
@@ -176,7 +195,7 @@ export function promotePiece(
   piece: Piece | string,
   promoted_to: Piece | string
 ) {
-  const mutation = `mutation { promotePiece(from: "${from}", to: "${to}", piece: "${piece}", promoted_to: "${promoted_to}") }`
+  const mutation = `mutation { pawnPromotion(from: "${from}", to: "${to}", piece: "${piece}", promotedPiece: "${promoted_to}") }`
   const query = buildGraphQLQuery(mutation)
   request(query).then((res) => console.log(res))
 }
