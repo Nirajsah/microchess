@@ -10,21 +10,25 @@ import {
 import { RightSideMenu } from './RightSideMenu'
 import { useBoard } from '@/store/board'
 import Board from './Board'
-import { capturedPiece, makeMove } from '@/api'
+import { capturedPiece, gameData, makeMove } from '@/api'
 import { PlayerInfo } from './PlayerInfo'
 import { GameControls } from './GameControls'
 
 import { useWalletStore } from '@/store/wallet'
 import Navbar from '@/components/ChessBoard/Navbar'
 import LeftMenu from '@/components/LeftSideMenu'
+import { PromotionCard } from '@/components/ChessBoard/PromotionCard'
 
 const ChessBoard = () => {
-  const { state: board, initDefaultAsync, localMakeMove } = useBoard((s) => s)
+  const {
+    state: board,
+    initDefaultAsync,
+    localMakeMove,
+    updateAsync,
+  } = useBoard((s) => s)
   const notification = useWalletStore((s) => s.notification)
-
-  React.useEffect(() => {
-    console.log('notification', notification)
-  }, [notification])
+  const pubKey = useWalletStore((s) => s.pubKey)
+  const ready = useWalletStore((s) => s.pubKey)
 
   const [isGameChain, setIsGameChain] = React.useState<boolean | null>(null)
   const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
@@ -38,15 +42,19 @@ const ChessBoard = () => {
       try {
         const data = await capturedPiece()
         const res = JSON.parse(data.result).data.capturedPieces
-        setCapturedPieces(res || [])
+        setCapturedPieces(res)
       } catch (e) {
         console.error('failed', e)
       }
     }
+    const fetchAndUpdateBoard = async () => {
+      await updateAsync(pubKey!)
+    }
     if (isGameChain) {
       getCapturedPieces()
+      fetchAndUpdateBoard()
     }
-  }, [notification, board.lastMove])
+  }, [notification, ready, isGameChain])
 
   function localMove(selectedSquare: Square, to_square: Square, piece: Piece) {
     if (board.color === 'White' && piece.charAt(0) === 'b') return
@@ -121,6 +129,7 @@ const ChessBoard = () => {
                       ? board.player_turn === 'b'
                       : board.player_turn === 'w'
                   }
+                  isStarted={board.game_state === 'OnGoing'}
                 />
               </div>
             </div>
@@ -128,11 +137,18 @@ const ChessBoard = () => {
           <div className="w-full relative max-w-[720px] rounded-md">
             {renderSquare()}
           </div>
+          {promoteData.show && (
+            <PromotionCard
+              color={board.color as Color}
+              promoteData={promoteData}
+              setPromoteData={setPromoteData}
+            />
+          )}
           {board.color && board.timer && (
             <div className="w-full flex justify-between">
               <div className="w-full pb-0 pt-2.5">
                 <PlayerInfo
-                  id={board.color}
+                  id={pubKey}
                   timer={
                     board.color === 'White'
                       ? board.timer.white
@@ -143,6 +159,7 @@ const ChessBoard = () => {
                       ? board.player_turn === 'w'
                       : board.player_turn === 'b'
                   }
+                  isStarted={board.game_state === 'OnGoing'}
                 />
               </div>
             </div>
@@ -158,6 +175,7 @@ const ChessBoard = () => {
               game_state={board.game_state}
               timer={board.timer}
               setIsGameChain={setIsGameChain}
+              capturedPieces={capturedPieces}
             />
           </div>
         </div>

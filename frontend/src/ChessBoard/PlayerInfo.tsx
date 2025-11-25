@@ -5,9 +5,10 @@ import { opponentProfile, getProfile } from '@/api'
 
 interface PlayerInfoProps {
   isOpponent?: boolean
-  id?: string
+  id: string | null
   timer: number
   isActive: boolean
+  isStarted: boolean
 }
 
 export const PlayerInfo = ({
@@ -15,6 +16,7 @@ export const PlayerInfo = ({
   id,
   timer,
   isActive,
+  isStarted,
 }: PlayerInfoProps) => {
   const [profile, setProfile] = React.useState<{
     name: string | null
@@ -62,8 +64,7 @@ export const PlayerInfo = ({
         </div>
         <div className="flex flex-col">
           <span className="text-white font-medium text-sm">
-            {profile.name ||
-              (id ? `${id.slice(0, 4)}...${id.slice(-4)}` : 'Unknown')}
+            {profile.name || id}
           </span>
         </div>
       </div>
@@ -76,7 +77,11 @@ export const PlayerInfo = ({
               : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
           }`}
         >
-          <Timer initialTime={timer} isActive={isActive} isStarted={true} />
+          <Timer
+            initialTime={timer}
+            isActive={isActive}
+            isStarted={isStarted}
+          />
         </div>
       </div>
     </div>

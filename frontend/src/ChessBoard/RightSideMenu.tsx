@@ -5,6 +5,7 @@ import MatchSelect from './MatchSelect'
 import MatchDataUI from './MatchData'
 import { PieceRow } from './CapturedPieces'
 import { GameControls } from './GameControls'
+import { useWalletStore } from '@/store/wallet'
 
 export const PieceMap: any = {
   bP: '♙',
@@ -41,20 +42,22 @@ export interface MatchData {
     black: number
   }
   setIsGameChain?: (value: boolean | null) => void
+  capturedPieces: string[] | null
 }
 
 export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
-  const { setIsGameChain } = matchData
-  const [capturedPieces, setCapturedPieces] = React.useState<string[] | null>(
-    null
-  )
+  const { setIsGameChain, capturedPieces } = matchData
+
   const [playMatch, setPlayMatch] = React.useState(false)
+  const ready = useWalletStore((s) => s.ready)
 
   React.useEffect(() => {
     const checkGameChain = async () => {
       try {
         const res = await isGameChain()
         const check = JSON.parse(res.result).data.isGameChain
+
+        console.log('is gamechain', check)
 
         if (setIsGameChain) {
           setIsGameChain(check)
@@ -64,8 +67,10 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
         setIsGameChain?.(false)
       }
     }
-    checkGameChain()
-  }, [])
+    if (ready) {
+      checkGameChain()
+    }
+  }, [ready])
 
   const blackPieces = capturedPieces?.filter((p) => p.startsWith('b')) || []
   const whitePieces = capturedPieces?.filter((p) => p.startsWith('w')) || []

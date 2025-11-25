@@ -4,6 +4,7 @@ import { Color } from '../components/ChessBoard/types'
 import { capturedPiece, getMvString, opponentProfile } from '@/api'
 // import { ResignButton } from './ResignButton'
 import { useWalletStore } from '@/store/wallet'
+import { ResignButton } from '@/components/ChessBoard/ResignButton'
 
 interface MatchData {
   player: string
@@ -85,6 +86,7 @@ const MatchDataUI = (data: MatchData) => {
 
   return (
     <div className="w-full h-full flex flex-col gap-4 bg-[#262626] rounded-xl">
+      <ResignButton />
       {/* Move History */}
       <div className="flex-1 rounded-xl border border-zinc-800 overflow-hidden flex flex-col min-h-full">
         <div className="border-b border-zinc-800 backdrop-blur-sm">
@@ -98,7 +100,14 @@ const MatchDataUI = (data: MatchData) => {
             </thead>
           </table>
         </div>
-        <div className="overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent flex-1">
+        <div
+          style={{
+            overflowX: 'auto',
+            scrollBehavior: 'smooth',
+            overscrollBehavior: 'contain',
+          }}
+          className="overflow-y-auto flex-1 no-scrollbar"
+        >
           <table className="w-full">
             <tbody>
               {moves && movePairs.length > 0 ? (
@@ -148,10 +157,6 @@ const MatchDataUI = (data: MatchData) => {
           </div>
         </div>
       )}
-      {/* Player Info & Resign */}
-      {/* <div className="flex gap-2">
-        <ResignButton />
-      </div> */}
     </div>
   )
 }

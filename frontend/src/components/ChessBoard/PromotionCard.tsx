@@ -1,4 +1,4 @@
-import { Color, Piece, Square } from "./types";
+import { Color, Piece, Square } from './types'
 import {
   whiteRook,
   whiteKnight,
@@ -8,61 +8,61 @@ import {
   blackKnight,
   blackBishop,
   blackQueen,
-} from "@/assets";
+} from '@/assets'
 
-import { promotePiece } from "@/api";
+import { promotePiece } from '@/api'
 
 interface PromotionCardProps {
-  color: Color;
-  promoteData: { from: Square; to: Square; piece: Piece; show: boolean };
+  color: Color
+  promoteData: { from: Square; to: Square; piece: Piece; show: boolean }
   setPromoteData: (value: {
-    from: Square;
-    to: Square;
-    piece: Piece;
-    show: boolean;
-  }) => void;
+    from: Square
+    to: Square
+    piece: Piece
+    show: boolean
+  }) => void
 }
 
 const blackPieces: { image: string; piece: Piece }[] = [
-  { image: blackQueen, piece: "bQ" },
+  { image: blackQueen, piece: 'bQ' },
   {
     image: blackRook,
-    piece: "bR",
+    piece: 'bR',
   },
-  { image: blackBishop, piece: "bB" },
+  { image: blackBishop, piece: 'bB' },
   {
     image: blackKnight,
-    piece: "bN",
+    piece: 'bN',
   },
-];
+]
 
 const whitePieces: { image: string; piece: Piece }[] = [
-  { image: whiteQueen, piece: "wQ" },
+  { image: whiteQueen, piece: 'wQ' },
   {
     image: whiteRook,
-    piece: "wR",
+    piece: 'wR',
   },
-  { image: whiteBishop, piece: "wB" },
+  { image: whiteBishop, piece: 'wB' },
   {
     image: whiteKnight,
-    piece: "wN",
+    piece: 'wN',
   },
-];
+]
 
 export const PromotionCard = ({
   color,
   promoteData,
   setPromoteData,
 }: PromotionCardProps) => {
-  const pieceData = color === "White" ? whitePieces : blackPieces;
+  const pieceData = color === 'White' ? whitePieces : blackPieces
 
   const promotion = (
     piece: Piece,
     promoteData: { from: Square; to: Square; piece: Piece; show: boolean }
   ) => {
-    promotePiece(promoteData.from, promoteData.to, promoteData.piece, piece);
-    setPromoteData({ ...promoteData, show: false });
-  };
+    promotePiece(promoteData.from, promoteData.to, promoteData.piece, piece)
+    setPromoteData({ ...promoteData, show: false })
+  }
 
   return (
     <div className="w-fit flex border bg-white drop-shadow-sm rounded-xl">
@@ -80,5 +80,5 @@ export const PromotionCard = ({
         </div>
       ))}
     </div>
-  );
-};
+  )
+}
