@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import { Server } from 'croissant/wallet'
+import { Result, Server } from 'croissant/wallet'
 import { checkWalletExists } from '@/lib/checkWalletExist'
+import { Convert } from '@/lib/chainsType'
 
 type Request = {
   type: 'QUERY'
@@ -14,6 +15,8 @@ type WalletStore = {
   notification: any
   walletExists: boolean
   JsWallet: string | null
+  chainBalance: string
+  pubKey: string | null
 
   initAsync: () => Promise<void>
   requestAsync: (req: Request) => Promise<void>
@@ -22,9 +25,9 @@ type WalletStore = {
   createWalletAsync: () => Promise<void>
   assignChainAsync: (data: {
     chainId: string
-    timestamp: string
-  }) => Promise<void>
-  setDefaultAsync: (chainId: string) => Promise<void>
+    timestamp: number
+  }) => Promise<Result<string>>
+  setDefaultAsync: (chainId: string) => Promise<Result<string>>
   getJsWalletAsync: () => Promise<void>
 }
 
@@ -34,6 +37,8 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   notification: null,
   walletExists: false,
   JsWallet: null,
+  chainBalance: '',
+  pubKey: null,
 
   getJsWalletAsync: async () => {
     const { walletExists, server } = get()
@@ -41,7 +46,8 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     if (!walletExists || !server) return
     try {
       const wallet = await server.JsWallet()
-      set({ JsWallet: wallet })
+      const id = Object.values(Convert.toWallet(wallet).chains)[0].owner
+      set({ JsWallet: wallet, pubKey: id })
     } catch (e: any) {
       return e
     }
@@ -61,7 +67,8 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       await server.initClient((data) => {
         set((state) => (state.notification = data))
       })
-      set({ server, ready: true })
+      const bal = (await server.getBalance()) || '0'
+      set({ server, ready: true, chainBalance: bal })
     } catch {
       return
     }
@@ -85,18 +92,28 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   requestAsync: async (req: Request): Promise<any> => {
     const server = get().server
     if (!server) throw new Error('failed server does not exist')
-    return server.request(req)
+    return await server.request(req)
   },
 
-  assignChainAsync: async (data: { chainId: string; timestamp: string }) => {
+  assignChainAsync: async (data: {
+    chainId: string
+    timestamp: number
+  }): Promise<Result<string>> => {
     const { server, ready } = get()
-    if (!server || !ready) return
-    server.assign(data)
+    if (!server || !ready)
+      return { success: false, error: 'Server is not ready..' }
+    return await server.assign(data)
   },
 
-  setDefaultAsync: async (chainId: string) => {
+  setDefaultAsync: async (chainId: string): Promise<Result<string>> => {
     const { server, ready } = get()
-    if (!server || !ready) return
-    server.setDefault(chainId)
+    if (!server || !ready)
+      return { success: false, error: 'Server is not ready..' }
+    try {
+      let res = await server.setDefault(chainId)
+      return res
+    } catch (e) {
+      return { success: false, error: 'Failed to set Default chain..' }
+    }
   },
 }))

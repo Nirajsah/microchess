@@ -3,7 +3,7 @@ import { WasmManager } from './wasmManager'
 import { ClientManager } from './clientManager'
 import { WalletManager } from './walletManager'
 
-type Result<T> =
+export type Result<T> =
   | { success: true; result: T }
   | { success: false; error: string }
 
@@ -165,7 +165,7 @@ export class Server {
 
   async assign(data: {
     chainId: string
-    timestamp: string
+    timestamp: number
   }): Promise<Result<string>> {
     const res = await this._handleAssignment(data)
     return { success: true, result: res as string }
@@ -174,6 +174,11 @@ export class Server {
   async setDefault(chainId: string): Promise<Result<string>> {
     const res = await this._handleSetDefaultChain(chainId)
     return { success: true, result: res as string }
+  }
+
+  async getBalance(): Promise<string> {
+    const res = await this.client.getBalance()
+    return res as string
   }
 
   static async init(): Promise<Server> {

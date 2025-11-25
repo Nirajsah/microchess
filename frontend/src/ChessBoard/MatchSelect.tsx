@@ -19,7 +19,6 @@ import {
   startGame,
   storage,
 } from '@/api'
-import { useWalletNotifications } from '@/hooks/useWalletNotification'
 import { useWalletStore } from '@/store/wallet'
 
 const MatchSelect = () => {
@@ -68,6 +67,7 @@ const MatchSelect = () => {
   }
 
   const notification = useWalletStore((s) => s.notification)
+  const assignChainAsync = useWalletStore((s) => s.assignChainAsync)
 
   const [chainMetaData, setChainMetaData] = React.useState<{
     chainId: string
@@ -168,7 +168,7 @@ const MatchSelect = () => {
   const handleStart = () => {
     if (!chainMetaData) return
     try {
-      // assignChain(chainMetaData.chainId, chainMetaData.timestamp)
+      assignChainAsync(chainMetaData)
       storage.removeGameState()
     } catch (e) {
       console.log(e)
@@ -208,7 +208,7 @@ const MatchSelect = () => {
     storage.removeGameState()
   }
   return (
-    <div className="h-full w-full max-w-2xl mx-auto">
+    <div className="h-full w-full mx-auto">
       {/* Selection Screen */}
       {step === 'select' && (
         <div className="space-y-4 animate-in fade-in duration-300">
@@ -342,7 +342,7 @@ const MatchSelect = () => {
 
       {/* Random Match - Assign Required */}
       {step === 'random-assign' && chainMetaData && (
-        <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="space-y-6 animate-in fade-in duration-300 max-w-[400px]">
           <BackToMenu setStep={setStep} />
 
           <div className="rounded-2xl bg-blue-500/10 border-blue-500/20 p-8 space-y-6">
