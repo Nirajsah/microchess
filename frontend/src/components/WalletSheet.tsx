@@ -112,8 +112,8 @@ const LoadingState = () => {
                   isDone
                     ? 'bg-green-500/20 border-green-500/50 text-green-400'
                     : isActive
-                      ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
-                      : 'border-zinc-800'
+                    ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
+                    : 'border-zinc-800'
                 }`}
               >
                 {isDone ? (

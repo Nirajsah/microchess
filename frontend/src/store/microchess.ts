@@ -13,33 +13,52 @@ type Profile = {
 type UserSettings = {
   showProfile: boolean
   walletExists: boolean
+
   updateShowProfile: () => void
   updateWalletExists: () => void
 
-  userProfile: Profile | null
+  getStarted: boolean
+  userProfile: {
+    state: Profile | null
+    isLoading: boolean
+  }
+
+  handleGetStarted: () => void
   setUserProfile: (data: any) => void
+  updateName: (name: string) => void
 }
 
 export const useUserStore = create<UserSettings>((set) => ({
   showProfile: false,
   walletExists: false,
-  userProfile: null,
 
-  setUserProfile: (data: any) => {
+  updateShowProfile: () =>
+    set((state) => ({ showProfile: !state.showProfile })),
+
+  updateWalletExists: () =>
+    set((state) => ({ walletExists: !state.walletExists })),
+
+  userProfile: {
+    state: null,
+    isLoading: true,
+  },
+
+  getStarted: false,
+
+  handleGetStarted: () => set((state) => ({ getStarted: !state.getStarted })),
+
+  setUserProfile: (data) =>
     set(() => ({
-      userProfile: data,
-    }))
-  },
+      userProfile: {
+        state: data,
+        isLoading: false,
+      },
+    })),
 
-  updateShowProfile: () => {
-    set((state) => ({
-      showProfile: !state.showProfile,
-    }))
-  },
-
-  updateWalletExists: () => {
-    set((state) => ({
-      walletExists: !state.walletExists,
-    }))
+  updateName: (name: string) => {
+    set((state) => {
+      state.userProfile.state!.name = name
+      return state
+    })
   },
 }))

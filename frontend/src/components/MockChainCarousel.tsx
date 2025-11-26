@@ -1,30 +1,13 @@
-import { Convert } from '@/lib/chainsType'
 import { useWalletStore } from '@/store/wallet'
 import { ChevronLeft, ChevronRight, Copy, RefreshCw } from 'lucide-react'
-import React, { useRef } from 'react'
+import { useRef } from 'react'
 
 export function MockChainCarousel() {
   const scrollRef = useRef<HTMLDivElement>(null)
-  const rawWallet = useWalletStore((s) => s.JsWallet)
+  const chains = useWalletStore((s) => s.chains)
+  const defaultChain = useWalletStore((s) => s.defaultChain)
   const balance = useWalletStore((s) => s.chainBalance)
   const setDefault = useWalletStore((s) => s.setDefaultAsync)
-
-  const walletData = React.useMemo(() => {
-    if (!rawWallet) return null
-    try {
-      const wallet = Convert.toWallet(rawWallet)
-      return {
-        chains: Object.values(wallet.chains),
-        defaultChain: wallet.defaultChain,
-      }
-    } catch (e) {
-      console.error('Failed to parse wallet:', e)
-      return null
-    }
-  }, [rawWallet])
-
-  const chains = walletData?.chains || null
-  const defaultChain = walletData?.defaultChain || ''
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -48,7 +31,7 @@ export function MockChainCarousel() {
   }
 
   // 3. Loading State: Show Skeleton Card
-  if (!chains) {
+  if (!chains || !chains.length) {
     return (
       <div className="w-full h-full max-w-full flex items-center justify-center p-2">
         {/* Skeleton Card */}
@@ -88,22 +71,18 @@ export function MockChainCarousel() {
     )
   }
 
-  // 4. Render Carousel
   return (
-    <div className="w-full h-full max-w-full">
-      {/* Navigation Buttons (Absolute Positioned) */}
+    <div className="w-full h-full relative max-w-full group">
       <button
         onClick={() => scroll('left')}
-        className="absolute left-0 bottom-0 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-0 group-hover:opacity-100 disabled:opacity-0 m-2"
-        aria-label="Scroll left"
+        className="absolute left-2 -bottom-2 -translate-y-1/2 bg-[#242f24] p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity z-20"
       >
         <ChevronLeft size={20} />
       </button>
 
       <button
         onClick={() => scroll('right')}
-        className="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-0 group-hover:opacity-100 disabled:opacity-0 m-2"
-        aria-label="Scroll right"
+        className="absolute right-2 -bottom-2 -translate-y-1/2 bg-[#242424] p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity z-20"
       >
         <ChevronRight size={20} />
       </button>
@@ -116,7 +95,7 @@ export function MockChainCarousel() {
         }}
         className="flex w-full h-full overflow-y-hidden overflow-x-auto scroll-smooth snap-x snap-mandatory no-scrollbar gap-2"
       >
-        {chains.map((chain, i) => (
+        {chains?.map((chain, i) => (
           <div
             key={i}
             className="relative w-full min-w-[94%] bg-transparent flex items-center justify-center snap-center"
@@ -243,12 +222,12 @@ export function MockChainCarousel() {
             </svg>
 
             <div className="absolute font-sansation w-full top-0 inset-0 flex flex-col justify-between z-10 text-white">
-              <div className="bottom-0 absolute w-full py-4 mb-4 px-5">
-                <div className="flex">
+              <div className="bottom-0 absolute top-10 w-full py-4 mb-4 px-5">
+                <div className="flex mb-2">
                   <div className="text-[40px] font-bold">{balance}</div>
                 </div>
 
-                <div className="flex w-full py-4 space-y-2 flex-col justify-between items-start">
+                <div className="flex w-full space-y-2 flex-col justify-between items-start">
                   <span className="flex items-center gap-2 rounded-full text-sm w-full min-w-0">
                     <span className="flex w-full gap-1 items-center">
                       ChainId:

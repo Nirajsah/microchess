@@ -23,11 +23,12 @@ const formatElo = (elo?: number) => elo ?? 0
 const formatNumber = (num?: number) => num ?? 0
 
 export const PlayerProfile = () => {
-  const profile = useUserStore((s) => s.userProfile)
+  const { state: user, isLoading } = useUserStore((s) => s.userProfile)
+  const updateName = useUserStore((s) => s.updateName)
+  const [tempName, setTempName] = React.useState('Player')
+  const [isEditingName, setIsEditingName] = React.useState(false)
 
   const [activeTab, setActiveTab] = React.useState<'stats' | 'matches'>('stats')
-  const [isEditingName, setIsEditingName] = React.useState(false)
-  const [tempName, setTempName] = React.useState('')
   const [matcheHistory, setMatchHistory] = React.useState<MatchHistory[]>([
     {
       you: {
@@ -42,28 +43,20 @@ export const PlayerProfile = () => {
     },
   ])
 
-  const user = React.useMemo(() => {
-    return {
-      name: profile?.name || 'Player',
-      elo: formatElo(profile?.elo),
-      matches: formatNumber(profile?.matches),
-      won: formatNumber(profile?.won),
-      lost: formatNumber(profile?.lost),
-      ath: formatElo(profile?.ath),
-      id: profile?.id || 'update your profile',
-      draws: formatNumber(0),
-    }
-  }, [profile])
+  let draws = 0
 
   React.useEffect(() => {
     const fetchMatches = async () => {
       const data = await getMatchHistory()
       setMatchHistory(JSON.parse(data.result).data.matchHistoryAll)
     }
+    if (!user) return
+    draws = user.matches - user.won - user.lost
     fetchMatches()
-  }, [profile])
+  }, [isLoading])
 
   const handleSaveName = () => {
+    updateName(tempName)
     setIsEditingName(false)
   }
 
@@ -71,24 +64,26 @@ export const PlayerProfile = () => {
     <div className="w-full space-y-4 max-h-[68%]">
       {/* ─── HEADER (Profile Image + Name + Rank) ────────────────────────── */}
       <div className="flex items-center gap-4">
-        {!user ? (
+        {isLoading ? (
           <Skeleton className="w-14 h-14 rounded-2xl" />
         ) : (
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-3xl font-bold">
-            {user.name.charAt(0).toUpperCase()}
+            {user?.name.charAt(0).toUpperCase()}
           </div>
         )}
 
         {/* Name + Rank */}
         <div className="flex flex-col">
-          {!user ? (
+          {isLoading ? (
             <>
               <Skeleton className="h-6 w-32 rounded-md" />
               <Skeleton className="h-4 w-20 rounded-md" />
             </>
           ) : (
             <>
-              {isEditingName ? (
+              {user?.name ? (
+                <div></div>
+              ) : (
                 <div className="flex items-center gap-2">
                   <input
                     className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1 text-white"
@@ -109,22 +104,21 @@ export const PlayerProfile = () => {
                     <X size={14} className="text-red-400" />
                   </button>
                 </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-bold">{user.name}</h2>
-                  <button
-                    onClick={() => {
-                      setTempName(user.name)
-                      setIsEditingName(true)
-                    }}
-                    className="p-1 rounded-md hover:bg-zinc-700"
-                  >
-                    <Edit2 size={14} className="text-zinc-500" />
-                  </button>
-                </div>
+                // <div className="flex items-center gap-2">
+                //   <h2 className="text-xl font-bold">{user.name}</h2>
+                //   <button
+                //     onClick={() => {
+                //       setTempName(user.name)
+                //       setIsEditingName(true)
+                //     }}
+                //     className="p-1 rounded-md hover:bg-zinc-700"
+                //   >
+                //     <Edit2 size={14} className="text-zinc-500" />
+                //   </button>
+                // </div>
               )}
               <p className="text-xs text-zinc-400 mt-0.5 max-w-[270px] truncate">
-                {user.id}
+                {user?.id}
               </p>
             </>
           )}
@@ -156,7 +150,7 @@ export const PlayerProfile = () => {
 
       {activeTab === 'stats' && (
         <div className="space-y-4 max-h-[42%]">
-          {!user ? (
+          {isLoading ? (
             <Skeleton className="h-[74px] w-full rounded-xl" />
           ) : (
             <div className="rounded-xl bg-zinc-800/40 border border-zinc-700/50 px-4 py-2">
@@ -166,14 +160,14 @@ export const PlayerProfile = () => {
                   Rating
                 </div>
                 <span className="text-2xl font-bold text-amber-400">
-                  {user.elo}
+                  {user?.elo}
                 </span>
               </div>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-4">
-            {!user ? (
+            {isLoading ? (
               <>
                 <Skeleton className="h-[90px] rounded-xl" />
                 <Skeleton className="h-[90px] rounded-xl" />
@@ -182,13 +176,13 @@ export const PlayerProfile = () => {
               <>
                 <div className="rounded-xl bg-zinc-800/40 p-4 text-center border border-zinc-700/50">
                   <Target className="text-blue-400 mx-auto mb-2" />
-                  <p className="text-2xl font-bold">{user.matches}</p>
+                  <p className="text-2xl font-bold">{user?.matches}</p>
                   <p className="text-xs text-zinc-400">Games Played</p>
                 </div>
 
                 <div className="rounded-xl bg-zinc-800/40 p-4 text-center border border-zinc-700/50">
                   <ThumbsUpIcon className="text-green-400 mx-auto mb-2" />
-                  <p className="text-2xl font-bold">{user.ath}</p>
+                  <p className="text-2xl font-bold">{user?.ath}</p>
                   <p className="text-xs text-zinc-400">ATH</p>
                 </div>
               </>
@@ -196,7 +190,7 @@ export const PlayerProfile = () => {
           </div>
 
           <div className="space-y-2">
-            {!user ? (
+            {isLoading ? (
               <>
                 <Skeleton className="h-[46px] w-full rounded-lg" />
                 <Skeleton className="h-[46px] w-full rounded-lg" />
@@ -206,17 +200,17 @@ export const PlayerProfile = () => {
               <>
                 <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                   <span className="text-sm text-zinc-300">Wins</span>
-                  <span className="font-bold text-green-400">{user.won}</span>
+                  <span className="font-bold text-green-400">{user?.won}</span>
                 </div>
 
                 <div className="flex items-center justify-between p-3 rounded-lg bg-red-500/10 border border-red-500/20">
                   <span className="text-sm text-zinc-300">Losses</span>
-                  <span className="font-bold text-red-400">{user.lost}</span>
+                  <span className="font-bold text-red-400">{user?.lost}</span>
                 </div>
 
                 <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-500/10 border border-zinc-500/20">
                   <span className="text-sm text-zinc-300">Draws</span>
-                  <span className="font-bold text-zinc-400">{user.draws}</span>
+                  <span className="font-bold text-zinc-400">{draws}</span>
                 </div>
               </>
             )}
@@ -232,13 +226,14 @@ export const PlayerProfile = () => {
           }}
           className="space-y-2 overflow-scroll max-h-[70%]"
         >
-          {!user ? (
+          {isLoading ? (
             <>
               <Skeleton className="h-[66px] w-full rounded-lg" />
               <Skeleton className="h-[66px] w-full rounded-lg" />
               <Skeleton className="h-[66px] w-full rounded-lg" />
             </>
           ) : (
+            matcheHistory.length === 0 &&
             matcheHistory.map((m: MatchHistory, index) => (
               <div
                 key={index}

@@ -10,15 +10,15 @@ export default function Navbar() {
   const initAsync = useWalletStore((s) => s.initAsync)
   const ready = useWalletStore((s) => s.ready)
 
-  React.useEffect(() => {
-    checkWalletExistsAsync()
-  }, [])
+  // React.useEffect(() => {
+  //   checkWalletExistsAsync()
+  // }, [])
 
-  React.useEffect(() => {
-    if (walletExists && !ready) {
-      initAsync()
-    }
-  }, [walletExists])
+  // React.useEffect(() => {
+  //   if (walletExists && !ready) {
+  //     initAsync()
+  //   }
+  // }, [walletExists])
 
   return (
     <div className="w-full h-14 p-3 flex justify-center">

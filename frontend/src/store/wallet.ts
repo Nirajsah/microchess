@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { Result, Server } from 'croissant/wallet'
 import { checkWalletExists } from '@/lib/checkWalletExist'
-import { Convert } from '@/lib/chainsType'
+import { ChainInfo, Convert } from '@/lib/chainsType'
 
 type Request = {
   type: 'QUERY'
@@ -10,25 +10,30 @@ type Request = {
 }
 
 type WalletStore = {
+  /** Foundational Setup */
   server: Server | null
   ready: boolean
   notification: any
   walletExists: boolean
-  JsWallet: string | null
-  chainBalance: string
-  pubKey: string | null
 
   initAsync: () => Promise<void>
-  requestAsync: (req: Request) => Promise<void>
-  checkWalletExistAsync: () => Promise<void>
-
   createWalletAsync: () => Promise<void>
+  checkWalletExistAsync: () => Promise<void>
+  getJsWalletAsync: () => Promise<void>
+
+  /** Basic UI/UX Setup */
+  chainBalance: string
+  pubKey: string | null
+  defaultChain: string | null
+  chains: ChainInfo[] | null
+
+  /** User methods */
+  requestAsync: (req: Request) => Promise<void>
   assignChainAsync: (data: {
     chainId: string
     timestamp: number
   }) => Promise<Result<string>>
   setDefaultAsync: (chainId: string) => Promise<Result<string>>
-  getJsWalletAsync: () => Promise<void>
 }
 
 export const useWalletStore = create<WalletStore>((set, get) => ({
@@ -36,18 +41,23 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   ready: false,
   notification: null,
   walletExists: false,
-  JsWallet: null,
   chainBalance: '',
+
   pubKey: null,
+  defaultChain: null,
+  chains: null,
 
   getJsWalletAsync: async () => {
     const { walletExists, server } = get()
 
     if (!walletExists || !server) return
     try {
-      const wallet = await server.JsWallet()
-      const id = Object.values(Convert.toWallet(wallet).chains)[0].owner
-      set({ JsWallet: wallet, pubKey: id })
+      const res = await server.JsWallet()
+      const wallet = Convert.toWallet(res)
+      const defaultChain = wallet.defaultChain
+      const chains = Object.values(wallet.chains)
+      const id = chains[0].owner
+      set({ chains, pubKey: id, defaultChain })
     } catch (e: any) {
       return e
     }

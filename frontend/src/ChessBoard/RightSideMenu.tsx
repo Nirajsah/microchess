@@ -6,6 +6,7 @@ import MatchDataUI from './MatchData'
 import { PieceRow } from './CapturedPieces'
 import { GameControls } from './GameControls'
 import { useWalletStore } from '@/store/wallet'
+import { useBoard } from '@/store/board'
 
 export const PieceMap: any = {
   bP: '♙',
@@ -48,7 +49,7 @@ export interface MatchData {
 export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
   const { setIsGameChain, capturedPieces } = matchData
 
-  const [playMatch, setPlayMatch] = React.useState(false)
+  const [playMatch, setPlayMatch] = React.useState(true)
   const ready = useWalletStore((s) => s.ready)
 
   React.useEffect(() => {
@@ -74,6 +75,7 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
 
   const blackPieces = capturedPieces?.filter((p) => p.startsWith('b')) || []
   const whitePieces = capturedPieces?.filter((p) => p.startsWith('w')) || []
+  const localMakeMove = useBoard((s) => s.localMakeMove)
 
   return (
     <div className="w-full h-[400px] flex justify-center items-center">
@@ -86,7 +88,9 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
             <GameControls
               onStart={() => console.log('Start')}
               onBack={() => console.log('Back')}
-              onPlay={() => console.log('Play')}
+              onPlay={() => {
+                console.log('Play')
+              }}
               onNext={() => console.log('Next')}
               onEnd={() => console.log('End')}
               onStop={() => console.log('Stop')}

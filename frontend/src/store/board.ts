@@ -10,7 +10,18 @@ type BoardState = {
   localMakeMove: (from: string, to: string, piece: string) => void
 }
 
-export const useBoard = create<BoardState>((set) => ({
+const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+const ranks = ['1', '2', '3', '4', '5', '6', '7', '8']
+
+function squareToCoords(square: any) {
+  return { file: square[0], rank: square[1] }
+}
+
+function pieceIs(piece: any, type: any) {
+  return piece.toLowerCase() === type.toLowerCase()
+}
+
+export const useBoard = create<BoardState>((set, get) => ({
   state: {
     position: {},
     KingInCheck: '',
@@ -89,6 +100,7 @@ export const useBoard = create<BoardState>((set) => ({
 
   localMakeMove: (from: string, to: string, piece: string) => {
     // Optimistically update UI immediately
+    console.log('move made')
     set((state) => {
       const position: any = { ...state.state.position }
       if (position[to]) {

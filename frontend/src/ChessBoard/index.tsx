@@ -10,9 +10,8 @@ import {
 import { RightSideMenu } from './RightSideMenu'
 import { useBoard } from '@/store/board'
 import Board from './Board'
-import { capturedPiece, gameData, makeMove } from '@/api'
+import { capturedPiece, makeMove } from '@/api'
 import { PlayerInfo } from './PlayerInfo'
-import { GameControls } from './GameControls'
 
 import { useWalletStore } from '@/store/wallet'
 import Navbar from '@/components/ChessBoard/Navbar'
@@ -169,7 +168,8 @@ const ChessBoard = () => {
           <div className="w-full h-full flex-1 rounded-[18px]">
             <RightSideMenu
               player={board.player_turn || '-'}
-              color={board.color}
+              // color={board.color}
+              color={'Black'}
               checkStatus={board.KingInCheck}
               opponentId={board.opponent}
               game_state={board.game_state}
