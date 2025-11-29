@@ -5,7 +5,9 @@
 use chess::{playerprofile::PlayerProfile, ChessAbi, GameChain, InstantiationArgument, Operation};
 use linera_chain::types::ConfirmedBlockCertificate;
 use linera_sdk::{
-    linera_base_types::{ApplicationId, TimeDelta},
+    linera_base_types::{
+        AccountSecretKey, ApplicationId, BlobType, ChainDescription, Secp256k1SecretKey, TimeDelta,
+    },
     serde_json,
     test::{ActiveChain, QueryOutcome, TestValidator},
 };
@@ -51,13 +53,47 @@ async fn application_test() {
     // Player 2 requests game - capture certificate
     let player2_certificate = test_request_new_game(player_2_chain.clone(), app_id).await;
 
+    let key_pair1 = player_1_chain.key_pair();
+    let key_pair2 = player_2_chain.key_pair();
+
     // App chain processes player 2's request
-    app_chain
+    let certificate = app_chain
         .add_block(|block| {
             block.with_messages_from(&player2_certificate);
         })
         .await;
 
+    let block = certificate.inner().block();
+    let description = block
+        .created_blobs()
+        .into_iter()
+        .filter_map(|(blob_id, blob)| {
+            (blob_id.blob_type == BlobType::ChainDescription)
+                .then(|| bcs::from_bytes::<ChainDescription>(blob.content().bytes()).unwrap())
+        })
+        .next()
+        .unwrap();
+
+    let mut game_chain = ActiveChain::new(key_pair1.copy(), description, validator);
+
+    game_chain
+        .add_block(|block| {
+            block.with_messages_from(&certificate);
+            block.with_operation(
+                app_id,
+                Operation::MakeMove {
+                    from: "e2".to_string(),
+                    to: "e4".to_string(),
+                    piece: "wP".to_string(),
+                },
+            );
+        })
+        .await;
+
+    let QueryOutcome { response, .. } =
+        game_chain.graphql_query(app_id, "query { mvString }").await;
+
+    
     // Player 1 processes messages from app_chain (receives GameChainData)
     player_1_chain.handle_received_messages().await;
 
@@ -249,11 +285,17 @@ async fn create_player_profile(
 
 /*
 1. Operations:
-        NewGame,
-        FrGame,
-        FrGameHash {
-            token: String,
-        },
+
+        /*
+            Profile {
+                name: String,
+            },
+            NewGame,
+            FrGame,
+            FrGameHash {
+                token: String,
+            },
+        */
 
         // match operations
         MakeMove {
@@ -271,7 +313,5 @@ async fn create_player_profile(
         DeleteChainMetadata,
         // basic user operations
         Subscribe,
-        Profile {
-            name: String,
-        },
+
 */
