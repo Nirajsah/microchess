@@ -7,6 +7,7 @@ export function MockChainCarousel() {
   const chains = useWalletStore((s) => s.chains)
   const defaultChain = useWalletStore((s) => s.defaultChain)
   const balance = useWalletStore((s) => s.chainBalance)
+  const setRefetch = useWalletStore((s) => s.setRefetch)
   const setDefault = useWalletStore((s) => s.setDefaultAsync)
 
   const handleCopy = (text: string) => {
@@ -15,8 +16,7 @@ export function MockChainCarousel() {
   }
 
   const handleSetDefault = async (chainId: string) => {
-    await setDefault(chainId)
-    console.log('Setting default:', chainId)
+    await setDefault(chainId).then(() => setRefetch())
   }
 
   const scroll = (direction: 'left' | 'right') => {
@@ -75,14 +75,14 @@ export function MockChainCarousel() {
     <div className="w-full h-full relative max-w-full group">
       <button
         onClick={() => scroll('left')}
-        className="absolute left-2 -bottom-2 -translate-y-1/2 bg-[#242f24] p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity z-20"
+        className="absolute left-12 -bottom-2 -translate-y-1/2 bg-gray-700/40 p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity z-20"
       >
         <ChevronLeft size={20} />
       </button>
 
       <button
         onClick={() => scroll('right')}
-        className="absolute right-2 -bottom-2 -translate-y-1/2 bg-[#242424] p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity z-20"
+        className="absolute right-12 -bottom-2 -translate-y-1/2 bg-gray-700/40 p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity z-20"
       >
         <ChevronRight size={20} />
       </button>

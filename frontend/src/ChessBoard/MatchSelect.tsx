@@ -1,4 +1,4 @@
-import React, { useReducer, useState } from 'react'
+import React from 'react'
 import {
   Shuffle,
   Users,
@@ -20,6 +20,7 @@ import {
   storage,
 } from '@/api'
 import { useWalletStore } from '@/store/wallet'
+import { useSearchParams } from 'react-router-dom'
 
 const MatchSelect = () => {
   type MatchState =
@@ -45,7 +46,7 @@ const MatchSelect = () => {
 
       case 'RANDOM_ASSIGNED':
         return {
-          status: 'random.assigned',
+          status: 'random.ready',
           chainId: event.chainId,
           timestamp: event.timestamp,
         }
@@ -70,42 +71,137 @@ const MatchSelect = () => {
     }
   }
 
-  const saved = storage.getGameState()
-  const initial: MatchState = { status: saved ? saved : 'idle' }
+  const notification = useWalletStore((s) => s.notification)
+  const ready = useWalletStore((s) => s.ready)
+
+  let saved = storage.getGameState()
+  if (saved === 'friendly.share' || saved === 'random.ready') {
+    saved = 'idle'
+  }
+  const initial: MatchState = { status: saved ? (saved as any) : 'idle' }
 
   const [state, dispatch] = React.useReducer(reducer, initial)
+  const [searchParams] = useSearchParams()
 
   React.useEffect(() => {
-    storage.setGameState(state)
+    storage.setGameState(state.status)
   }, [state])
 
-  const BackToMenu = ({
-    setStep,
-  }: {
-    setStep: React.Dispatch<React.SetStateAction<any>>
-  }) => {
-    return (
-      <button
-        onClick={() => {
-          setStep('select')
-        }}
-        className="relative z-20 flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800/50 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-400 hover:text-white transition-all cursor-pointer pointer-events-auto"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>Back to menu</span>
-      </button>
-    )
+  React.useEffect(() => {
+    const hash = searchParams.get('gamehash') || ''
+    if (hash.length > 0) {
+      dispatch({ type: 'JOIN_FRIENDLY' })
+    }
+  }, [])
+
+  const back = () => {
+    dispatch({ type: 'RESET' })
+  }
+
+  const startRandom = async () => {
+    if (ready) {
+      dispatch({ type: 'START_RANDOM' })
+      await startGame()
+    }
+  }
+
+  // fetch gameChainInfo(chainId, timestamp)
+  const fetchGameChainInfo = async () => {
+    const chain = await getGameChainInfo()
+    const data = JSON.parse(chain.result).data.gameChain
+    if (data && data.chainId) {
+      dispatch({ type: 'RANDOM_ASSIGNED', ...data })
+    }
+  }
+
+  // creates a new personalId to share with friend for friendly match
+  const requestFriendly = async () => {
+    if (ready) {
+      dispatch({ type: 'START_FRIENDLY' })
+      await reqFriendlyGame()
+    }
+  }
+
+  // this is FriendId passed to friend to start a friendly match
+  const getPersonalId = async () => {
+    const chain = await friendId()
+    const data = JSON.parse(chain.result).data.friendId
+    dispatch({ type: 'FRIENDLY_READY', gameHash: data })
+  }
+
+  const JoinWithHash = () => {
+    dispatch({ type: 'JOIN_FRIENDLY' })
   }
 
   const handleCancel = () => {
-    storage.removeGameState()
+    dispatch({ type: 'RESET' })
   }
-  return <div className="h-full w-full mx-auto"></div>
+
+  React.useEffect(() => {
+    if (state.status === 'random.loading') {
+      fetchGameChainInfo()
+    }
+    if (state.status === 'friendly.loading') {
+      getPersonalId()
+    }
+  }, [state.status, notification])
+
+  React.useEffect(() => {
+    if (state.status === 'friendly.share' || state.status === 'friendly.join') {
+      fetchGameChainInfo()
+    }
+  }, [notification])
+
+  return (
+    <div className="h-full w-full mx-auto">
+      {state.status === 'idle' && (
+        <MatchTypeSelection
+          requestRandom={startRandom}
+          requestFriendly={requestFriendly}
+          JoinWithHash={JoinWithHash}
+        />
+      )}
+
+      {state.status === 'random.loading' && (
+        <RandomLoading cancel={handleCancel} />
+      )}
+      {state.status === 'random.ready' && (
+        <RandomAssignScreen
+          chainId={state.chainId}
+          timestamp={state.timestamp}
+          back={back}
+        />
+      )}
+      {state.status === 'friendly.loading' && (
+        <FriendlyLoading cancel={handleCancel} />
+      )}
+      {state.status === 'friendly.share' && (
+        <FriendlyShare gameHash={state.gameHash} back={back} />
+      )}
+      {state.status === 'friendly.join' && <FriendlyJoin back={back} />}
+    </div>
+  )
 }
 
 export default MatchSelect
 
-function MatchTypeSelection() {
+const BackToMenu = ({ back }: any) => {
+  return (
+    <button
+      onClick={back}
+      className="relative z-20 flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800/50 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-400 hover:text-white transition-all cursor-pointer pointer-events-auto"
+    >
+      <ArrowLeft className="w-4 h-4" />
+      <span>Back to menu</span>
+    </button>
+  )
+}
+
+function MatchTypeSelection({
+  requestRandom,
+  requestFriendly,
+  JoinWithHash,
+}: any) {
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       {/* Header */}
@@ -123,7 +219,8 @@ function MatchTypeSelection() {
       <div className="grid md:grid-cols-2 gap-3">
         {/* Random Match Card */}
         <button
-          onClick={handleRandomMatch}
+          onClick={requestRandom}
+          // onClick={handleRandomMatch}
           className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 hover:border-blue-400/50 p-4 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-blue-500/20"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -153,7 +250,7 @@ function MatchTypeSelection() {
 
         {/* Friendly Match Card */}
         <button
-          onClick={handleFriendlyMatch}
+          onClick={requestFriendly}
           className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 hover:border-green-400/50 p-4 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/20"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -194,7 +291,7 @@ function MatchTypeSelection() {
       </div>
 
       <button
-        onClick={() => setStep('friendly-join')}
+        onClick={JoinWithHash}
         className="w-full group relative overflow-hidden rounded-xl bg-zinc-900/50 border border-zinc-800 hover:border-purple-500/50 p-6 text-center transition-all duration-300 hover:scale-[1.01]"
       >
         <div className="flex items-center justify-center gap-3">
@@ -209,7 +306,7 @@ function MatchTypeSelection() {
   )
 }
 
-function RandomLoading() {
+function RandomLoading({ cancel }: any) {
   return (
     <div className="flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in duration-300 py-12">
       <div className="relative">
@@ -226,20 +323,38 @@ function RandomLoading() {
           Searching for players at your skill level
         </p>
       </div>
-      <button
-        onClick={handleCancel}
-        className="text-orange-400 hover:scale-105"
-      >
+      <button onClick={cancel} className="text-orange-400 hover:scale-105">
         Cancel
       </button>
     </div>
   )
 }
 
-function RandomAssignScreen({ data }) {
+function RandomAssignScreen({ chainId, timestamp, back }: any) {
+  const assignChain = useWalletStore((s) => s.assignChainAsync)
+  const handleStart = async () => {
+    try {
+      const res = await assignChain({ chainId, timestamp })
+      back() // just to reset the state
+      if (res.success) {
+        window.location.reload()
+      }
+    } catch (e) {
+      console.log(e)
+    }
+  }
+
+  const handleDeleteMetadata = () => {
+    try {
+      deleteInfo()
+      back() // just to reset the state
+    } catch (e) {
+      console.log(e)
+    }
+  }
   return (
     <div className="space-y-6 animate-in fade-in duration-300 max-w-[400px]">
-      <BackToMenu setStep={setStep} />
+      <BackToMenu back={back} />
 
       <div className="rounded-2xl bg-blue-500/10 border-blue-500/20 p-8 space-y-6">
         <div className="text-center space-y-2">
@@ -254,14 +369,12 @@ function RandomAssignScreen({ data }) {
           <div className="flex justify-between items-center">
             <span className="text-white font-mono truncate">
               <span className="text-zinc-400 text-sm">ChainId: </span>
-              {chainMetaData?.chainId}
+              {chainId}
             </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-zinc-400 text-sm">Timestamp:</span>
-            <span className="text-white font-mono">
-              {chainMetaData?.timestamp}
-            </span>
+            <span className="text-white font-mono">{timestamp}</span>
           </div>
         </div>
 
@@ -283,7 +396,7 @@ function RandomAssignScreen({ data }) {
   )
 }
 
-function FriendlyLoading() {
+function FriendlyLoading({ cancel }: any) {
   return (
     <div className="flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in duration-300 py-12">
       <div className="relative">
@@ -299,20 +412,25 @@ function FriendlyLoading() {
         <p className="text-zinc-400">Setting up your friendly match</p>
       </div>
 
-      <button
-        onClick={handleCancel}
-        className="text-orange-400 hover:scale-105"
-      >
+      <button onClick={cancel} className="text-orange-400 hover:scale-105">
         Cancel
       </button>
     </div>
   )
 }
 
-function FriendlyShare({ gameHash }) {
+function FriendlyShare({ gameHash, back }: any) {
+  const [copied, setCopied] = React.useState(false)
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <BackToMenu setStep={setStep} />
+      <BackToMenu back={back} />
 
       <div className="rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 p-4 space-y-6">
         <div className="text-center space-y-4">
@@ -358,7 +476,7 @@ function FriendlyShare({ gameHash }) {
             className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold py-4 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-green-500/50 flex items-center justify-center gap-2"
           >
             <Users className="w-5 h-5" />
-            <span>{copied ? 'Link Copied!' : 'Copy Invitation Link'}</span>
+            {/* <span>{copied ? 'Link Copied!' : 'Copy Invitation Link'}</span> */}
           </button>
         </div>
 
@@ -372,10 +490,23 @@ function FriendlyShare({ gameHash }) {
   )
 }
 
-function FriendlyJoin() {
+function FriendlyJoin({ back }: any) {
+  const [gameHash, setGameHash] = React.useState('')
+  const [searchParams] = useSearchParams()
+
+  React.useEffect(() => {
+    const hash = searchParams.get('gamehash') || ''
+    setGameHash(hash)
+  }, [])
+
+  // starts a friendly match using the friends hash
+  const invokeFriendlyMatch = async (hash: string) => {
+    await gameWithToken(hash)
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <BackToMenu setStep={setStep} />
+      <BackToMenu back={back} />
 
       <div className="rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 p-4 space-y-6">
         <div className="text-center space-y-2">
@@ -395,16 +526,15 @@ function FriendlyJoin() {
             </label>
             <input
               type="text"
-              value={inputHash}
-              onChange={(e) => setInputHash(e.target.value)}
+              value={gameHash}
+              onChange={(e) => setGameHash(e.target.value)}
               placeholder="Enter game hash..."
               className="w-full bg-zinc-900/80 border border-zinc-700 focus:border-purple-500 rounded-xl px-4 py-4 text-white font-mono placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
             />
           </div>
 
           <button
-            onClick={handleJoinMatch}
-            disabled={!inputHash.trim()}
+            onClick={() => invokeFriendlyMatch(gameHash.trim())}
             className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/50 disabled:hover:scale-100 disabled:hover:shadow-none flex items-center justify-center gap-2"
           >
             <Play className="w-5 h-5" />

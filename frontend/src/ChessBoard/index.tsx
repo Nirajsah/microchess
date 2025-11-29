@@ -1,12 +1,7 @@
 import React from 'react'
-import Ranks from '../components/ChessBoard/Ranks'
-import Files from '../components/ChessBoard/Files'
-import {
-  Color,
-  Piece,
-  PromoteData,
-  Square,
-} from '../components/ChessBoard/types'
+import Ranks from './Ranks'
+import Files from './Files'
+import { Color, Piece, PromoteData, Square } from './types'
 import { RightSideMenu } from './RightSideMenu'
 import { useBoard } from '@/store/board'
 import Board from './Board'
@@ -14,9 +9,9 @@ import { capturedPiece, makeMove } from '@/api'
 import { PlayerInfo } from './PlayerInfo'
 
 import { useWalletStore } from '@/store/wallet'
-import Navbar from '@/components/ChessBoard/Navbar'
+import Navbar from '@/ChessBoard/Navbar'
 import LeftMenu from '@/components/LeftSideMenu'
-import { PromotionCard } from '@/components/ChessBoard/PromotionCard'
+import { PromotionCard } from './PromotionCard'
 
 const ChessBoard = () => {
   const {
@@ -73,8 +68,8 @@ const ChessBoard = () => {
       })
       return
     }
-    const audio = new Audio('/move-sound.mp3')
-    audio.play().catch((e) => console.log('Audio play failed', e))
+    // const audio = new Audio('/move-sound.mp3')
+    // audio.play().catch((e) => console.log('Audio play failed', e))
 
     // updates the local board
     localMakeMove(selectedSquare, to_square, piece)
@@ -110,7 +105,7 @@ const ChessBoard = () => {
     <div className="relative min-h-full w-full bg-[#161616]">
       <LeftMenu />
       <Navbar />
-      <div className="flex justify-center items-center gap-4">
+      <div className="flex justify-center items-center gap-4 flex-col lg:flex-row">
         <div className="w-full max-w-[720px] bg-[#262626] p-2.5 rounded-[18px]">
           {board.color && board.timer && (
             <div className="w-full flex justify-between">
@@ -164,16 +159,12 @@ const ChessBoard = () => {
             </div>
           )}
         </div>
-        <div className="flex flex-col h-full justify-center w-full max-w-[400px]">
+        <div className="flex flex-col h-full justify-center w-full max-w-[400px] mt-40 md:mt-20 lg:mt-0">
           <div className="w-full h-full flex-1 rounded-[18px]">
             <RightSideMenu
-              player={board.player_turn || '-'}
-              // color={board.color}
-              color={'Black'}
+              color={board.color}
               checkStatus={board.KingInCheck}
-              opponentId={board.opponent}
               game_state={board.game_state}
-              timer={board.timer}
               setIsGameChain={setIsGameChain}
               capturedPieces={capturedPieces}
             />

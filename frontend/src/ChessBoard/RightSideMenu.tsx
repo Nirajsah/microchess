@@ -1,4 +1,4 @@
-import { Color, PieceColor } from '../components/ChessBoard/types'
+import { Color } from './types'
 import React from 'react'
 import { isGameChain } from '@/api'
 import MatchSelect from './MatchSelect'
@@ -6,7 +6,7 @@ import MatchDataUI from './MatchData'
 import { PieceRow } from './CapturedPieces'
 import { GameControls } from './GameControls'
 import { useWalletStore } from '@/store/wallet'
-import { useBoard } from '@/store/board'
+import { ResignButton } from '@/ChessBoard/ResignButton'
 
 export const PieceMap: any = {
   bP: '♙',
@@ -33,15 +33,9 @@ export const pieceOrder: { [key: string]: number } = {
 }
 
 export interface MatchData {
-  player: PieceColor | '-'
   color?: Color
   checkStatus: string
-  opponentId: string | null
   game_state: string
-  timer: {
-    white: number
-    black: number
-  }
   setIsGameChain?: (value: boolean | null) => void
   capturedPieces: string[] | null
 }
@@ -49,7 +43,7 @@ export interface MatchData {
 export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
   const { setIsGameChain, capturedPieces } = matchData
 
-  const [playMatch, setPlayMatch] = React.useState(true)
+  const [playMatch, _setPlayMatch] = React.useState(false)
   const ready = useWalletStore((s) => s.ready)
 
   React.useEffect(() => {
@@ -57,8 +51,6 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
       try {
         const res = await isGameChain()
         const check = JSON.parse(res.result).data.isGameChain
-
-        console.log('is gamechain', check)
 
         if (setIsGameChain) {
           setIsGameChain(check)
@@ -75,33 +67,25 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
 
   const blackPieces = capturedPieces?.filter((p) => p.startsWith('b')) || []
   const whitePieces = capturedPieces?.filter((p) => p.startsWith('w')) || []
-  const localMakeMove = useBoard((s) => s.localMakeMove)
 
   return (
-    <div className="w-full h-[400px] flex justify-center items-center">
+    <div className="w-full h-[500px] flex justify-center items-center">
       {matchData.game_state !== 'Resign' &&
       (matchData.color === 'White' || matchData.color === 'Black') ? (
         <div className="w-full h-full flex flex-col">
           {capturedPieces && <PieceRow pieces={blackPieces} />}
 
-          {playMatch && (
-            <GameControls
-              onStart={() => console.log('Start')}
-              onBack={() => console.log('Back')}
-              onPlay={() => {
-                console.log('Play')
-              }}
-              onNext={() => console.log('Next')}
-              onEnd={() => console.log('End')}
-              onStop={() => console.log('Stop')}
-            />
-          )}
+          {playMatch && <GameControls />}
 
           <div className="w-full flex-1 overflow-hidden">
             <MatchDataUI {...matchData} />
           </div>
 
           {capturedPieces && <PieceRow pieces={whitePieces} />}
+
+          <div className="max-h-[100px]">
+            <ResignButton />
+          </div>
         </div>
       ) : (
         <div className="">

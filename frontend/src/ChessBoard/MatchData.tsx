@@ -1,48 +1,19 @@
 import React from 'react'
 import { AlertCircle } from 'lucide-react'
-import { Color } from '../components/ChessBoard/types'
-import { capturedPiece, getMvString, opponentProfile } from '@/api'
-// import { ResignButton } from './ResignButton'
+import { getMvString } from '@/api'
 import { useWalletStore } from '@/store/wallet'
-import { ResignButton } from '@/components/ChessBoard/ResignButton'
 
 interface MatchData {
-  player: string
-  color?: Color
-  opponentId: string | null
   checkStatus: string
-  timer: {
-    white: number
-    black: number
-  }
-  game_state: string
 }
 
 const MatchDataUI = (data: MatchData) => {
-  const { player, color, checkStatus, timer, game_state, opponentId } = data
-  const [opponent, setOpponent] = React.useState({
-    ath: 0,
-    elo: 0,
-    matches: 0,
-    name: null,
-  })
+  const { checkStatus } = data
   const [moves, setMoves] = React.useState<string[] | null>(null)
-  const [capturedPieces, setCapturedPieces] = React.useState<string[] | null>(
-    null
-  )
 
   const notification = useWalletStore((s) => s.notification)
 
   React.useEffect(() => {
-    const getCapturedPieces = async () => {
-      try {
-        const data = await capturedPiece()
-        const res = JSON.parse(data.result).data.capturedPieces
-        setCapturedPieces(res)
-      } catch (e) {
-        console.error('failed', e)
-      }
-    }
     const getMoves = async () => {
       try {
         const data = await getMvString()
@@ -52,7 +23,6 @@ const MatchDataUI = (data: MatchData) => {
         console.error('failed', e)
       }
     }
-    getCapturedPieces()
     getMoves()
   }, [notification])
 
@@ -67,26 +37,8 @@ const MatchDataUI = (data: MatchData) => {
     [moves]
   )
 
-  React.useEffect(() => {
-    const checkGameChain = async () => {
-      try {
-        const res = await opponentProfile(opponentId!)
-        const check = JSON.parse(res.result).data.opponentProfile
-        if (!check) {
-          return
-        }
-        setOpponent(check)
-      } catch (err) {
-        console.error('Error checking game chain:', err)
-      }
-    }
-
-    checkGameChain()
-  }, [opponentId])
-
   return (
     <div className="w-full h-full flex flex-col gap-4 bg-[#262626] rounded-xl">
-      {/* <ResignButton /> */}
       {/* Move History */}
       <div className="flex-1 rounded-xl border border-zinc-800 overflow-hidden flex flex-col min-h-full">
         <div className="border-b border-zinc-800 backdrop-blur-sm">

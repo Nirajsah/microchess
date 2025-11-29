@@ -1,16 +1,11 @@
 import React, { useRef, useState } from 'react'
-import {
-  BoardType,
-  Piece,
-  Square,
-  SquareToPieceMap,
-} from '../components/ChessBoard/types'
-import ChessTile from '../components/ChessBoard/ChessTile'
-import CustomDragLayer from '../components/ChessBoard/CustomDragLayer'
-import { useMicroChess } from '@/context/MicroChessProvider'
+import { BoardType, Piece, Square, SquareToPieceMap } from './types'
+import ChessTile from '../ChessBoard/ChessTile'
+import CustomDragLayer from './CustomDragLayer'
 import { FlagIcon, HandshakeIcon, TrophyIcon } from 'lucide-react'
-import { ThemeName, themes } from '@/components/ChessBoard/theme'
+import { ThemeName, themes } from '@/components/theme'
 import { chessWasm } from '@/lib/chessWasmClient'
+import { useUserStore } from '@/store/microchess'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
@@ -21,9 +16,10 @@ interface BoardProps {
 }
 
 export default function Board(props: BoardProps) {
-  const { chessSettings } = useMicroChess()
   const boardRef = useRef<HTMLDivElement>(null)
   const board = props.boardData.position
+
+  const theme = useUserStore((s) => s.theme)
 
   const [draggingPiece, setDraggingPiece] = useState<Piece | null>(null)
   const [dragPosition, setDragPosition] = useState({
@@ -142,7 +138,7 @@ export default function Board(props: BoardProps) {
     }
   }
 
-  const selectedTheme = themes[chessSettings.theme as ThemeName]
+  const selectedTheme = themes[theme as ThemeName]
 
   const getSquareColor = (
     square: Square,
@@ -267,26 +263,32 @@ const getGameOverInfo = (
 ) => {
   if (resigned) {
     return {
-      title: `${winner} wins!`,
-      detail: 'Resigned',
-      icon: <FlagIcon width={32} height={32} color="red" />,
-      color: 'bg-red-100 border-red-400 text-red-800',
+      title: `${winner} WINS!`,
+      detail: 'Victory by resignation',
+      icon: FlagIcon,
+      color:
+        'bg-gradient-to-br from-red-900/20 to-red-800/20 border-red-500/50 backdrop-blur-xl',
+      glow: 'shadow-red-500/25 shadow-xl',
     }
   }
   if (state === 'GameOver' && winner) {
     return {
-      title: `${winner} wins!`,
-      detail: 'Checkmate.',
-      icon: <TrophyIcon width={32} height={32} color="gold" />,
-      color: 'bg-yellow-50 border-yellow-400 text-yellow-800',
+      title: `${winner.toUpperCase()} WINS!`,
+      detail: 'Checkmate',
+      icon: TrophyIcon,
+      color:
+        'bg-gradient-to-br from-amber-900/30 to-yellow-800/20 border-amber-400/60 backdrop-blur-2xl',
+      glow: 'shadow-amber-400/30 shadow-2xl',
     }
   }
   if (state === 'GameOver' && !winner) {
     return {
-      title: 'Draw',
-      detail: 'Stalemate or repetition.',
-      icon: <HandshakeIcon width={32} height={32} color="slategray" />,
-      color: 'bg-gray-100 border-gray-400 text-gray-800',
+      title: 'DRAW',
+      detail: 'Perfect balance',
+      icon: HandshakeIcon,
+      color:
+        'bg-gradient-to-br from-slate-900/40 to-slate-800/20 border-slate-500/40 backdrop-blur-xl',
+      glow: 'shadow-slate-400/20 shadow-xl',
     }
   }
   return null
@@ -303,22 +305,28 @@ const GameOverDisplay = ({
 }) => {
   const info = getGameOverInfo(gameState, winner, resigned)
   if (!info) return null
+
   return (
-    <div className="absolute inset-0 flex items-center justify-center z-20 bg-black bg-opacity-50">
+    <div className="absolute inset-0 flex items-center justify-center z-50">
+      <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-slate-900/80 to-black/60 backdrop-blur-sm"></div>
       <div
-        className={`rounded-xl border-2 p-8 shadow-2xl flex flex-col items-center ${info.color}`}
+        className={`relative w-full max-w-[500px] py-6 px-10 rounded-2xl border-2 shadow-2xl flex flex-col items-center text-center overflow-hidden max-h-[85vh] ${
+          info.color
+        } ${info.glow}`}
       >
-        <div className="mb-1">{info.icon}</div>
-        <div className="text-lg font-extrabold tracking-wide mb-2">
-          {info.title}
+        <div className="absolute inset-0 rounded-2xl bg-blue-500/10 opacity-75"></div>
+        <div className="w-20 h-20 mb-3 flex items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 shadow-2xl">
+          <info.icon width={30} height={30} color="white" />
         </div>
-        <div className="text-xl">{info.detail}</div>
-        <button
-          className="mt-2 px-5 py-2 rounded bg-blue-600 text-white text-base font-medium hover:bg-blue-700 shadow"
-          // onClick={() => window.location.reload()}
-        >
-          Play Again, is not supported yet, switch to your main chain
-        </button>
+        <h2 className="text-xl truncate text-wrap max-w-[400px] md:text-2xl font-black tracking-tight mb-1 bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent drop-shadow-2xl">
+          {info.title}
+        </h2>
+        <p className="text-md font-medium text-slate-200/90 px-4 leading-relaxed">
+          {info.detail}
+        </p>
+        <div className="pt-4 text-white text-sm font-bold">
+          <span>Switch Chain</span>
+        </div>
       </div>
     </div>
   )
