@@ -124,10 +124,8 @@ export default function HomePage({ gameCount }: { gameCount: number }) {
 
               <div className="mt-10">
                 {[
-                  'Download Croissant from github',
-                  'Install Croissant Wallet Extension',
-                  'Create a new Wallet on Croissant',
-                  'Press "Connect" and approve the request',
+                  'Press "Get Started"',
+                  'Create a New Wallet',
                   'Click on "Play Now"',
                   'Select "Random" or "Friendly Match"',
                   'Click "Assign" and approve the request',

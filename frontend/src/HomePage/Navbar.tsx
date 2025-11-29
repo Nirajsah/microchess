@@ -3,9 +3,10 @@ import { useWalletStore } from '@/store/wallet'
 import React from 'react'
 
 export default function Navbar() {
-  const updateShowProfile = useUserStore((s) => s.updateShowProfile)
+  const handleGetStarted = useUserStore((s) => s.handleGetStarted)
   const checkWalletExistsAsync = useWalletStore((s) => s.checkWalletExistAsync)
   const walletExists = useWalletStore((s) => s.walletExists)
+  const pubKey = useWalletStore((s) => s.pubKey)
   const initAsync = useWalletStore((s) => s.initAsync)
 
   React.useEffect(() => {
@@ -24,7 +25,12 @@ export default function Navbar() {
         MicroChess
       </div>
 
-      <button onClick={updateShowProfile}>Open</button>
+      <button
+        onClick={handleGetStarted}
+        className="px-6 py-2 rounded-3xl hover:scale-105 duration-300 transition-all"
+      >
+        {pubKey ? pubKey : 'Get Started'}
+      </button>
     </div>
   )
 }

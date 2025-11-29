@@ -202,10 +202,6 @@ function l(typ: any) {
   return { literal: typ }
 }
 
-function a(typ: any) {
-  return { arrayItems: typ }
-}
-
 function u(...typs: any[]) {
   return { unionMembers: typs }
 }

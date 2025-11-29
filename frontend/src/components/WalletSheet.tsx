@@ -14,11 +14,12 @@ import { getProfile } from '@/api'
 import { Loader2, ShieldCheck, Wallet } from 'lucide-react'
 
 export default function WalletSheet() {
-  const isOpen = useUserStore((s) => s.showProfile)
-  const toggle = useUserStore((s) => s.updateShowProfile)
+  const isOpen = useUserStore((s) => s.getStarted)
+  const toggle = useUserStore((s) => s.handleGetStarted)
   const setProfile = useUserStore((s) => s.setUserProfile)
   const walletExists = useWalletStore((s) => s.walletExists)
   const ready = useWalletStore((s) => s.ready)
+  const refetch = useWalletStore((s) => s.refetch)
   const JsWallet = useWalletStore((s) => s.getJsWalletAsync)
 
   React.useEffect(() => {
@@ -35,7 +36,7 @@ export default function WalletSheet() {
     if (ready) {
       fetchProfile()
     }
-  }, [walletExists, ready])
+  }, [walletExists, ready, refetch])
 
   return (
     <Sheet open={isOpen} onOpenChange={toggle}>
@@ -112,8 +113,8 @@ const LoadingState = () => {
                   isDone
                     ? 'bg-green-500/20 border-green-500/50 text-green-400'
                     : isActive
-                    ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
-                    : 'border-zinc-800'
+                      ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
+                      : 'border-zinc-800'
                 }`}
               >
                 {isDone ? (
@@ -142,7 +143,7 @@ const LoadingState = () => {
 }
 
 const GetStarted = () => {
-  const toggle = useUserStore((s) => s.updateShowProfile)
+  const toggle = useUserStore((s) => s.handleGetStarted)
   const create = useWalletStore((s) => s.createWalletAsync)
   const [isCreating, setIsCreating] = useState(false)
 

@@ -1,24 +1,20 @@
-import { useMicroChess } from '../context/MicroChessProvider'
-import ThemePreviewGrid from './ChessBoard/ThemeGrid'
-import { ThemeName } from './ChessBoard/theme'
+import { useUserStore } from '@/store/microchess'
+import ThemePreviewGrid from './ThemeGrid'
+import { ThemeName } from './theme'
 
 const Themes = () => {
-  const { chessSettings, setChessSettings } = useMicroChess()
-  const themeSelected = chessSettings.theme
+  const updateTheme = useUserStore((s) => s.updateTheme)
+  const theme = useUserStore((s) => s.theme)
   function changeTheme(themeKey: ThemeName) {
-    setChessSettings({
-      ...chessSettings,
-      theme: themeKey,
-    })
+    updateTheme(themeKey)
   }
-
   return (
     <div className="font-fira rounded-xl h-[600px] flex justify-between">
       <div className="max-w-full h-full">
         <ThemePreviewGrid
-          selected={themeSelected}
+          selected={theme}
           onSelect={(themeKey) => {
-            changeTheme(themeKey)
+            changeTheme(themeKey as ThemeName)
           }}
         />
       </div>
