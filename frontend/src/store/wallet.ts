@@ -15,6 +15,7 @@ type WalletStore = {
   ready: boolean
   notification: any
   walletExists: boolean
+  refetch: boolean
 
   initAsync: () => Promise<void>
   createWalletAsync: () => Promise<void>
@@ -26,6 +27,7 @@ type WalletStore = {
   pubKey: string | null
   defaultChain: string | null
   chains: ChainInfo[] | null
+  setRefetch: () => void
 
   /** User methods */
   requestAsync: (req: Request) => Promise<void>
@@ -42,10 +44,18 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   notification: null,
   walletExists: false,
   chainBalance: '',
+  refetch: false,
 
   pubKey: null,
   defaultChain: null,
   chains: null,
+
+  setRefetch: () => {
+    const { refetch } = get()
+    set({
+      refetch: !refetch,
+    })
+  },
 
   getJsWalletAsync: async () => {
     const { walletExists, server } = get()
@@ -56,8 +66,9 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       const wallet = Convert.toWallet(res)
       const defaultChain = wallet.defaultChain
       const chains = Object.values(wallet.chains)
+      const bal = (await server.getBalance()) || '0'
       const id = chains[0].owner
-      set({ chains, pubKey: id, defaultChain })
+      set({ chains, pubKey: id, defaultChain, chainBalance: bal })
     } catch (e: any) {
       return e
     }
@@ -77,8 +88,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       await server.initClient((data) => {
         set((state) => (state.notification = data))
       })
-      const bal = (await server.getBalance()) || '0'
-      set({ server, ready: true, chainBalance: bal })
+      set({ server, ready: true })
     } catch {
       return
     }

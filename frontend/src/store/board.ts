@@ -1,5 +1,5 @@
 import { gameData, timer } from '@/api'
-import { BoardType, Color, PieceColor } from '@/components/ChessBoard/types'
+import { BoardType, Color, PieceColor } from '@/ChessBoard/types'
 import { chessWasm } from '@/lib/chessWasmClient'
 import { create } from 'zustand'
 
@@ -10,18 +10,7 @@ type BoardState = {
   localMakeMove: (from: string, to: string, piece: string) => void
 }
 
-const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-const ranks = ['1', '2', '3', '4', '5', '6', '7', '8']
-
-function squareToCoords(square: any) {
-  return { file: square[0], rank: square[1] }
-}
-
-function pieceIs(piece: any, type: any) {
-  return piece.toLowerCase() === type.toLowerCase()
-}
-
-export const useBoard = create<BoardState>((set, get) => ({
+export const useBoard = create<BoardState>((set) => ({
   state: {
     position: {},
     KingInCheck: '',

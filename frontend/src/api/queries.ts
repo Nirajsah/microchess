@@ -1,5 +1,5 @@
 import { useWalletStore } from '@/store/wallet.ts'
-import { Piece, Square } from '../components/ChessBoard/types.ts'
+import { Piece, Square } from '../ChessBoard/types.ts'
 
 // export function connect_wallet(): Promise<any> {
 //   if (!window.linera) throw new Error('Linera extension not found.')

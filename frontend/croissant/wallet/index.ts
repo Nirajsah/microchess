@@ -53,8 +53,8 @@ export class Server {
   }
 
   private async _faucetAction(op: OpType): Promise<Result<string>> {
-    const FAUCET_URL = 'http://localhost:8079'
-    // const FAUCET_URL = 'https://faucet.testnet-conway.linera.net/'
+    // const FAUCET_URL = 'http://localhost:8079'
+    const FAUCET_URL = 'https://faucet.testnet-conway.linera.net/'
     const faucet = new wasm.Faucet(FAUCET_URL)
     const handler = this.faucetHandlers[op]
     if (!handler) return { success: false, error: 'Invalid operation' }

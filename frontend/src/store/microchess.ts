@@ -1,3 +1,5 @@
+import { storage } from '@/api'
+import { ThemeName } from '@/components/theme'
 import { create } from 'zustand'
 
 type Profile = {
@@ -11,10 +13,10 @@ type Profile = {
 }
 
 type UserSettings = {
-  showProfile: boolean
   walletExists: boolean
+  theme: ThemeName
 
-  updateShowProfile: () => void
+  updateTheme: (theme: ThemeName) => void
   updateWalletExists: () => void
 
   getStarted: boolean
@@ -28,18 +30,22 @@ type UserSettings = {
   updateName: (name: string) => void
 }
 
-export const useUserStore = create<UserSettings>((set) => ({
-  showProfile: false,
+export const useUserStore = create<UserSettings>((set, get) => ({
   walletExists: false,
+  theme: 'classicWood' as ThemeName,
 
-  updateShowProfile: () =>
-    set((state) => ({ showProfile: !state.showProfile })),
-
+  updateTheme: (theme) => {
+    set({
+      theme,
+    })
+    storage.setTheme(theme)
+  },
   updateWalletExists: () =>
     set((state) => ({ walletExists: !state.walletExists })),
 
   userProfile: {
     state: null,
+    name: 'Player',
     isLoading: true,
   },
 
@@ -47,18 +53,20 @@ export const useUserStore = create<UserSettings>((set) => ({
 
   handleGetStarted: () => set((state) => ({ getStarted: !state.getStarted })),
 
-  setUserProfile: (data) =>
+  setUserProfile: (data) => {
     set(() => ({
       userProfile: {
         state: data,
         isLoading: false,
       },
-    })),
+    }))
+  },
 
   updateName: (name: string) => {
     set((state) => {
       state.userProfile.state!.name = name
       return state
     })
+    console.log('updated state', get().userProfile)
   },
 }))
