@@ -18,7 +18,7 @@ pub mod playerprofile;
 use linera_sdk::{
     abi::{ContractAbi, ServiceAbi},
     graphql::GraphQLMutationRoot,
-    linera_base_types::{AccountOwner, ChainId, TimeDelta, Timestamp},
+    linera_base_types::{AccountOwner, ChainId, DataBlobHash, TimeDelta, Timestamp},
 };
 
 use crate::playerprofile::Players;
@@ -115,8 +115,9 @@ pub enum Message {
         metadata: MatchMetaData,
     },
     // app_chain sends points update to the players
-    ProfileUpdate {
+    MatchUpdate {
         player_hash: PlayerHash,
+        match_history: MatchHistory,
     },
 }
 
@@ -126,9 +127,10 @@ pub struct MatchMetaData {
     pub match_id: MatchId,
     pub winner: AccountOwner,
     pub match_type: MatchType,
+    pub blob_hash: DataBlobHash, // we only store moves in this, so we can replay the entire game
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, SimpleObject, InputObject)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug, SimpleObject, InputObject)]
 pub struct MatchId {
     value: String,
 }
@@ -189,12 +191,14 @@ impl TimedToken {
 pub enum Event {
     GameCount { value: u64 },
     Leaderboard { leaderboard: Vec<Leaderboard> },
+    MatchHistory { history: MatchHistory },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum EventType {
     GameCount,
     Leaderboard,
+    MatchHistory,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
@@ -282,6 +286,7 @@ impl DerefMut for GameWrapper {
 ///
 /// Register View needs this struct to impl Default trait. but ChainId does not, we use Option<ChainId<ChainId>
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject)]
+#[serde(rename_all = "camelCase")]
 pub struct GameChain {
     /// The Timestamp of the `OpenChain` message that created the chain.
     pub timestamp: Timestamp,
@@ -371,4 +376,18 @@ impl Clock {
         let t = self.time_left[player.index()].saturating_sub(elapsed);
         t.eq(&TimeDelta::ZERO)
     }
+}
+
+// Struct to hold the entire match metadata
+#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
+pub struct MatchHistory {
+    pub you: Player,
+    pub opponent: Player,
+    pub blob_hash: DataBlobHash, // we only store moves here
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
+pub struct Player {
+    pub id: AccountOwner,
+    pub name: Option<String>,
 }

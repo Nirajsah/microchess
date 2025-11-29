@@ -134,6 +134,7 @@ impl PlayerProfile {
         self.won = updated.won;
         self.lost = updated.lost;
         self.ath = updated.ath;
+        self.player_hash = Some(new_hash);
     }
 
     // When player loses
