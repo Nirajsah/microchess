@@ -138,7 +138,7 @@ export default function Board(props: BoardProps) {
     }
   }
 
-  const selectedTheme = themes[theme as ThemeName]
+  const selectedTheme = themes[theme as ThemeName] ?? themes['forest']
 
   const getSquareColor = (
     square: Square,
@@ -310,9 +310,7 @@ const GameOverDisplay = ({
     <div className="absolute inset-0 flex items-center justify-center z-50">
       <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-slate-900/80 to-black/60 backdrop-blur-sm"></div>
       <div
-        className={`relative w-full max-w-[500px] py-6 px-10 rounded-2xl border-2 shadow-2xl flex flex-col items-center text-center overflow-hidden max-h-[85vh] ${
-          info.color
-        } ${info.glow}`}
+        className={`relative w-full max-w-[500px] py-6 px-10 rounded-2xl border-2 shadow-2xl flex flex-col items-center text-center overflow-hidden max-h-[85vh] ${info.color} ${info.glow}`}
       >
         <div className="absolute inset-0 rounded-2xl bg-blue-500/10 opacity-75"></div>
         <div className="w-20 h-20 mb-3 flex items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 shadow-2xl">

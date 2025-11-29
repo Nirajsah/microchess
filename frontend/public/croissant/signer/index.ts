@@ -1,5 +1,5 @@
-import type { Signer } from './signer.d.ts'
-export type { Signer } from './signer.d.ts'
+import type { Signer } from './signer'
+export type { Signer } from './signer'
 import { Wallet, ethers } from 'ethers'
 
 /**

@@ -27,5 +27,5 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src", "croissant"]
+  "include": ["src", "croissant", "public/croissant"]
 }
