@@ -390,6 +390,58 @@ impl ChessBoard {
     }
 
     #[inline]
+    pub fn is_move_legal(&self, from: Square, to: Square, piece: Piece) -> bool {
+        let color = piece.color();
+        let opponent = color.opposite();
+        let own_king = self.get_king_square(color);
+
+        // Create temporary board state
+        let mut all_occ = self.all_pieces();
+        let mut opponent_occ = self.occupancies[opponent.index()];
+        let mut own_occ = self.occupancies[color.index()];
+
+        // Handle en passant capture (special case)
+        let is_en_passant =
+            matches!(piece, Piece::WhitePawn | Piece::BlackPawn) && Some(to) == self.en_passant;
+
+        if is_en_passant {
+            let capture_square = match color {
+                Color::White => Square::uint_to_square((to - 8) as u8),
+                Color::Black => Square::uint_to_square((to + 8) as u8),
+            };
+            if self.square_map[capture_square.index()].is_some() {
+                opponent_occ.clear(capture_square);
+                all_occ.clear(capture_square);
+            }
+        }
+
+        // Make the move temporarily
+        all_occ.clear(from);
+        all_occ.set(to);
+        own_occ.clear(from);
+        own_occ.set(to);
+
+        // If capturing (regular capture), remove opponent piece
+        if self.square_map[to.index()].is_some() && !is_en_passant {
+            opponent_occ.clear(to);
+            all_occ.clear(to);
+            all_occ.set(to);
+        }
+
+        // Get king square (may have changed if piece is king)
+        let king_sq = if matches!(piece, Piece::WhiteKing | Piece::BlackKing) {
+            to
+        } else {
+            own_king
+        };
+
+        // Return true ONLY if THIS specific move leaves the king safe
+        !self
+            .compute_attack_mask_on_the_fly(&all_occ, &opponent_occ)
+            .is_set(king_sq)
+    }
+
+    #[inline]
     pub fn get_legal_moves(&self, from: Square, piece: Piece) -> BitBoard {
         let color = piece.color();
 

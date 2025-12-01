@@ -401,7 +401,7 @@ impl Game {
             return Err(ChessError::InvalidMove);
         }
 
-        if !self.board.get_pseudo_legal_moves(mv.from, mv.piece) {
+        if !self.board.is_move_legal(mv.from, mv.to, mv.piece) {
             return Err(ChessError::InvalidMove);
         }
 

@@ -6,6 +6,13 @@ import topLevelAwait from 'vite-plugin-top-level-await'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: './',
+  server: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
@@ -22,4 +29,5 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@wasm'],
   },
+  assetsInclude: ['**/*.wasm'],
 })

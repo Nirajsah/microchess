@@ -4,7 +4,7 @@ use async_graphql::SimpleObject;
 use linera_sdk::linera_base_types::AccountOwner;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, SimpleObject)]
+#[derive(Clone, Debug, Deserialize, Eq, Serialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct Leaderboard {
     pub id: AccountOwner,
@@ -13,6 +13,12 @@ pub struct Leaderboard {
     pub matches: u32,
     pub won: u32,
     pub lost: u32,
+}
+
+impl PartialEq for Leaderboard {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
 }
 
 // Implement ordering: sort by elo descending, then by id for uniqueness
@@ -25,7 +31,10 @@ impl PartialOrd for Leaderboard {
 impl Ord for Leaderboard {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // Higher elo comes first
-        other.elo.cmp(&self.elo)
+        match other.elo.cmp(&self.elo) {
+            std::cmp::Ordering::Equal => self.id.cmp(&other.id),
+            ordering => ordering,
+        }
     }
 }
 
@@ -50,26 +59,32 @@ impl LeaderboardManager {
     }
 
     /// Try to add a player to the leaderboard after a match
-    pub fn try_add_player(&mut self, player: Leaderboard) {
-        // Remove old entry if player already exists (in case of updated stats)
-        self.players.retain(|p| p.id != player.id);
+    pub fn try_add_player(&mut self, player: Leaderboard) -> bool {
+        // Check if player already exists
+        let existing = self.players.take(&player); // Remove and return if exists
 
-        // If leaderboard has room, add the player
+        if existing.is_some() {
+            // Player was already in leaderboard - always re-insert with updated stats
+            self.players.insert(player);
+            return true;
+        }
+
+        // New player - check if leaderboard has room
         if self.players.len() < self.max_size {
             self.players.insert(player);
-            return;
+            return true;
         }
 
         // Leaderboard is full - check if player beats the weakest
         if let Some(weakest) = self.players.iter().next_back() {
             if player.elo > weakest.elo {
-                // Remove weakest player
                 let weakest_clone = weakest.clone();
                 self.players.remove(&weakest_clone);
-                // Add new player (BTreeSet automatically sorts)
                 self.players.insert(player);
+                return true;
             }
         }
+        false
     }
 
     /// Get the top 10 players (already sorted)

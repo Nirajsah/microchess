@@ -1,34 +1,49 @@
-import { Piece, Square } from '../components/ChessBoard/types.ts'
+import { useWalletStore } from '@/store/wallet.ts'
+import { Piece, Square } from '../ChessBoard/types.ts'
 
-export function connect_wallet(): Promise<any> {
-  if (!window.linera) throw new Error('Linera extension not found.')
+// export function connect_wallet(): Promise<any> {
+//   if (!window.linera) throw new Error('Linera extension not found.')
 
-  return window.linera.request({
-    type: 'CONNECT_WALLET',
-  })
-}
+//   return window.linera.request({
+//     type: 'CONNECT_WALLET',
+//   })
+// }
 
-// Ask the wallet to assign the wallet with new chain
-export function assignChain(chainId: string, timestamp: number) {
-  ;(async () => {
-    await window.linera?.request({
-      type: 'ASSIGNMENT',
-      chainId: chainId,
-      timestamp: timestamp,
-    })
-  })()
-}
+// // Ask the wallet to assign the wallet with new chain
+// export function assignChain(chainId: string, timestamp: number) {
+//   ;(async () => {
+//     await window.linera?.request({
+//       type: 'ASSIGNMENT',
+//       chainId: chainId,
+//       timestamp: timestamp,
+//     })
+//   })()
+// }
 
 function request(query: string): Promise<any> {
   let APP_ID = import.meta.env.VITE_MICROCHESS_APPLICATION_ID
 
-  if (!window.linera) throw new Error('Linera extension not found.')
+  const ready = useWalletStore.getState().ready
+  const requestAsync = useWalletStore.getState().requestAsync
 
-  return window.linera.request({
+  if (!ready) {
+    console.log('Server NOT READY!')
+    return Promise.reject('Server not ready')
+  }
+
+  return requestAsync({
     type: 'QUERY',
     applicationId: APP_ID,
     query: query,
   })
+
+  // if (!window.linera) throw new Error('Linera extension not found.')
+
+  // return window.linera.request({
+  //   type: 'QUERY',
+  //   applicationId: APP_ID,
+  //   query: query,
+  // })
 }
 
 export function isGameChain() {
@@ -86,7 +101,28 @@ export function getProfile() {
           won
           lost
           ath
+          chainId
+          id
         } }`
+
+  const gqlQuery = JSON.stringify({ query: query })
+  return request(gqlQuery)
+}
+
+export function getMatchHistory() {
+  const query = `query {
+    matchHistoryAll {
+      you {
+        id
+        name
+      }
+      opponent {
+        id
+        name	
+      }
+      blobHash
+    }
+  }`
 
   const gqlQuery = JSON.stringify({ query: query })
   return request(gqlQuery)
@@ -150,7 +186,7 @@ export function updateProfile(name: string) {
 export function makeMove(from: string, to: string, piece: string) {
   const mutation = `mutation { makeMove(from: "${from}", to: "${to}", piece: "${piece}") }`
   const gqlQuery = JSON.stringify({ query: mutation })
-  request(gqlQuery).then((res) => console.log(res))
+  request(gqlQuery).then((p) => console.log(p))
 }
 
 export function promotePiece(
@@ -159,7 +195,7 @@ export function promotePiece(
   piece: Piece | string,
   promoted_to: Piece | string
 ) {
-  const mutation = `mutation { promotePiece(from: "${from}", to: "${to}", piece: "${piece}", promoted_to: "${promoted_to}") }`
+  const mutation = `mutation { pawnPromotion(from: "${from}", to: "${to}", piece: "${piece}", promotedPiece: "${promoted_to}") }`
   const query = buildGraphQLQuery(mutation)
   request(query).then((res) => console.log(res))
 }

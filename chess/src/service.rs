@@ -8,12 +8,12 @@ use async_graphql::{EmptySubscription, Object, Request, Response, Schema, Simple
 use chess::{
     leaderboard::Leaderboard,
     playerprofile::{PlayerInfo, PlayerProfile},
-    GameChain, LastMove, Operation, PlayersTime,
+    GameChain, LastMove, MatchHistory, Operation, PlayersTime,
 };
 use linera_sdk::{
     abi::WithServiceAbi,
     graphql::GraphQLMutationRoot,
-    linera_base_types::{AccountOwner, TimeDelta},
+    linera_base_types::{AccountOwner, DataBlobHash, TimeDelta},
     views::View,
     Service, ServiceRuntime,
 };
@@ -150,5 +150,21 @@ impl ChessService {
 
     async fn captured_pieces(&self) -> &Vec<String> {
         &self.state.board.get().captured_pieces
+    }
+
+    /// called by the user/player_chain
+    async fn match_history_all(&self) -> &Vec<MatchHistory> {
+        &self.state.match_history.get()
+    }
+
+    /// called by the subscriber chain to update the db
+    async fn match_history_last(&self) -> Option<&MatchHistory> {
+        self.state.match_history.get().last()
+    }
+
+    /// Read moves from datablob
+    async fn read_moves(&self, hash: DataBlobHash) -> Vec<String> {
+        let moves: Vec<String> = postcard::from_bytes(&self.runtime.read_data_blob(hash)).unwrap();
+        moves
     }
 }
