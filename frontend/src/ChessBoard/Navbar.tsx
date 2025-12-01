@@ -32,7 +32,10 @@ export default function Navbar() {
         <Link to="/">
           <div className="text-xl">MicroChess</div>
         </Link>
-        <button className="text-md" onClick={handleGetStarted}>
+        <button
+          className="text-md max-w-[200px] truncate lg:w-full lg:max-w-full text-end"
+          onClick={handleGetStarted}
+        >
           {pubKey ? pubKey : 'Get Started'}
         </button>
       </div>

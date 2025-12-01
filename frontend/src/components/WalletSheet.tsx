@@ -67,8 +67,8 @@ const LoadingState = () => {
   const [step, setStep] = useState(0)
 
   useEffect(() => {
-    const t1 = setTimeout(() => setStep(1), 600)
-    const t2 = setTimeout(() => setStep(2), 1400)
+    const t1 = setTimeout(() => setStep(1), 1000)
+    const t2 = setTimeout(() => setStep(2), 2400)
     return () => {
       clearTimeout(t1)
       clearTimeout(t2)
@@ -113,8 +113,8 @@ const LoadingState = () => {
                   isDone
                     ? 'bg-green-500/20 border-green-500/50 text-green-400'
                     : isActive
-                      ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
-                      : 'border-zinc-800'
+                    ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
+                    : 'border-zinc-800'
                 }`}
               >
                 {isDone ? (

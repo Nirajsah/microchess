@@ -124,9 +124,17 @@ const MatchSelect = () => {
 
   // this is FriendId passed to friend to start a friendly match
   const getPersonalId = async () => {
-    const chain = await friendId()
-    const data = JSON.parse(chain.result).data.friendId
-    dispatch({ type: 'FRIENDLY_READY', gameHash: data })
+    await friendId()
+      .then((chain) => {
+        const data = JSON.parse(chain.result).data.friendId
+        if (data) {
+          dispatch({ type: 'FRIENDLY_READY', gameHash: data })
+        }
+      })
+      .catch((e) => {
+        console.log(e)
+        dispatch({ type: 'RESET' })
+      })
   }
 
   const JoinWithHash = () => {
@@ -149,6 +157,9 @@ const MatchSelect = () => {
   React.useEffect(() => {
     if (state.status === 'friendly.share' || state.status === 'friendly.join') {
       fetchGameChainInfo()
+    }
+    if (state.status === 'friendly.loading') {
+      getPersonalId()
     }
   }, [notification])
 
