@@ -20,7 +20,7 @@ export default function App() {
 
     async function getCount() {
       const { data } = await supabase.from('gameCount').select()
-      setGameCount(data![0].count)
+      setGameCount(data![1].count)
     }
 
     async function getMatchHistory() {
