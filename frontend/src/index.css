@@ -710,6 +710,10 @@ video {
   top: 176px;
 }
 
+.isolate {
+  isolation: isolate;
+}
+
 .z-0 {
   z-index: 0;
 }
@@ -999,6 +1003,10 @@ video {
 
 .max-h-\[85vh\] {
   max-height: 85vh;
+}
+
+.min-h-\[100dvh\] {
+  min-height: 100dvh;
 }
 
 .min-h-\[200px\] {
@@ -3887,6 +3895,14 @@ html {
 
   .lg\:w-\[70px\] {
     width: 70px;
+  }
+
+  .lg\:w-full {
+    width: 100%;
+  }
+
+  .lg\:max-w-full {
+    max-width: 100%;
   }
 
   .lg\:flex-row {

@@ -5,6 +5,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import NotFound from './NotFound.tsx'
 import ChessBoard from './ChessBoard/index.tsx'
 import WalletSheet from './components/WalletSheet.tsx'
+import ReplayBoard from './ChessBoard/ReplayBoard.tsx'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <div className="font-sansation text-white min-h-screen w-full flex justify-center">
@@ -13,6 +14,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/chess" element={<ChessBoard />} />
+        <Route path="/replay" element={<ReplayBoard />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
