@@ -35,15 +35,15 @@ export const pieceOrder: { [key: string]: number } = {
 export interface MatchData {
   color?: Color
   checkStatus: string
-  game_state: string
+  game_state?: string
   setIsGameChain?: (value: boolean | null) => void
-  capturedPieces: string[] | null
+  capturedPieces?: string[] | null
+  replay: boolean
 }
 
 export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
   const { setIsGameChain, capturedPieces } = matchData
 
-  const [playMatch, _setPlayMatch] = React.useState(false)
   const ready = useWalletStore((s) => s.ready)
 
   React.useEffect(() => {
@@ -75,7 +75,7 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
         <div className="w-full h-full flex flex-col">
           {capturedPieces && <PieceRow pieces={blackPieces} />}
 
-          {playMatch && <GameControls />}
+          {matchData.replay && <GameControls />}
 
           <div className="w-full flex-1 overflow-hidden">
             <MatchDataUI {...matchData} />
@@ -83,9 +83,11 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
 
           {capturedPieces && <PieceRow pieces={whitePieces} />}
 
-          <div className="max-h-[100px]">
-            <ResignButton />
-          </div>
+          {!matchData.replay && (
+            <div className="max-h-[100px]">
+              <ResignButton />
+            </div>
+          )}
         </div>
       ) : (
         <div className="">

@@ -5,26 +5,40 @@ import { useWalletStore } from '@/store/wallet'
 
 interface MatchData {
   checkStatus: string
+  moves?: string[] | null
+  replay: boolean
 }
 
 const MatchDataUI = (data: MatchData) => {
-  const { checkStatus } = data
-  const [moves, setMoves] = React.useState<string[] | null>(null)
+  const { checkStatus, moves: propMoves, replay } = data
+  const [moves, setMoves] = React.useState<string[] | null>(
+    replay ? propMoves || null : null
+  )
 
   const notification = useWalletStore((s) => s.notification)
 
+  // When replay mode: update moves if propMoves changes
   React.useEffect(() => {
-    const getMoves = async () => {
-      try {
-        const data = await getMvString()
-        const res = JSON.parse(data.result).data.mvString
-        setMoves(res)
-      } catch (e) {
-        console.error('failed', e)
-      }
+    if (replay) {
+      setMoves(propMoves || null)
     }
-    getMoves()
-  }, [notification])
+  }, [propMoves, replay])
+
+  // When NOT replay mode: fetch moves
+  React.useEffect(() => {
+    if (!replay) {
+      const getMoves = async () => {
+        try {
+          const data = await getMvString()
+          const res = JSON.parse(data.result).data.mvString
+          setMoves(res)
+        } catch (e) {
+          console.error('failed', e)
+        }
+      }
+      getMoves()
+    }
+  }, [notification, replay])
 
   const movePairs = React.useMemo(
     () =>
@@ -34,7 +48,7 @@ const MatchDataUI = (data: MatchData) => {
             black: moves[i * 2 + 1] || '',
           }))
         : [],
-    [moves]
+    [moves, propMoves]
   )
 
   return (
