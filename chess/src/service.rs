@@ -8,6 +8,7 @@ use async_graphql::{EmptySubscription, Object, Request, Response, Schema, Simple
 use chess::{
     leaderboard::Leaderboard,
     playerprofile::{PlayerInfo, PlayerProfile},
+    tournament::Tournament,
     GameChain, LastMove, MatchHistory, Operation, PlayersTime,
 };
 use linera_sdk::{
@@ -65,6 +66,12 @@ struct GameData {
     game_state: String,     // State of the Game, NotStarted, OnGoing, StaleMate or CheckMate
     winner: Option<AccountOwner>,
     last_move: Option<LastMove>,
+}
+
+#[derive(Deserialize, Serialize, SimpleObject)]
+struct TournamentParticipant {
+    id: AccountOwner,
+    player: PlayerInfo,
 }
 
 #[Object]
@@ -166,5 +173,52 @@ impl ChessService {
     async fn read_moves(&self, hash: DataBlobHash) -> Vec<String> {
         let moves: Vec<String> = postcard::from_bytes(&self.runtime.read_data_blob(hash)).unwrap();
         moves
+    }
+
+    async fn tournament(&self, id: String) -> Option<Tournament> {
+        let data = self
+            .state
+            .tournaments
+            .get(&id)
+            .await
+            .expect("failed to get data");
+
+        data
+    }
+
+    async fn my_tournament(&self) -> &Vec<String> {
+        self.state.my_tournament.get()
+    }
+
+    async fn all_tournaments(&self) -> &Vec<Tournament> {
+        self.state.all_tournaments.get()
+    }
+
+    async fn participants(&self, tournament_id: String) -> Vec<TournamentParticipant> {
+        let mut participants = Vec::new();
+
+        let Some(player_ids) = self
+            .state
+            .participants
+            .get(&tournament_id)
+            .await
+            .ok()
+            .flatten()
+        else {
+            return participants;
+        };
+
+        for id in player_ids {
+            let Some(p) = self.state.tournament_players.get(&id).await.ok().flatten() else {
+                continue; // skip missing player instead of panicking
+            };
+
+            participants.push(TournamentParticipant {
+                id,
+                player: p.decode().info(),
+            });
+        }
+
+        participants
     }
 }

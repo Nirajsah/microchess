@@ -33,7 +33,7 @@ pub struct PlayerInfo {
     pub ath: u32,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, SimpleObject)]
 pub struct PlayerHash {
     value: String,
 }
