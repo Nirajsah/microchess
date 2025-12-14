@@ -89,7 +89,6 @@ export const useBoard = create<BoardState>((set) => ({
 
   localMakeMove: (from: string, to: string, piece: string) => {
     // Optimistically update UI immediately
-    console.log('move made')
     set((state) => {
       const position: any = { ...state.state.position }
       if (position[to]) {
