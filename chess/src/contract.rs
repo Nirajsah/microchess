@@ -10,6 +10,7 @@ use crate::state::ChessState;
 use chess::{
     leaderboard::{EloCalculator, LeaderboardManager},
     playerprofile::{PlayerHash, PlayerProfile, Players},
+    tournament::TournamentInput,
     ChessResponse, Clock, Event, EventType, GameChain, GameWrapper, InstantiationArgument,
     MatchHistory, MatchId, MatchMetaData, MatchType, Message, Operation, Player, TimedToken,
 };
@@ -25,6 +26,8 @@ use linera_sdk::{
     Contract, ContractRuntime,
 };
 use tracing::Instrument;
+pub mod messages;
+pub mod operations;
 
 const STREAM_NAME: &[u8] = b"chess";
 
@@ -65,6 +68,10 @@ impl Contract for ChessContract {
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
         match operation {
+            Operation::HostTournament { value } => {
+                self.on_op_host_tournament(value);
+                ChessResponse::Ok
+            }
             Operation::DeleteChainMetadata => {
                 assert_ne!(self.runtime.chain_id(), self.app_chain());
                 self.state.game_chain.set(None);
@@ -331,6 +338,29 @@ impl Contract for ChessContract {
                 let history = self.state.match_history.get_mut();
                 history.push(match_history);
             }
+            Message::HostTournament { value } => self.on_msg_host_tournament(value),
+            Message::UpdateTournament {
+                tournament_id,
+                update,
+            } => {
+                let sender = self.runtime.message_origin_chain_id().unwrap();
+                self.on_msg_update_tournament(sender, tournament_id, update)
+                    .await;
+            }
+            Message::TournamentWithDraw {
+                tournament_id,
+                owner,
+            } => {
+                self.on_msg_tournament_withdraw(tournament_id, owner);
+            }
+            Message::TournamentRegister {
+                tournament_id,
+                owner,
+                player,
+            } => {
+                self.on_msg_tournament_registration(tournament_id, owner, player)
+                    .await
+            }
         }
     }
 
@@ -354,6 +384,31 @@ impl Contract for ChessContract {
                     }
                     Event::MatchHistory { history } => {
                         self.state.match_history.get_mut().push(history);
+                    }
+                    Event::Tournament { value } => self.state.all_tournaments.get_mut().push(value),
+                    Event::TournamentRegistration {
+                        tournament_id,
+                        owner,
+                        player,
+                    } => {
+                        if let Ok(Some(participants)) =
+                            self.state.participants.get_mut(&tournament_id).await
+                        {
+                            participants.push(owner);
+                            let _ = self.state.tournament_players.insert(&owner, player);
+                        }
+                    }
+                    Event::TournamentWithDraw {
+                        tournament_id,
+                        owner,
+                    } => {
+                        if let Ok(Some(participants)) =
+                            self.state.participants.get_mut(&tournament_id).await
+                        {
+                            if participants.contains(&owner) {
+                                participants.retain(|v| v != &owner);
+                            }
+                        }
                     }
                 }
             }
