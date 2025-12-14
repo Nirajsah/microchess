@@ -102,10 +102,10 @@ const ChessBoard = () => {
   }
 
   return (
-    <div className="relative min-h-full w-full bg-[#161616]">
+    <div className="relative min-h-[100dvh] w-full bg-[#161616]">
       <LeftMenu />
       <Navbar />
-      <div className="flex justify-center items-center gap-4 flex-col lg:flex-row">
+      <div className="flex flex-1 justify-center items-center gap-4 flex-col lg:flex-row">
         <div className="w-full max-w-[720px] bg-[#262626] p-2.5 rounded-[18px]">
           {board.color && board.timer && (
             <div className="w-full flex justify-between">
@@ -167,6 +167,7 @@ const ChessBoard = () => {
               game_state={board.game_state}
               setIsGameChain={setIsGameChain}
               capturedPieces={capturedPieces}
+              replay={false}
             />
           </div>
         </div>

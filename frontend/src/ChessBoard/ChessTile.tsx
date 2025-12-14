@@ -26,7 +26,7 @@ interface ChessTileProps {
   handleMouseDown: (e: React.MouseEvent) => void
 }
 
-const pieceImages: any = {
+export const pieceImages: any = {
   wP: whitePawn,
   wR: whiteRook,
   wN: whiteKnight,
