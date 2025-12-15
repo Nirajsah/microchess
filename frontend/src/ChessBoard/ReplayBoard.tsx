@@ -9,16 +9,15 @@ import Navbar from './Navbar'
 import { PieceRow } from './CapturedPieces'
 import { GameControls } from './GameControls'
 import MatchDataUI from './MatchData'
-import React from 'react'
+import React, { useEffect } from 'react'
 import { parseSan, parseSan2 } from '@/lib/matchReplay'
+import { useParams } from 'react-router-dom'
+import { getSanFromBlob } from '@/api'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 const ranks = ['8', '7', '6', '5', '4', '3', '2', '1']
 
-function Board(props: {
-  board: SquareToPieceMap
-  KingInCheck: string | null
-}) {
+function Board(props: { board: SquareToPieceMap; KingInCheck: string | null }) {
   const theme = useUserStore((s) => s.theme)
   const { board, KingInCheck } = props
 
@@ -136,12 +135,28 @@ const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
 }
 
 export default function ReplayBoard() {
+  const { id } = useParams()
   const state = useReplayStore((s) => s.board)
   const setHistory = useReplayStore((s) => s.setHistory)
   const updateBoard = useReplayStore((s) => s.updateBoard)
   const resetBoard = useReplayStore((s) => s.resetBoard)
   const [moves, setMoves] = React.useState<string[]>([])
   const [isPlaying, setIsPlaying] = React.useState(false)
+  const [sans, setSan] = React.useState<string[]>([])
+
+  console.log(id)
+  useEffect(() => {
+    const fetchSanFromBlob = async () => {
+      try {
+        const response = await getSanFromBlob(id!)
+        const data = JSON.parse(response.result).data.readMoves
+        setSan(data)
+      } catch (error) {
+        console.error('Error fetching my tournaments:', error)
+      }
+    }
+    fetchSanFromBlob()
+  }, [id])
 
   const san = [
     'e4', // pawn move
