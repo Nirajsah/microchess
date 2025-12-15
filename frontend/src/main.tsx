@@ -9,6 +9,8 @@ import ReplayBoard from './ChessBoard/ReplayBoard.tsx'
 import TournamentPage from './Tournament/TournamentPage.tsx'
 import TournamentList from './Tournament/TournamentList.tsx'
 import CreateTournament from './Tournament/CreateTournament.tsx'
+import MyTournaments from './Tournament/MyTournaments.tsx'
+import MyTournament from './Tournament/MyTournament.tsx'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <div className="font-sansation text-white min-h-screen w-full flex justify-center">
@@ -17,10 +19,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/chess" element={<ChessBoard />} />
-        <Route path="/replay" element={<ReplayBoard />} />
-        <Route path="/tournament" element={<TournamentPage />} />
+        <Route path="/replay/:id" element={<ReplayBoard />} />
+        <Route path="/tournaments/:id" element={<TournamentPage />} />
         <Route path="/tournaments" element={<TournamentList />} />
-        <Route path="/create" element={<CreateTournament />} />
+        <Route path="/tournaments/create" element={<CreateTournament />} />
+        <Route path="/tournaments/my" element={<MyTournaments />} />
+        <Route path="/tournaments/my/:id" element={<MyTournament />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
