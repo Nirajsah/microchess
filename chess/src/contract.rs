@@ -68,6 +68,21 @@ impl Contract for ChessContract {
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
         match operation {
+            Operation::TournamentRegistration { tournament_id } => {
+                self.on_op_tournament_registration(tournament_id);
+                ChessResponse::Ok
+            }
+            Operation::TournamentWithDraw { tournament_id } => {
+                self.on_op_tournament_withdraw(tournament_id);
+                ChessResponse::Ok
+            }
+            Operation::UpdateTournament {
+                tournament_id,
+                update,
+            } => {
+                self.on_op_update_tournament(tournament_id, update);
+                ChessResponse::Ok
+            }
             Operation::HostTournament { value } => {
                 self.on_op_host_tournament(value);
                 ChessResponse::Ok
@@ -351,7 +366,7 @@ impl Contract for ChessContract {
                 tournament_id,
                 owner,
             } => {
-                self.on_msg_tournament_withdraw(tournament_id, owner);
+                self.on_msg_tournament_withdraw(tournament_id, owner).await;
             }
             Message::TournamentRegister {
                 tournament_id,
@@ -359,7 +374,7 @@ impl Contract for ChessContract {
                 player,
             } => {
                 self.on_msg_tournament_registration(tournament_id, owner, player)
-                    .await
+                    .await;
             }
         }
     }
@@ -391,24 +406,43 @@ impl Contract for ChessContract {
                         owner,
                         player,
                     } => {
-                        if let Ok(Some(participants)) =
-                            self.state.participants.get_mut(&tournament_id).await
-                        {
-                            participants.push(owner);
-                            let _ = self.state.tournament_players.insert(&owner, player);
-                        }
+                        let mut participants = self
+                            .state
+                            .participants
+                            .get(&tournament_id)
+                            .await
+                            .ok()
+                            .flatten()
+                            .unwrap_or_default();
+
+                        participants.push(owner);
+                        self.state
+                            .participants
+                            .insert(&tournament_id, participants)
+                            .ok();
+                        self.state.tournament_players.insert(&owner, player).ok();
                     }
                     Event::TournamentWithDraw {
                         tournament_id,
                         owner,
                     } => {
-                        if let Ok(Some(participants)) =
-                            self.state.participants.get_mut(&tournament_id).await
-                        {
-                            if participants.contains(&owner) {
-                                participants.retain(|v| v != &owner);
-                            }
-                        }
+                        let mut participants = self
+                            .state
+                            .participants
+                            .get(&tournament_id)
+                            .await
+                            .ok()
+                            .flatten()
+                            .unwrap_or_default();
+
+                        participants.retain(|v| v != &owner);
+
+                        self.state
+                            .participants
+                            .insert(&tournament_id, participants)
+                            .ok();
+
+                        self.state.tournament_players.remove(&owner).ok();
                     }
                 }
             }
