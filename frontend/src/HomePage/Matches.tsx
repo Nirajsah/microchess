@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 export type MatchHistory = {
   player1Id: string
   player1Name: string | null
@@ -14,10 +16,10 @@ export default function Matches({ matches }: { matches: MatchHistory[] }) {
         Total Matches: {matches.length}
       </div>
       <div className="flex-1 overflow-y-auto max-h-[600px]">
-        {matches.map((match: MatchHistory, index) => (
-          <div
-            key={index}
-            onClick={() => console.log('blobhash:', match.blobHash)}
+        {matches.map((match: MatchHistory) => (
+          <Link
+            key={match.blobHash}
+            to={`/replay/${match.blobHash}`}
             className="cursor-pointer border border-[#212121] rounded-xl p-3 md:p-4 mb-3 md:mb-4 last:mb-0 flex flex-col md:flex-row md:items-center justify-between"
           >
             <div className="w-full lg:w-[260px] truncate text-xs md:text-base text-gray-300 md:mb-0">
@@ -29,7 +31,7 @@ export default function Matches({ matches }: { matches: MatchHistory[] }) {
             <div className="w-full lg:w-[260px] truncate text-xs md:text-base text-gray-300 text-right">
               {match.player2Name ? match.player2Name : match.player2Id}
             </div>
-          </div>
+          </Link>
         ))}
 
         {matches && matches.length === 0 && (

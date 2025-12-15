@@ -173,13 +173,12 @@ export default function HomePage({ gameCount }: { gameCount: number }) {
             </div>
           </div>
           <div className="hidden lg:flex relative w-1/3 bg-gradient-to-r from-[#2146ed6e] to-[#3769f1fc] rounded-[30px] h-full">
-            <a
-              href="https://github.com/Nirajsah/croissant"
-              target="_blank"
+            <Link
+              to="/tournaments"
               className="w-full h-full cursor-pointer flex justify-center items-center"
             >
-              <span className="text-[40px]">Croissant 🥐</span>
-            </a>
+              <span className="text-[30px]">Tournaments</span>
+            </Link>
           </div>
 
           <Link
