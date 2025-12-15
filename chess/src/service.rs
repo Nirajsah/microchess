@@ -171,7 +171,7 @@ impl ChessService {
 
     /// Read moves from datablob
     async fn read_moves(&self, hash: DataBlobHash) -> Vec<String> {
-        if let Ok(Some(moves)) = postcard::from_bytes(&self.runtime.read_data_blob(hash)) {
+        if let Ok(moves) = postcard::from_bytes::<Vec<String>>(&self.runtime.read_data_blob(hash)) {
             moves
         } else {
             vec![]

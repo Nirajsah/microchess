@@ -142,7 +142,7 @@ export default function ReplayBoard() {
   const resetBoard = useReplayStore((s) => s.resetBoard)
   const [moves, setMoves] = React.useState<string[]>([])
   const [isPlaying, setIsPlaying] = React.useState(false)
-  const [sans, setSan] = React.useState<string[]>([])
+  const [san, setSan] = React.useState<string[]>([])
 
   useEffect(() => {
     const fetchSanFromBlob = async () => {
@@ -156,48 +156,6 @@ export default function ReplayBoard() {
     }
     fetchSanFromBlob()
   }, [id])
-
-  const san = [
-    'e4', // pawn move
-    'e5', // pawn move
-    'Nf3', // knight move
-    'Nc6', // knight move
-    'Bb5', // bishop move
-    'a6', // pawn move
-    'Ba4', // bishop move
-    'Nf6', // knight move
-    'O-O', // white castles king-side
-    'Be7', // bishop move
-    'Re1', // rook move
-    'b5', // pawn move
-    'Bb3', // bishop retreat
-    'd6', // pawn move
-    'c3', // pawn move
-    'O-O', // black castles king-side
-    'h3', // pawn move
-    'Na5', // knight move
-    'Bc2', // bishop move
-    'c5', // pawn move
-    'd4', // pawn move
-    'Qc7', // queen move
-    'Nbd2', // knight move with disambiguation
-    'cxd4', // pawn capture
-    'cxd4', // pawn capture
-    'Be6', // bishop move
-    'd5', // pawn push
-    'Bd7', // bishop move
-    'b3', // pawn move
-    'Rac8', // rook move (file disambiguation)
-    'Bb2', // bishop move
-    'Nb7', // knight move
-    'a4', // pawn move
-    'bxa4', // pawn capture
-    'Rxa4', // rook capture
-    'Qxc2', // queen capture
-    'Qxc2', // white queen captures back
-    'Rxc2', // rook capture
-    'Ba1', // bishop retreat
-  ]
 
   const [count, setCount] = React.useState<number>(-1)
 
@@ -283,7 +241,7 @@ export default function ReplayBoard() {
     return () => {
       isCancelled = true
     }
-  }, [])
+  }, [san])
 
   const { position: board, KingInCheck } = state
 
