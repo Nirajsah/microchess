@@ -46,7 +46,7 @@ pub struct ChessState {
     /// for subscribers
     pub all_tournaments: RegisterView<Vec<Tournament>>,
     /// for user_chain
-    pub my_tournament: RegisterView<Vec<String>>,
+    pub my_tournaments: RegisterView<Vec<Tournament>>,
     pub tournament_list: RegisterView<Vec<String>>,
 
     /// on app_chain

@@ -171,8 +171,11 @@ impl ChessService {
 
     /// Read moves from datablob
     async fn read_moves(&self, hash: DataBlobHash) -> Vec<String> {
-        let moves: Vec<String> = postcard::from_bytes(&self.runtime.read_data_blob(hash)).unwrap();
-        moves
+        if let Ok(Some(moves)) = postcard::from_bytes(&self.runtime.read_data_blob(hash)) {
+            moves
+        } else {
+            vec![]
+        }
     }
 
     async fn tournament(&self, id: String) -> Option<Tournament> {
@@ -186,8 +189,22 @@ impl ChessService {
         data
     }
 
-    async fn my_tournament(&self) -> &Vec<String> {
-        self.state.my_tournament.get()
+    async fn my_tournaments(&self) -> &Vec<Tournament> {
+        self.state.my_tournaments.get()
+    }
+
+    async fn my_tournament(&self, tournament_id: String) -> Option<&Tournament> {
+        if let Some(tournament) = self
+            .state
+            .my_tournaments
+            .get()
+            .iter()
+            .find(|t| t.tournament_id == tournament_id)
+        {
+            Some(tournament)
+        } else {
+            None
+        }
     }
 
     async fn all_tournaments(&self) -> &Vec<Tournament> {

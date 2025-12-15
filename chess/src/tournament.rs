@@ -18,7 +18,7 @@ pub struct Tournament {
     pub tournament_format: TournamentFormat,
     pub match_type: MatchType,
     pub game_mode: GameMode,
-    pub time_control: TimeControl,
+    pub time_control: Option<TimeControl>,
     pub max_players: Option<u32>,
     pub min_players: Option<u32>,
     pub round_count: Option<u16>,
@@ -27,11 +27,12 @@ pub struct Tournament {
     // --- Schedule ---
     pub starting_time: Timestamp,
     pub end_time: Timestamp,
-    pub round_time_limit_minutes: Timestamp,
-    pub check_in_time: Timestamp,
+    pub round_time_limit_minutes: Option<Timestamp>,
+    pub check_in_time: Option<Timestamp>,
 
     // --- Rewards ---
     pub prize_type: Vec<PrizeType>,
+    pub prize_pool: u32,
     pub prize_pool_description: Option<String>,
 
     // --- Access & Privacy ---
@@ -51,40 +52,65 @@ pub struct Tournament {
     pub status: TournamentStatus,
 }
 
+impl Tournament {
+    pub fn update(&mut self, update: TournamentUpdate) {
+        if let Some(banner) = update.banner_image_url {
+            self.banner_image_url = Some(banner);
+        }
+
+        if let Some(logo) = update.sponsor_logo_url {
+            self.sponsor_logo_url = Some(logo);
+        }
+
+        if !update.custom_tags.is_empty() {
+            self.custom_tags = update.custom_tags;
+        }
+
+        if let Some(status) = update.status {
+            self.status = status;
+        }
+
+        if let Some(visibility) = update.visibility {
+            self.visibility = visibility;
+        }
+    }
+}
+
 /// Input object for creating a new Tournament (Mutations).
 #[derive(Debug, Serialize, Deserialize, Clone, InputObject)]
 pub struct TournamentInput {
     // --- Identity ---
-    pub organiser_chain: ChainId,
-    pub organiser_id: AccountOwner,
+    pub organiser_chain: Option<ChainId>,
+    pub organiser_id: Option<AccountOwner>,
     pub organiser_name: String,
     pub tournament_id: Option<String>, // Generated system-side if not provided
     pub tournament_name: String,
     pub tournament_description: Option<String>,
 
     // --- Format & Rules ---
-    pub tournament_format: TournamentFormat,
-    pub match_type: MatchType,
+    pub tournament_format: Option<TournamentFormat>,
+    pub match_type: Option<MatchType>,
     pub game_mode: GameMode,
-    pub time_control: TimeControlInput,
+    pub time_control: Option<TimeControlInput>,
     pub max_players: Option<u32>,
     pub min_players: Option<u32>,
     pub round_count: Option<u16>,
-    pub allow_late_join: bool,
+    pub allow_late_join: Option<bool>,
 
     // --- Schedule ---
-    pub starting_time: Timestamp,
-    pub end_time: Timestamp,
-    pub round_time_limit_minutes: Timestamp,
-    pub check_in_time: Timestamp,
+    pub starting_time: Option<Timestamp>,
+    pub end_time: Option<Timestamp>,
+    pub round_time_limit_minutes: Option<Timestamp>,
+    pub check_in_time: Option<Timestamp>,
 
     // --- Rewards ---
     pub prize_type: Vec<PrizeType>,
+    pub prize_pool: u32,
     pub prize_pool_description: Option<String>,
 
     // --- Access & Privacy ---
     pub visibility: Visibility,
-    pub invite_only: bool,
+    pub invite_only: Option<bool>,
     pub access_code: Option<String>,
 
     // --- Branding ---
@@ -102,8 +128,6 @@ pub struct TournamentInput {
 /// Input object for updating a Tournament.
 #[derive(Debug, Serialize, Deserialize, Clone, InputObject)]
 pub struct TournamentUpdate {
-    pub update_type: TournamentUpdates,
-
     // --- Branding Updates ---
     pub banner_image_url: Option<String>,
     pub sponsor_logo_url: Option<String>,
@@ -132,36 +156,37 @@ impl From<TournamentInput> for Tournament {
     fn from(input: TournamentInput) -> Self {
         Tournament {
             // Identity
-            organiser_chain: input.organiser_chain,
-            organiser_id: input.organiser_id,
+            organiser_chain: input.organiser_chain.unwrap(),
+            organiser_id: input.organiser_id.unwrap(),
             organiser_name: input.organiser_name,
             tournament_id: input.tournament_id.unwrap_or_default(), // Should be set before conversion if using new(), otherwise default
             tournament_name: input.tournament_name,
             tournament_description: input.tournament_description,
 
             // Format
-            tournament_format: input.tournament_format,
-            match_type: input.match_type,
+            tournament_format: input.tournament_format.unwrap_or(TournamentFormat::Swiss),
+            match_type: input.match_type.unwrap_or(MatchType::Bo1),
             game_mode: input.game_mode,
-            time_control: input.time_control.into(),
+            time_control: None,
             max_players: input.max_players,
             min_players: input.min_players,
             round_count: input.round_count,
-            allow_late_join: input.allow_late_join,
+            allow_late_join: input.allow_late_join.unwrap_or(false),
 
             // Schedule
-            starting_time: input.starting_time,
-            end_time: input.end_time,
-            round_time_limit_minutes: input.round_time_limit_minutes,
-            check_in_time: input.check_in_time,
+            starting_time: input.starting_time.unwrap_or(Timestamp::from(600)),
+            end_time: input.end_time.unwrap_or(Timestamp::from(600)),
+            round_time_limit_minutes: None,
+            check_in_time: None,
 
             // Rewards
             prize_type: input.prize_type,
+            prize_pool: input.prize_pool,
             prize_pool_description: input.prize_pool_description,
 
             // Access
             visibility: input.visibility,
-            invite_only: input.invite_only,
+            invite_only: input.invite_only.unwrap_or(false),
             access_code: input.access_code,
 
             // Branding
@@ -181,11 +206,12 @@ impl From<TournamentInput> for Tournament {
 impl TournamentInput {
     pub fn new(value: Self, chain_id: ChainId, now: Timestamp, owner: AccountOwner) -> Self {
         use base64::engine::{general_purpose::STANDARD_NO_PAD, Engine as _};
-        let tournament_id = STANDARD_NO_PAD.encode(value.tournament_name.clone());
+        let unique = format!("{}{}{}", now, owner, value.tournament_name.clone()); // for how keeping it simple
+        let tournament_id = STANDARD_NO_PAD.encode(unique);
         let mut tournament = value;
 
-        tournament.organiser_id = owner;
-        tournament.organiser_chain = chain_id;
+        tournament.organiser_id = Some(owner);
+        tournament.organiser_chain = Some(chain_id);
         tournament.tournament_id = Some(tournament_id);
         tournament.version = Some(TOURNAMENT_VERSION.to_string());
         tournament.created_at = Some(now);
@@ -483,7 +509,7 @@ impl<'de> Deserialize<'de> for TournamentStatus {
                 &raw,
                 &[
                     "draft",
-                    "published",
+                    "registration_open",
                     "registration_closed",
                     "in_progress",
                     "completed",
@@ -492,10 +518,4 @@ impl<'de> Deserialize<'de> for TournamentStatus {
             )),
         }
     }
-}
-
-#[cfg(test)]
-mod examples {
-    #[test]
-    fn example_host_tournament_input() {}
 }

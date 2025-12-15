@@ -96,6 +96,7 @@ async fn test_tournament() {
         round_time_limit_minutes: Timestamp::from(100),
         check_in_time: Timestamp::from(300),
         prize_type: vec![PrizeType::Tokens],
+        prize_pool: 100,
         prize_pool_description: None,
         visibility: Visibility::Public,
         invite_only: false,
@@ -155,6 +156,7 @@ async fn test_tournament() {
                     roundTimeLimitMinutes
                     checkInTime
                     
+                    prizePool
                     prizeType
                     
                     visibility
@@ -206,6 +208,7 @@ async fn test_tournament() {
     );
     assert_eq!(data.check_in_time, value.check_in_time);
 
+    assert_eq!(data.prize_pool, value.prize_pool);
     assert_eq!(data.prize_type, value.prize_type);
     assert_eq!(data.visibility, value.visibility);
     assert_eq!(data.invite_only, value.invite_only);
