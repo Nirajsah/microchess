@@ -27,6 +27,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/tournaments/create" element={<CreateTournament />} />
         <Route path="/tournaments/my" element={<MyTournaments />} />
         <Route path="/tournaments/my/:id" element={<MyTournament />} />
+        <Route path="/replay/:id" element={<ReplayBoard />} />
+        <Route path="/tournaments/:id" element={<TournamentPage />} />
+        <Route path="/tournaments" element={<TournamentList />} />
+        <Route path="/tournaments/create" element={<CreateTournament />} />
+        <Route path="/tournaments/my" element={<MyTournaments />} />
+        <Route path="/tournaments/my/:id" element={<MyTournament />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

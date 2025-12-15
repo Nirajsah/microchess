@@ -162,21 +162,18 @@ function TournamentCard({
         <span
           className={`
                     px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide backdrop-blur-md border border-white/10
-                    ${
-                      tournament.status === 'IN_PROGRESS'
-                        ? 'bg-red-500/80 text-white animate-pulse'
-                        : ''
-                    }
-                    ${
-                      tournament.status === 'REGISTRATION_OPEN'
-                        ? 'bg-green-500/80 text-white'
-                        : ''
-                    }
-                    ${
-                      tournament.status === 'COMPLETED'
-                        ? 'bg-gray-800/80 text-gray-400'
-                        : ''
-                    }
+                    ${tournament.status === 'IN_PROGRESS'
+              ? 'bg-red-500/80 text-white animate-pulse'
+              : ''
+            }
+                    ${tournament.status === 'REGISTRATION_OPEN'
+              ? 'bg-green-500/80 text-white'
+              : ''
+            }
+                    ${tournament.status === 'COMPLETED'
+              ? 'bg-gray-800/80 text-gray-400'
+              : ''
+            }
                 `}
         >
           {tournament.status === 'IN_PROGRESS' && (
