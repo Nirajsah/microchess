@@ -11,10 +11,12 @@ import TournamentList from './Tournament/TournamentList.tsx'
 import CreateTournament from './Tournament/CreateTournament.tsx'
 import MyTournaments from './Tournament/MyTournaments.tsx'
 import MyTournament from './Tournament/MyTournament.tsx'
+import { Toaster } from 'sonner'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <div className="font-sansation text-white min-h-screen w-full flex justify-center">
     <WalletSheet />
+    <Toaster richColors position="bottom-right" theme="dark" />
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />} />

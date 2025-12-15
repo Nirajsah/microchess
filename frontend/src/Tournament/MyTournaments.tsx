@@ -16,35 +16,6 @@ type MyTournaments = {
   status: string
 }
 
-// Mock Data for My Tournaments (Used for display)
-const MY_TOURNAMENTS = [
-  {
-    id: 'mt1',
-    tournament_name: 'Friday Night Blitz',
-    tournament_description:
-      'Our weekly blitz tournament for the community. 5 minute games.',
-    tournament_format: 'Arena',
-    max_players: 50,
-    prize_pool: '200',
-    banner_image_url:
-      'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=800&q=80',
-    status: 'Draft',
-    players_joined: 0,
-  },
-  {
-    id: 'mt2',
-    tournament_name: 'Corporate Chess Open',
-    tournament_description: 'Exclusive tournament for corporate partners.',
-    tournament_format: 'Swiss',
-    max_players: 100,
-    prize_pool: '5000',
-    banner_image_url:
-      'https://images.unsplash.com/photo-1586165368502-1bad197a6461?w=800&q=80',
-    status: 'Published',
-    players_joined: 32,
-  },
-]
-
 export default function MyTournaments() {
   const navigate = useNavigate()
 

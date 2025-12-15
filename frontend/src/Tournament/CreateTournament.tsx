@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import Navbar from '../ChessBoard/Navbar'
 import { motion } from 'framer-motion'
 import { Button } from '../components/ui/button'
@@ -17,6 +17,8 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { hostTournament } from '@/api'
+import { useUserStore } from '@/store/microchess'
+import { toast } from 'sonner'
 
 // Define input types matching the GraphQL schema
 interface TimeControlInput {
@@ -79,12 +81,12 @@ enum PrizeType {
   TOKENS = 'TOKENS',
 }
 
-enum Visibility {
+export enum Visibility {
   PUBLIC = 'PUBLIC', // Assuming based on common patterns
   PRIVATE = 'PRIVATE',
 }
 
-enum TournamentStatus {
+export enum TournamentStatus {
   DRAFT = 'DRAFT',
   REGISTRATION_OPEN = 'REGISTRATION_OPEN',
   REGISTRATION_CLOSED = 'REGISTRATION_CLOSED',
@@ -96,9 +98,10 @@ enum TournamentStatus {
 export default function CreateTournament() {
   const navigate = useNavigate()
   const [previewMode, setPreviewMode] = useState(false)
+  const name = useUserStore((s) => s.userProfile.state?.name)
   // Updated formData to match TournamentInput exactly
   const [formData, setFormData] = useState<TournamentInput>({
-    organiserName: 'Dove', // Populate from user profile/wallet
+    organiserName: name!, // Populate from user profile/wallet
     tournamentName: '',
     tournamentDescription: '',
     tournamentFormat: TournamentFormat.SWISS,
@@ -179,10 +182,18 @@ export default function CreateTournament() {
   // }, [formData.gameMode])
 
   const handleSubmit = () => {
+    if (!formData.organiserName) {
+      toast.error('Organiser name is required, update your profile')
+      return
+    }
     console.log('Creating tournament:', formData)
   }
 
   const handleSaveDraft = async () => {
+    if (!formData.organiserName) {
+      toast.error('Organiser name is required, update your profile')
+      return
+    }
     await hostTournament(formData)
   }
 
@@ -211,21 +222,19 @@ export default function CreateTournament() {
           <div className="flex items-center bg-[#262626] p-1.5 rounded-[18px] border border-[#333]">
             <button
               onClick={() => setPreviewMode(false)}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-[14px] text-sm font-medium transition-all ${
-                !previewMode
-                  ? 'bg-[#333] text-white shadow-sm ring-1 ring-white/5'
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-[14px] text-sm font-medium transition-all ${!previewMode
+                ? 'bg-[#333] text-white shadow-sm ring-1 ring-white/5'
+                : 'text-gray-500 hover:text-gray-300'
+                }`}
             >
               <Settings className="w-4 h-4" /> Editor
             </button>
             <button
               onClick={() => setPreviewMode(true)}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-[14px] text-sm font-medium transition-all ${
-                previewMode
-                  ? 'bg-[#333] text-white shadow-sm ring-1 ring-white/5'
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-[14px] text-sm font-medium transition-all ${previewMode
+                ? 'bg-[#333] text-white shadow-sm ring-1 ring-white/5'
+                : 'text-gray-500 hover:text-gray-300'
+                }`}
             >
               <Eye className="w-4 h-4" /> Preview
             </button>
@@ -271,32 +280,6 @@ export default function CreateTournament() {
               </Section>
 
               <Section
-                title="Branding"
-                description="Upload assets to make your tournament stand out."
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <ImageUploadInput
-                    label="Banner Image"
-                    name="bannerImageUrl"
-                    value={formData.bannerImageUrl || ''}
-                    onChange={(val) =>
-                      setFormData((prev) => ({ ...prev, bannerImageUrl: val }))
-                    }
-                    aspect="aspect-[3/1]"
-                  />
-                  <ImageUploadInput
-                    label="Sponsor Logo"
-                    name="sponsorLogoUrl"
-                    value={formData.sponsorLogoUrl || ''}
-                    onChange={(val) =>
-                      setFormData((prev) => ({ ...prev, sponsorLogoUrl: val }))
-                    }
-                    aspect="aspect-square"
-                  />
-                </div>
-              </Section>
-
-              <Section
                 title="Prizes & Rewards"
                 description="What are players competing for?"
               >
@@ -338,6 +321,32 @@ export default function CreateTournament() {
                     onChange={handleChange}
                     placeholder="Detailed breakdown of the prize distribution (e.g. 1st: $500, 2nd: $300...)"
                     className="w-full bg-[#262626] border border-[#333] rounded-xl p-4 text-white text-base focus:outline-none focus:border-yellow-600/50 min-h-[100px] resize-y placeholder:text-gray-500 transition-colors"
+                  />
+                </div>
+              </Section>
+
+              <Section
+                title="Branding"
+                description="Upload assets to make your tournament stand out."
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <ImageUploadInput
+                    label="Banner Image"
+                    name="bannerImageUrl"
+                    value={formData.bannerImageUrl || ''}
+                    onChange={(val) =>
+                      setFormData((prev) => ({ ...prev, bannerImageUrl: val }))
+                    }
+                    aspect="aspect-[3/1]"
+                  />
+                  <ImageUploadInput
+                    label="Sponsor Logo"
+                    name="sponsorLogoUrl"
+                    value={formData.sponsorLogoUrl || ''}
+                    onChange={(val) =>
+                      setFormData((prev) => ({ ...prev, sponsorLogoUrl: val }))
+                    }
+                    aspect="aspect-square"
                   />
                 </div>
               </Section>
@@ -552,11 +561,10 @@ export default function CreateTournament() {
                               visibility: opt.value,
                             }))
                           }
-                          className={`py-2 text-sm font-medium rounded-lg border transition-all ${
-                            formData.visibility === opt.value
-                              ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
-                              : 'bg-[#1f1f1f] border-[#333] text-gray-500 hover:border-[#444]'
-                          }`}
+                          className={`py-2 text-sm font-medium rounded-lg border transition-all ${formData.visibility === opt.value
+                            ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
+                            : 'bg-[#1f1f1f] border-[#333] text-gray-500 hover:border-[#444]'
+                            }`}
                         >
                           {opt.label}
                         </button>
@@ -814,13 +822,19 @@ function ImageUploadInput({
         <div className="flex gap-2">
           <button
             onClick={() => setMode('link')}
-            className={`text-xs px-2 py-1 rounded ${mode === 'link' ? 'text-yellow-500 bg-yellow-500/10' : 'text-gray-500'}`}
+            className={`text-xs px-2 py-1 rounded ${mode === 'link'
+              ? 'text-yellow-500 bg-yellow-500/10'
+              : 'text-gray-500'
+              }`}
           >
             Link
           </button>
           <button
             onClick={() => setMode('upload')}
-            className={`text-xs px-2 py-1 rounded ${mode === 'upload' ? 'text-yellow-500 bg-yellow-500/10' : 'text-gray-500'}`}
+            className={`text-xs px-2 py-1 rounded ${mode === 'upload'
+              ? 'text-yellow-500 bg-yellow-500/10'
+              : 'text-gray-500'
+              }`}
           >
             Upload
           </button>

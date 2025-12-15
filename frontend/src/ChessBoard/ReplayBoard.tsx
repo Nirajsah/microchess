@@ -10,7 +10,7 @@ import { PieceRow } from './CapturedPieces'
 import { GameControls } from './GameControls'
 import MatchDataUI from './MatchData'
 import React, { useEffect } from 'react'
-import { parseSan, parseSan2 } from '@/lib/matchReplay'
+import { parseSan2 } from '@/lib/matchReplay'
 import { useParams } from 'react-router-dom'
 import { getSanFromBlob } from '@/api'
 
@@ -144,7 +144,6 @@ export default function ReplayBoard() {
   const [isPlaying, setIsPlaying] = React.useState(false)
   const [sans, setSan] = React.useState<string[]>([])
 
-  console.log(id)
   useEffect(() => {
     const fetchSanFromBlob = async () => {
       try {

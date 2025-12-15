@@ -14,6 +14,15 @@ import {
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { myTournament } from '@/api'
+import { TournamentStatus, Visibility } from './CreateTournament'
+
+export type TournamentUpdate = {
+  bannerImageUrl?: string
+  sponsorLogoUrl?: string
+  customTags?: string[]
+  status: TournamentStatus
+  visibility: Visibility
+}
 
 export default function ManageTournament() {
   const { id } = useParams()
@@ -200,11 +209,10 @@ export default function ManageTournament() {
                   <Shield className="w-5 h-5 text-yellow-500" /> Configuration
                 </h3>
                 <span
-                  className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                    formData.status === 'DRAFT'
-                      ? 'bg-green-500/20 text-green-500'
-                      : 'bg-yellow-500/20 text-yellow-500'
-                  }`}
+                  className={`px-2 py-1 rounded text-xs font-bold uppercase ${formData.status === 'DRAFT'
+                    ? 'bg-green-500/20 text-green-500'
+                    : 'bg-yellow-500/20 text-yellow-500'
+                    }`}
                 >
                   {formData.status}
                 </span>
@@ -282,11 +290,10 @@ export default function ManageTournament() {
                           }))
                           setHasChanges(true)
                         }}
-                        className={`py-2 text-sm font-medium rounded-lg border transition-all ${
-                          formData.visibility === opt
-                            ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
-                            : 'bg-[#1f1f1f] border-[#333] text-gray-500 hover:border-[#444]'
-                        }`}
+                        className={`py-2 text-sm font-medium rounded-lg border transition-all ${formData.visibility === opt
+                          ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
+                          : 'bg-[#1f1f1f] border-[#333] text-gray-500 hover:border-[#444]'
+                          }`}
                       >
                         {opt}
                       </button>

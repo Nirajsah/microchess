@@ -1,5 +1,6 @@
 import { useWalletStore } from '@/store/wallet.ts'
 import { Piece, Square } from '../ChessBoard/types.ts'
+import { TournamentUpdate } from '@/Tournament/MyTournament.tsx'
 
 // export function connect_wallet(): Promise<any> {
 //   if (!window.linera) throw new Error('Linera extension not found.')
@@ -162,18 +163,22 @@ function buildGraphQLQuery(queryBody: string): string {
 /** ---------------------------------------Mutation---------------------- */
 
 export function hostTournament(input: any) {
-  // const mutation = `mutation { hostTournament(input: ${input}) }`
-  const inputJson = JSON.stringify(input)
+  const mutation = `{ "query": mutation { hostTournament(value: ${input}) } "}`
+  return request(mutation)
+}
 
-  // { "query": "query { mvString }" }
-
-  const m = `mutation { hostTournament(value: {organiserName: "Dove", tournamentName: "The", gameMode: STANDARD, prizeType: TOKENS, prizePool: 100, visibility: PUBLIC, customTags: ["abc"], status: DRAFT})}`
-  // 2. Use GraphQL variable syntax (recommended)
-  const mutation = `{ "query": mutation { hostTournament(value: "${inputJson}") } "}`
-  let query = buildGraphQLQuery(m)
-  console.log('final query', query)
+export function tournamentRegistration(tournamentId: string) {
+  const mutation = `mutation { tournamentRegistration(tournamentId: "${tournamentId}") }`
+  let query = buildGraphQLQuery(mutation)
   return request(query)
 }
+
+export function updateTournament(tournamentId: string, updates: TournamentUpdate) {
+  const mutation = `mutation { updateTournament(tournamentId: "${tournamentId} update: ${JSON.stringify(updates)}") }`
+  let query = buildGraphQLQuery(mutation)
+  return request(query)
+}
+
 // Start a new game
 export function startGame() {
   const mutation = `mutation { newGame }`
