@@ -46,6 +46,21 @@ function request(query: string): Promise<any> {
   // })
 }
 
+export function myTournaments() {
+  const query =
+    'query { myTournaments { tournamentId bannerImageUrl tournamentName tournamentFormat tournamentDescription status maxPlayers } }'
+  return request(buildGraphQLQuery(query))
+}
+
+export function myTournament(tournamentId: string) {
+  const query = `query { myTournament(tournamentId: "${tournamentId}") { organiserChain organiserId organiserName tournamentId bannerImageUrl sponsorLogoUrl tournamentName tournamentDescription tournamentFormat matchType gameMode maxPlayers minPlayers startingTime endTime roundCount status prizePool prizePoolDescription visibility } }`
+  return request(buildGraphQLQuery(query))
+}
+
+export function getSanFromBlob(blobHash: String) {
+  return request(`{ "query": "query { readMoves(hash: "${blobHash}") }" }`)
+}
+
 export function isGameChain() {
   return request(`{ "query": "query { isGameChain }" }`)
 }
@@ -145,6 +160,20 @@ function buildGraphQLQuery(queryBody: string): string {
 }
 
 /** ---------------------------------------Mutation---------------------- */
+
+export function hostTournament(input: any) {
+  // const mutation = `mutation { hostTournament(input: ${input}) }`
+  const inputJson = JSON.stringify(input)
+
+  // { "query": "query { mvString }" }
+
+  const m = `mutation { hostTournament(value: {organiserName: "Dove", tournamentName: "The", gameMode: STANDARD, prizeType: TOKENS, prizePool: 100, visibility: PUBLIC, customTags: ["abc"], status: DRAFT})}`
+  // 2. Use GraphQL variable syntax (recommended)
+  const mutation = `{ "query": mutation { hostTournament(value: "${inputJson}") } "}`
+  let query = buildGraphQLQuery(m)
+  console.log('final query', query)
+  return request(query)
+}
 // Start a new game
 export function startGame() {
   const mutation = `mutation { newGame }`

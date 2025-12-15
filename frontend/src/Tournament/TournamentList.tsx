@@ -1,49 +1,80 @@
-
 import Navbar from '../ChessBoard/Navbar'
 import { motion } from 'framer-motion'
 import { Button } from '../components/ui/button'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Users, Trophy, ArrowRight, Clock } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/utils'
+
+export type Tournaments = {
+    tournamentId: string,
+    tournamentName: string,
+    tournamentDescription: string,
+    tournamentFormat: string,
+    maxPlayers: number,
+    startingTime: number,
+    endTime: number,
+    prizePoolDescription: string,
+    visibility: string,
+    bannerImageUrl: string,
+    sponsorLogoUrl: string,
+    prizeType: string[],
+    createdAt: number,
+    status: string,
+}
 
 // Mock Data
-const tournaments = [
-    {
-        id: 't1',
-        name: 'Weekly Blitz Arena',
-        description: 'Fast-paced action for adrenaline junkies. 3+2 time control.',
-        format: 'Arena',
-        status: 'Registering',
-        players: '12/40',
-        prize: '$500',
-        startTime: 'In 2 hours',
-        image: 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=800&q=80'
-    },
-    {
-        id: 't2',
-        name: 'Grandmaster Clash 2025',
-        description: 'The ultimate battle for chess supremacy.',
-        format: 'Swiss',
-        status: 'Live',
-        players: '32/32',
-        prize: '$10,000',
-        startTime: 'Started',
-        image: 'https://images.unsplash.com/photo-1586165368502-1bad197a6461?w=800&q=80'
-    },
-    {
-        id: 't3',
-        name: 'Beginner Friendly Rapid',
-        description: 'A friendly environment for new players to learn and compete.',
-        format: 'Swiss',
-        status: 'Completed',
-        players: '24/24',
-        prize: 'NFT Badge',
-        startTime: 'Yesterday',
-        image: 'https://images.unsplash.com/photo-1580541832626-d297a73771de?w=800&q=80'
-    }
-]
+// Mock Data removed as it was unused and shadowed by state
 
 export default function TournamentList() {
     const navigate = useNavigate()
+    const [tournaments, setTournaments] = useState<Tournaments[]>([])
+    useEffect(() => {
+        async function getTournaments() {
+            const { data: tournaments } = await supabase
+                .from('tournaments')
+                .select(`
+                    tournamentId,
+                    tournamentName,
+                    tournamentDescription,
+                    tournamentFormat,
+                    maxPlayers,
+                    startingTime,
+                    endTime,
+                    prizePoolDescription,
+                    visibility,
+                    bannerImageUrl,
+                    sponsorLogoUrl,
+                    prizeType,
+                    createdAt,
+                    status
+                `)
+            if (!tournaments) return
+            setTournaments(tournaments)
+        }
+
+
+        getTournaments()
+
+        const channel_tournaments = supabase
+            .channel('tournaments-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'tournaments',
+                },
+                () => {
+                    getTournaments()
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel_tournaments)
+        }
+    }, [])
 
     return (
         <div className="min-h-screen w-full bg-[#161616] text-white flex flex-col font-sansation">
@@ -59,12 +90,20 @@ export default function TournamentList() {
                             </h1>
                             <p className="text-gray-400">Compete in high-stakes chess tournaments and win prizes.</p>
                         </div>
-                        <Button
-                            onClick={() => navigate('/create')}
-                            className="bg-yellow-600 hover:bg-yellow-500 text-white font-semibold text-lg py-6 px-8 rounded-full shadow-lg shadow-yellow-900/20 transition-all hover:scale-105"
-                        >
-                            <Plus className="w-5 h-5 mr-2" /> Host a Tournament
-                        </Button>
+                        <div className="flex gap-4">
+                            <Button
+                                onClick={() => navigate('/tournaments/my')}
+                                className="bg-[#262626] hover:bg-[#333] text-white font-semibold text-lg py-6 px-8 rounded-full border border-[#333] transition-all hover:scale-105"
+                            >
+                                <Trophy className="w-5 h-5 mr-2" /> My Tournaments
+                            </Button>
+                            <Button
+                                onClick={() => navigate('/tournaments/create')}
+                                className="bg-yellow-600 hover:bg-yellow-500 text-white font-semibold text-lg py-6 px-8 rounded-full shadow-lg shadow-yellow-900/20 transition-all hover:scale-105"
+                            >
+                                <Plus className="w-5 h-5 mr-2" /> Host a Tournament
+                            </Button>
+                        </div>
                     </div>
 
                     {/* Filters (Mock) */}
@@ -82,7 +121,7 @@ export default function TournamentList() {
                     {/* Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {tournaments.map((t, i) => (
-                            <TournamentCard key={t.id} tournament={t} index={i} onClick={() => navigate('/tournament')} />
+                            <TournamentCard key={t.tournamentId} tournament={t} index={i} onClick={() => navigate(`/tournaments/${t.tournamentId}`)} />
                         ))}
                     </div>
                 </div>
@@ -117,8 +156,8 @@ function TournamentCard({ tournament, index, onClick }: { tournament: any, index
             <div className="h-48 w-full relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-t from-[#262626] via-transparent to-transparent z-[1]" />
                 <img
-                    src={tournament.image}
-                    alt={tournament.name}
+                    src={tournament.bannerImageUrl}
+                    alt={tournament.tournamentName}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                 />
             </div>
@@ -127,10 +166,10 @@ function TournamentCard({ tournament, index, onClick }: { tournament: any, index
             <div className="p-6 flex flex-col gap-4 flex-1">
                 <div>
                     <h3 className="text-xl font-bold text-gray-100 group-hover:text-yellow-400 transition-colors mb-2">
-                        {tournament.name}
+                        {tournament.tournamentName}
                     </h3>
                     <p className="text-sm text-gray-400 line-clamp-2">
-                        {tournament.description}
+                        {tournament.tournamentDescription}
                     </p>
                 </div>
 
