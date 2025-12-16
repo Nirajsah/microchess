@@ -65,6 +65,9 @@ pub enum ChessResponse {
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
     // setup operations
+    HostTournament {
+        value: TournamentInput,
+    },
     TournamentRegistration {
         tournament_id: String,
     },
@@ -74,9 +77,6 @@ pub enum Operation {
     UpdateTournament {
         tournament_id: String,
         update: TournamentUpdate,
-    },
-    HostTournament {
-        value: TournamentInput,
     },
     NewGame,
     FrGame,

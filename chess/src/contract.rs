@@ -68,6 +68,10 @@ impl Contract for ChessContract {
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
         match operation {
+            Operation::HostTournament { value } => {
+                self.on_op_host_tournament(value);
+                ChessResponse::Ok
+            }
             Operation::TournamentRegistration { tournament_id } => {
                 self.on_op_tournament_registration(tournament_id);
                 ChessResponse::Ok
@@ -80,11 +84,8 @@ impl Contract for ChessContract {
                 tournament_id,
                 update,
             } => {
+                tracing::debug!("called to update tournament");
                 self.on_op_update_tournament(tournament_id, update);
-                ChessResponse::Ok
-            }
-            Operation::HostTournament { value } => {
-                self.on_op_host_tournament(value);
                 ChessResponse::Ok
             }
             Operation::DeleteChainMetadata => {
@@ -641,6 +642,7 @@ impl ChessContract {
         }
 
         let bytes = postcard::to_allocvec(&game.moves_string).unwrap();
+
         let blob_hash = self.runtime.create_data_blob(bytes);
 
         if let Some(winner) = game.winner {

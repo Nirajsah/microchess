@@ -63,26 +63,23 @@ impl ChessContract {
 
     pub fn on_op_update_tournament(&mut self, tournament_id: String, update: TournamentUpdate) {
         let app_chain = self.app_chain();
-        let my_tournament = self
-            .state
-            .my_tournaments
-            .get_mut()
+        let my_tournaments = self.state.my_tournaments.get_mut();
+
+        if let Some(tournament) = my_tournaments
             .iter_mut()
-            .find(|v| tournament_id == v.tournament_id);
-
-        if let Some(tournament) = my_tournament {
+            .find(|v| tournament_id == v.tournament_id)
+        {
             tournament.update(update.clone());
-
             if tournament.status == TournamentStatus::Draft {
                 return;
             }
         }
 
+        // Always send message if not early return
         let message = Message::UpdateTournament {
-            tournament_id: tournament_id.clone(),
+            tournament_id,
             update,
         };
-
         self.runtime.send_message(app_chain, message);
     }
 }

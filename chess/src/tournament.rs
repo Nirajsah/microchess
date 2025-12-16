@@ -1,6 +1,6 @@
 use async_graphql::{Enum, InputObject, SimpleObject};
 use linera_sdk::linera_base_types::{AccountOwner, ChainId, Timestamp};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 /// The main Tournament object used for output (Queries).
 #[derive(Debug, Serialize, Deserialize, Clone, SimpleObject)]
@@ -21,25 +21,18 @@ pub struct Tournament {
     pub time_control: Option<TimeControl>,
     pub max_players: Option<u32>,
     pub min_players: Option<u32>,
-    pub round_count: Option<u16>,
-    pub allow_late_join: bool,
 
     // --- Schedule ---
     pub starting_time: Timestamp,
     pub end_time: Timestamp,
-    pub round_time_limit_minutes: Option<Timestamp>,
-    pub check_in_time: Option<Timestamp>,
 
     // --- Rewards ---
-    pub prize_type: Vec<PrizeType>,
+    pub prize_type: PrizeType,
     pub prize_pool: u32,
     pub prize_pool_description: Option<String>,
 
     // --- Access & Privacy ---
     pub visibility: Visibility,
-    pub invite_only: bool,
-    pub access_code: Option<String>,
-
     // --- Branding ---
     pub banner_image_url: Option<String>,
     pub sponsor_logo_url: Option<String>,
@@ -54,6 +47,14 @@ pub struct Tournament {
 
 impl Tournament {
     pub fn update(&mut self, update: TournamentUpdate) {
+        if let Some(tournament_name) = update.tournament_name {
+            self.tournament_name = tournament_name;
+        }
+
+        if let Some(tournament_desc) = update.tournament_description {
+            self.tournament_description = Some(tournament_desc);
+        }
+
         if let Some(banner) = update.banner_image_url {
             self.banner_image_url = Some(banner);
         }
@@ -62,12 +63,28 @@ impl Tournament {
             self.sponsor_logo_url = Some(logo);
         }
 
-        if !update.custom_tags.is_empty() {
-            self.custom_tags = update.custom_tags;
+        if let Some(custom_tags) = update.custom_tags {
+            if !custom_tags.is_empty() {
+                self.custom_tags = custom_tags;
+            }
         }
 
-        if let Some(status) = update.status {
-            self.status = status;
+        if self.status == TournamentStatus::Draft {
+            if let Some(status) = update.status {
+                self.status = status;
+            }
+        }
+
+        if self.status == TournamentStatus::Draft {
+            if let Some(prize_type) = update.prize_type {
+                self.prize_type = prize_type;
+            }
+        }
+
+        if self.status == TournamentStatus::Draft && self.prize_type == PrizeType::Tokens {
+            if let Some(prize_pool) = update.prize_pool {
+                self.prize_pool = prize_pool;
+            }
         }
 
         if let Some(visibility) = update.visibility {
@@ -86,7 +103,6 @@ pub struct TournamentInput {
     pub tournament_id: Option<String>, // Generated system-side if not provided
     pub tournament_name: String,
     pub tournament_description: Option<String>,
-
     // --- Format & Rules ---
     pub tournament_format: Option<TournamentFormat>,
     pub match_type: Option<MatchType>,
@@ -94,24 +110,18 @@ pub struct TournamentInput {
     pub time_control: Option<TimeControlInput>,
     pub max_players: Option<u32>,
     pub min_players: Option<u32>,
-    pub round_count: Option<u16>,
-    pub allow_late_join: Option<bool>,
 
     // --- Schedule ---
-    pub starting_time: Option<Timestamp>,
-    pub end_time: Option<Timestamp>,
-    pub round_time_limit_minutes: Option<Timestamp>,
-    pub check_in_time: Option<Timestamp>,
+    pub starting_time: Option<u64>,
+    pub end_time: Option<u64>,
 
     // --- Rewards ---
-    pub prize_type: Vec<PrizeType>,
+    pub prize_type: Option<PrizeType>,
     pub prize_pool: u32,
     pub prize_pool_description: Option<String>,
 
     // --- Access & Privacy ---
     pub visibility: Visibility,
-    pub invite_only: Option<bool>,
-    pub access_code: Option<String>,
 
     // --- Branding ---
     pub banner_image_url: Option<String>,
@@ -129,25 +139,17 @@ pub struct TournamentInput {
 #[derive(Debug, Serialize, Deserialize, Clone, InputObject)]
 pub struct TournamentUpdate {
     // --- Branding Updates ---
+    pub tournament_name: Option<String>,
+    pub tournament_description: Option<String>,
     pub banner_image_url: Option<String>,
     pub sponsor_logo_url: Option<String>,
-    pub custom_tags: Vec<String>,
+    pub custom_tags: Option<Vec<String>>,
+    pub prize_pool: Option<u32>,
+    pub prize_type: Option<PrizeType>,
 
     // --- System Status Updates ---
     pub status: Option<TournamentStatus>,
     pub visibility: Option<Visibility>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Copy, Enum, Eq)]
-pub enum TournamentUpdates {
-    // Branding
-    BannerImage,
-    SponsorLogo,
-    CustomTags,
-
-    // System
-    Status,
-    Visibility,
 }
 
 const TOURNAMENT_VERSION: &str = "v1";
@@ -170,24 +172,18 @@ impl From<TournamentInput> for Tournament {
             time_control: None,
             max_players: input.max_players,
             min_players: input.min_players,
-            round_count: input.round_count,
-            allow_late_join: input.allow_late_join.unwrap_or(false),
 
             // Schedule
-            starting_time: input.starting_time.unwrap_or(Timestamp::from(600)),
-            end_time: input.end_time.unwrap_or(Timestamp::from(600)),
-            round_time_limit_minutes: None,
-            check_in_time: None,
+            starting_time: Timestamp::from(input.starting_time.unwrap_or(0)),
+            end_time: Timestamp::from(input.end_time.unwrap_or(0)),
 
             // Rewards
-            prize_type: input.prize_type,
+            prize_type: input.prize_type.unwrap_or(PrizeType::Tokens),
             prize_pool: input.prize_pool,
             prize_pool_description: input.prize_pool_description,
 
             // Access
             visibility: input.visibility,
-            invite_only: input.invite_only.unwrap_or(false),
-            access_code: input.access_code,
 
             // Branding
             banner_image_url: input.banner_image_url,
@@ -222,7 +218,7 @@ impl TournamentInput {
 }
 
 /// Supported tournament formats
-#[derive(Debug, Clone, PartialEq, Copy, Enum, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Copy, Enum, Eq)]
 pub enum TournamentFormat {
     Swiss,
     RoundRobin,
@@ -231,97 +227,15 @@ pub enum TournamentFormat {
     DoubleElim,
 }
 
-impl serde::Serialize for TournamentFormat {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // GraphQL typically outputs SCREAMING_SNAKE_CASE, but we can stick to snake_case for internal logic
-        // or align with what GraphQL is doing. Since the error was "expected swiss", the test JSON deserializer
-        // was looking for "swiss", but GraphQL returned "SWISS".
-        // Let's standardise on what matches async-graphql's default if we want zero-config, or force snake_case.
-        // Given we are writing manual impls, let's output snake_case which is usually preferred in JSON.
-        let s = match self {
-            TournamentFormat::Swiss => "swiss",
-            TournamentFormat::RoundRobin => "round_robin",
-            TournamentFormat::Arena => "arena",
-            TournamentFormat::SingleElim => "single_elim",
-            TournamentFormat::DoubleElim => "double_elim",
-        };
-        serializer.serialize_str(s)
-    }
-}
-
-impl<'de> Deserialize<'de> for TournamentFormat {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw = String::deserialize(deserializer)?;
-        let normalized = raw.to_lowercase(); // Handle SWISS -> swiss
-
-        match normalized.as_str() {
-            "swiss" => Ok(TournamentFormat::Swiss),
-            "round_robin" | "roundrobin" => Ok(TournamentFormat::RoundRobin),
-            "arena" => Ok(TournamentFormat::Arena),
-            "single_elim" | "singleelim" => Ok(TournamentFormat::SingleElim),
-            "double_elim" | "doubleelim" => Ok(TournamentFormat::DoubleElim),
-            _ => Err(serde::de::Error::unknown_variant(
-                &raw,
-                &[
-                    "swiss",
-                    "round_robin",
-                    "arena",
-                    "single_elim",
-                    "double_elim",
-                ],
-            )),
-        }
-    }
-}
 
 /// Match type / series
-#[derive(Debug, Clone, PartialEq, Copy, Enum, Eq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Copy, Enum, Eq)]
 pub enum MatchType {
     Bo1,
     Bo3,
     Bo5,
 }
 
-impl serde::Serialize for MatchType {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = match self {
-            MatchType::Bo1 => "bo1",
-            MatchType::Bo3 => "bo3",
-            MatchType::Bo5 => "bo5",
-        };
-        serializer.serialize_str(s)
-    }
-}
-
-impl<'de> Deserialize<'de> for MatchType {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw = String::deserialize(deserializer)?;
-
-        let normalized = raw.to_lowercase().replace('_', "").replace('-', "");
-
-        match normalized.as_str() {
-            "bo1" => Ok(MatchType::Bo1),
-            "bo3" => Ok(MatchType::Bo3),
-            "bo5" => Ok(MatchType::Bo5),
-            _ => Err(serde::de::Error::unknown_variant(
-                &raw,
-                &["bo1", "bo3", "bo5"],
-            )),
-        }
-    }
-}
 /// Simple time control representation (e.g., 3+2)
 #[derive(Debug, Serialize, Deserialize, Clone, SimpleObject)]
 #[serde(rename_all = "camelCase")]
@@ -351,118 +265,32 @@ impl From<TimeControlInput> for TimeControl {
 }
 
 /// Optional game mode (for variants)
-#[derive(Debug, Clone, PartialEq, Copy, Enum, Eq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Copy, Enum, Eq)]
 pub enum GameMode {
     Standard,
     Microchess,
     Crazyhouse,
 }
 
-impl serde::Serialize for GameMode {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = match self {
-            GameMode::Standard => "standard",
-            GameMode::Microchess => "microchess",
-            GameMode::Crazyhouse => "crazyhouse",
-        };
-        serializer.serialize_str(s)
-    }
-}
-
-impl<'de> Deserialize<'de> for GameMode {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw = String::deserialize(deserializer)?;
-        match raw.to_lowercase().as_str() {
-            "standard" => Ok(GameMode::Standard),
-            "microchess" => Ok(GameMode::Microchess),
-            "crazyhouse" => Ok(GameMode::Crazyhouse),
-            _ => Err(serde::de::Error::unknown_variant(
-                &raw,
-                &["standard", "microchess", "crazyhouse"],
-            )),
-        }
-    }
-}
 
 /// Prize types supported
-#[derive(Debug, Clone, PartialEq, Copy, Enum, Eq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Copy, Enum, Eq)]
 pub enum PrizeType {
     Nft,
     Tokens,
 }
 
-impl serde::Serialize for PrizeType {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = match self {
-            PrizeType::Nft => "nft",
-            PrizeType::Tokens => "tokens",
-        };
-        serializer.serialize_str(s)
-    }
-}
-
-impl<'de> Deserialize<'de> for PrizeType {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw = String::deserialize(deserializer)?;
-        match raw.to_lowercase().as_str() {
-            "nft" => Ok(PrizeType::Nft),
-            "tokens" => Ok(PrizeType::Tokens),
-            _ => Err(serde::de::Error::unknown_variant(&raw, &["nft", "tokens"])),
-        }
-    }
-}
 
 /// Tournament visibility
-#[derive(Debug, Clone, PartialEq, Copy, Enum, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Copy, Enum, Eq)]
 pub enum Visibility {
     Public,
     Private,
 }
 
-impl serde::Serialize for Visibility {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = match self {
-            Visibility::Public => "public",
-            Visibility::Private => "private",
-        };
-        serializer.serialize_str(s)
-    }
-}
-
-impl<'de> Deserialize<'de> for Visibility {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw = String::deserialize(deserializer)?;
-        match raw.to_lowercase().as_str() {
-            "public" => Ok(Visibility::Public),
-            "private" => Ok(Visibility::Private),
-            _ => Err(serde::de::Error::unknown_variant(
-                &raw,
-                &["public", "private"],
-            )),
-        }
-    }
-}
 
 /// Tournament status lifecycle
-#[derive(Debug, Clone, PartialEq, Copy, Enum, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Copy, Enum, Eq)]
 pub enum TournamentStatus {
     Draft,
     RegistrationOpen,
@@ -472,50 +300,3 @@ pub enum TournamentStatus {
     Cancelled,
 }
 
-impl serde::Serialize for TournamentStatus {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = match self {
-            TournamentStatus::Draft => "draft",
-            TournamentStatus::RegistrationOpen => "registration_open",
-            TournamentStatus::RegistrationClosed => "registration_closed",
-            TournamentStatus::InProgress => "in_progress",
-            TournamentStatus::Completed => "completed",
-            TournamentStatus::Cancelled => "cancelled",
-        };
-        serializer.serialize_str(s)
-    }
-}
-
-impl<'de> Deserialize<'de> for TournamentStatus {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let raw = String::deserialize(deserializer)?;
-        let normalized = raw.to_lowercase(); // Handle REGISTRATION_CLOSED -> registration_closed
-        match normalized.as_str() {
-            "draft" => Ok(TournamentStatus::Draft),
-            "registration_open" => Ok(TournamentStatus::RegistrationOpen),
-            "registration_closed" | "registrationclosed" => {
-                Ok(TournamentStatus::RegistrationClosed)
-            }
-            "in_progress" | "inprogress" => Ok(TournamentStatus::InProgress),
-            "completed" => Ok(TournamentStatus::Completed),
-            "cancelled" => Ok(TournamentStatus::Cancelled),
-            _ => Err(serde::de::Error::unknown_variant(
-                &raw,
-                &[
-                    "draft",
-                    "registration_open",
-                    "registration_closed",
-                    "in_progress",
-                    "completed",
-                    "cancelled",
-                ],
-            )),
-        }
-    }
-}
