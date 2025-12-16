@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import { Users, Trophy, Settings, ChevronLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-type MyTournaments = {
+type MyTournament = {
   tournamentId: string
   tournamentName: string
   tournamentDescription: string
@@ -19,7 +19,7 @@ type MyTournaments = {
 export default function MyTournaments() {
   const navigate = useNavigate()
 
-  const [tournaments, setTournamentsList] = useState<MyTournaments[]>([])
+  const [tournaments, setTournamentsList] = useState<MyTournament[]>([])
 
   useEffect(() => {
     const fetchMyTournaments = async () => {
@@ -74,7 +74,7 @@ export default function MyTournaments() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tournaments.map((t: any) => (
+              {tournaments.map((t: MyTournament) => (
                 <div
                   key={t.tournamentId}
                   onClick={() => navigate(`/tournaments/my/${t.tournamentId}`)}
@@ -83,19 +83,17 @@ export default function MyTournaments() {
                   <div className="h-48 w-full relative overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-t from-[#262626] via-transparent to-transparent z-[1]" />
                     <img
-                      src={
-                        t.banner_image_url ||
-                        'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=800&q=80'
-                      }
-                      alt={t.tournament_name}
+                      src={t.bannerImageUrl}
+                      alt={t.bannerImageUrl}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     />
                     <div className="absolute top-3 right-3 z-10 flex gap-2">
                       <span
-                        className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wide backdrop-blur-md border border-white/10 ${t.status === 'Published'
+                        className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wide backdrop-blur-md border border-white/10 ${
+                          t.status === 'Published'
                             ? 'bg-green-500/80 text-white'
                             : 'bg-gray-700/80 text-gray-300'
-                          }`}
+                        }`}
                       >
                         {t.status}
                       </span>
@@ -103,15 +101,15 @@ export default function MyTournaments() {
                   </div>
                   <div className="p-6 flex flex-col gap-3 flex-1">
                     <h3 className="text-xl font-bold text-white group-hover:text-yellow-400 transition-colors">
-                      {t.tournament_name}
+                      {t.tournamentName}
                     </h3>
                     <div className="flex items-center gap-4 text-sm text-gray-400">
                       <span className="flex items-center gap-1">
-                        <Users className="w-4 h-4" /> {t.players_joined}/
-                        {t.max_players}
+                        <Users className="w-4 h-4" />
+                        {t.maxPlayers}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Trophy className="w-4 h-4" /> ${t.prize_pool}
+                        <Trophy className="w-4 h-4" /> ${t.prizePool}
                       </span>
                     </div>
                     <div className="mt-auto pt-4 flex items-center justify-between text-yellow-500 font-medium text-sm">

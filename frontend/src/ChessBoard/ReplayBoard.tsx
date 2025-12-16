@@ -1,4 +1,4 @@
-import { Color, Piece, Square, SquareToPieceMap } from './types'
+import { Color, Square, SquareToPieceMap } from './types'
 import { pieceImages } from '../ChessBoard/ChessTile'
 import { ThemeName, themes } from '@/components/theme'
 import { useUserStore } from '@/store/microchess'

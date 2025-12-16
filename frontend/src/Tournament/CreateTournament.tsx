@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Navbar from '../ChessBoard/Navbar'
 import { motion } from 'framer-motion'
 import { Button } from '../components/ui/button'
@@ -21,34 +21,27 @@ import { useUserStore } from '@/store/microchess'
 import { toast } from 'sonner'
 
 // Define input types matching the GraphQL schema
-interface TimeControlInput {
+export interface TimeControlInput {
   baseMinutes: number
   incrementSeconds: number
 }
 
-interface TournamentInput {
+export interface TournamentInput {
   organiserName: string
-  tournamentId?: string
   tournamentName: string
   tournamentDescription: string
   tournamentFormat: TournamentFormat
   matchType: MatchType
   gameMode: GameMode
   timeControl: TimeControlInput
-  maxPlayers?: number
-  minPlayers?: number
-  roundCount?: number
-  allowLateJoin: boolean
-  startingTime: string // ISO timestamp
-  endTime: string // ISO timestamp
-  roundTimeLimitMinutes: number // Convert to number, schema expects Timestamp but likely minutes
-  checkInTime: string // ISO timestamp
-  prizeType: PrizeType[]
+  maxPlayers: number
+  minPlayers: number
+  startingTime: number // ISO timestamp
+  endTime: number // ISO timestamp
+  prizeType: PrizeType
   prizePool: number
   prizePoolDescription?: string
   visibility: Visibility
-  inviteOnly: boolean
-  accessCode?: string
   bannerImageUrl?: string
   sponsorLogoUrl?: string
   status: TournamentStatus
@@ -56,7 +49,7 @@ interface TournamentInput {
 }
 
 // Enums matching GraphQL schema
-enum TournamentFormat {
+export enum TournamentFormat {
   SWISS = 'SWISS',
   ROUND_ROBIN = 'ROUND_ROBIN',
   ARENA = 'ARENA',
@@ -64,19 +57,19 @@ enum TournamentFormat {
   DOUBLE_ELIM = 'DOUBLE_ELIM',
 }
 
-enum MatchType {
+export enum MatchType {
   BO_1 = 'BO_1',
   BO_3 = 'BO_3',
   BO_5 = 'BO_5',
 }
 
-enum GameMode {
+export enum GameMode {
   MICROCHESS = 'MICROCHESS',
   STANDARD = 'STANDARD',
   CRAZYHOUSE = 'CRAZYHOUSE',
 }
 
-enum PrizeType {
+export enum PrizeType {
   NFT = 'NFT',
   TOKENS = 'TOKENS',
 }
@@ -113,18 +106,12 @@ export default function CreateTournament() {
     },
     maxPlayers: 16,
     minPlayers: 4,
-    roundCount: 5,
-    allowLateJoin: false,
-    startingTime: '',
-    endTime: '',
-    checkInTime: '',
-    roundTimeLimitMinutes: 60,
-    prizeType: [PrizeType.TOKENS], // Array as per schema
+    startingTime: 0,
+    endTime: 0,
+    prizeType: PrizeType.TOKENS, // Array as per schema
     prizePool: 0,
     prizePoolDescription: '',
     visibility: Visibility.PUBLIC,
-    inviteOnly: false,
-    accessCode: '',
     bannerImageUrl: '',
     sponsorLogoUrl: '',
     status: TournamentStatus.DRAFT,
@@ -148,11 +135,6 @@ export default function CreateTournament() {
         return {
           ...prev,
           [name]: Number(value),
-        }
-      } else if (name === 'prizeType') {
-        return {
-          ...prev,
-          [name]: [value as PrizeType],
         }
       } else if (name === 'customTags') {
         // Keep it simple for now, we might need a better tag input later
@@ -181,12 +163,31 @@ export default function CreateTournament() {
   //   })
   // }, [formData.gameMode])
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    setFormData((prev) => {
+      return {
+        ...prev,
+        organiserName: name!,
+      }
+    })
+  }, [name])
+
+  const handleSubmit = async () => {
     if (!formData.organiserName) {
       toast.error('Organiser name is required, update your profile')
       return
     }
-    console.log('Creating tournament:', formData)
+    const submitData = {
+      ...formData,
+      prizePool: Number(formData.prizePool),
+      customTags: Array.isArray(formData.customTags) ? formData.customTags : [],
+    }
+    try {
+      await hostTournament(submitData)
+      toast.success('Saved to Draft')
+    } catch (error) {
+      console.error('Failed to create tournament:', error)
+    }
   }
 
   const handleSaveDraft = async () => {
@@ -194,7 +195,18 @@ export default function CreateTournament() {
       toast.error('Organiser name is required, update your profile')
       return
     }
-    await hostTournament(formData)
+
+    const submitData = {
+      ...formData,
+      prizePool: Number(formData.prizePool),
+      customTags: Array.isArray(formData.customTags) ? formData.customTags : [],
+    }
+    try {
+      await hostTournament(submitData)
+      toast.success('Saved to Draft')
+    } catch (error) {
+      console.error('Failed to create tournament:', error)
+    }
   }
 
   return (
@@ -222,19 +234,21 @@ export default function CreateTournament() {
           <div className="flex items-center bg-[#262626] p-1.5 rounded-[18px] border border-[#333]">
             <button
               onClick={() => setPreviewMode(false)}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-[14px] text-sm font-medium transition-all ${!previewMode
-                ? 'bg-[#333] text-white shadow-sm ring-1 ring-white/5'
-                : 'text-gray-500 hover:text-gray-300'
-                }`}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-[14px] text-sm font-medium transition-all ${
+                !previewMode
+                  ? 'bg-[#333] text-white shadow-sm ring-1 ring-white/5'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
             >
               <Settings className="w-4 h-4" /> Editor
             </button>
             <button
               onClick={() => setPreviewMode(true)}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-[14px] text-sm font-medium transition-all ${previewMode
-                ? 'bg-[#333] text-white shadow-sm ring-1 ring-white/5'
-                : 'text-gray-500 hover:text-gray-300'
-                }`}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-[14px] text-sm font-medium transition-all ${
+                previewMode
+                  ? 'bg-[#333] text-white shadow-sm ring-1 ring-white/5'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
             >
               <Eye className="w-4 h-4" /> Preview
             </button>
@@ -452,46 +466,12 @@ export default function CreateTournament() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Rounds</Label>
-                      <Input
-                        name="roundCount"
-                        type="number"
-                        value={formData.roundCount}
-                        onChange={handleChange}
-                        className="bg-[#1f1f1f] border-[#333] rounded-xl"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Round Time (Min)</Label>
-                      <Input
-                        name="roundTimeLimitMinutes"
-                        type="number"
-                        value={formData.roundTimeLimitMinutes}
-                        onChange={handleChange}
-                        className="bg-[#1f1f1f] border-[#333] rounded-xl"
-                      />
-                    </div>
-                  </div>
-
                   <div className="space-y-2">
                     <Label>Start Date</Label>
                     <Input
                       name="startingTime"
                       type="datetime-local"
                       value={formData.startingTime}
-                      onChange={handleChange}
-                      className="bg-[#1f1f1f] border-[#333] text-sm rounded-xl"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Check-In Time</Label>
-                    <Input
-                      name="checkInTime"
-                      type="datetime-local"
-                      value={formData.checkInTime}
                       onChange={handleChange}
                       className="bg-[#1f1f1f] border-[#333] text-sm rounded-xl"
                     />
@@ -506,43 +486,6 @@ export default function CreateTournament() {
                       onChange={handleChange}
                       className="bg-[#1f1f1f] border-[#333] text-sm rounded-xl"
                     />
-                  </div>
-
-                  <div className="space-y-4 pt-4 border-t border-[#333]">
-                    <div className="flex items-center justify-between">
-                      <Label>Allow Late Join</Label>
-                      <input
-                        type="checkbox"
-                        name="allowLateJoin"
-                        checked={formData.allowLateJoin}
-                        onChange={handleChange}
-                        className="w-5 h-5 rounded border-gray-600 bg-[#1f1f1f] text-yellow-500 focus:ring-yellow-500"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <Label>Invite Only</Label>
-                      <input
-                        type="checkbox"
-                        name="inviteOnly"
-                        checked={formData.inviteOnly}
-                        onChange={handleChange}
-                        className="w-5 h-5 rounded border-gray-600 bg-[#1f1f1f] text-yellow-500 focus:ring-yellow-500"
-                      />
-                    </div>
-
-                    {formData.inviteOnly && (
-                      <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                        <Label>Access Code</Label>
-                        <Input
-                          name="accessCode"
-                          value={formData.accessCode}
-                          onChange={handleChange}
-                          placeholder="Secret Code"
-                          className="bg-[#1f1f1f] border-[#333] rounded-xl"
-                        />
-                      </div>
-                    )}
                   </div>
 
                   <div className="pt-4 border-t border-[#333]">
@@ -561,10 +504,11 @@ export default function CreateTournament() {
                               visibility: opt.value,
                             }))
                           }
-                          className={`py-2 text-sm font-medium rounded-lg border transition-all ${formData.visibility === opt.value
-                            ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
-                            : 'bg-[#1f1f1f] border-[#333] text-gray-500 hover:border-[#444]'
-                            }`}
+                          className={`py-2 text-sm font-medium rounded-lg border transition-all ${
+                            formData.visibility === opt.value
+                              ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
+                              : 'bg-[#1f1f1f] border-[#333] text-gray-500 hover:border-[#444]'
+                          }`}
                         >
                           {opt.label}
                         </button>
@@ -796,7 +740,6 @@ const Select = ({ name, value, onChange, options }: any) => (
 
 function ImageUploadInput({
   label,
-  name,
   value,
   onChange,
   aspect = 'aspect-video',
@@ -822,19 +765,21 @@ function ImageUploadInput({
         <div className="flex gap-2">
           <button
             onClick={() => setMode('link')}
-            className={`text-xs px-2 py-1 rounded ${mode === 'link'
-              ? 'text-yellow-500 bg-yellow-500/10'
-              : 'text-gray-500'
-              }`}
+            className={`text-xs px-2 py-1 rounded ${
+              mode === 'link'
+                ? 'text-yellow-500 bg-yellow-500/10'
+                : 'text-gray-500'
+            }`}
           >
             Link
           </button>
           <button
             onClick={() => setMode('upload')}
-            className={`text-xs px-2 py-1 rounded ${mode === 'upload'
-              ? 'text-yellow-500 bg-yellow-500/10'
-              : 'text-gray-500'
-              }`}
+            className={`text-xs px-2 py-1 rounded ${
+              mode === 'upload'
+                ? 'text-yellow-500 bg-yellow-500/10'
+                : 'text-gray-500'
+            }`}
           >
             Upload
           </button>

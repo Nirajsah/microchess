@@ -1,6 +1,7 @@
 import { useWalletStore } from '@/store/wallet.ts'
 import { Piece, Square } from '../ChessBoard/types.ts'
 import { TournamentUpdate } from '@/Tournament/MyTournament.tsx'
+import { TournamentInput } from '@/Tournament/CreateTournament.tsx'
 
 // export function connect_wallet(): Promise<any> {
 //   if (!window.linera) throw new Error('Linera extension not found.')
@@ -49,17 +50,19 @@ function request(query: string): Promise<any> {
 
 export function myTournaments() {
   const query =
-    'query { myTournaments { tournamentId bannerImageUrl tournamentName tournamentFormat tournamentDescription status maxPlayers } }'
+    'query { myTournaments { tournamentId bannerImageUrl tournamentName tournamentFormat tournamentDescription status maxPlayers prizePool } }'
   return request(buildGraphQLQuery(query))
 }
 
 export function myTournament(tournamentId: string) {
-  const query = `query { myTournament(tournamentId: "${tournamentId}") { organiserChain organiserId organiserName tournamentId bannerImageUrl sponsorLogoUrl tournamentName tournamentDescription tournamentFormat matchType gameMode maxPlayers minPlayers startingTime endTime roundCount status prizePool prizePoolDescription visibility } }`
+  const query = `query { myTournament(tournamentId: "${tournamentId}") { organiserChain organiserId organiserName tournamentId bannerImageUrl sponsorLogoUrl tournamentName tournamentDescription tournamentFormat matchType gameMode maxPlayers minPlayers startingTime endTime status prizePool prizePoolDescription visibility } }`
   return request(buildGraphQLQuery(query))
 }
 
-export function getSanFromBlob(blobHash: String) {
-  return request(`{ "query": "query { readMoves(hash: "${blobHash}") }" }`)
+export function getSanFromBlob(blobHash: string) {
+  const query = `query { readMoves(hash: "${blobHash}") }`
+  const gqlQuery = JSON.stringify({ query: query })
+  return request(gqlQuery)
 }
 
 export function isGameChain() {
@@ -162,9 +165,33 @@ function buildGraphQLQuery(queryBody: string): string {
 
 /** ---------------------------------------Mutation---------------------- */
 
-export function hostTournament(input: any) {
-  const mutation = `{ "query": mutation { hostTournament(value: ${input}) } "}`
-  return request(mutation)
+export function hostTournament(input: TournamentInput) {
+  const m = `mutation { hostTournament(value: {
+    organiserName: "${input.organiserName}", 
+    tournamentName: "${input.tournamentName}", 
+    tournamentDescription: "${input.tournamentDescription}",
+    tournamentFormat: "${input.tournamentFormat}"
+    matchType: "${input.matchType}",
+    gameMode: "${input.gameMode}", 
+    timeControl: {
+      baseMinutes: ${input.timeControl.baseMinutes},
+      incrementSeconds: ${input.timeControl.incrementSeconds},
+    },
+    maxPlayers: ${input.maxPlayers},
+    minPlayers: ${input.minPlayers},
+    startingTime: ${input.startingTime},
+    endTime: ${input.endTime},
+    prizeType: "${input.prizeType}", 
+    prizePool: ${input.prizePool}, 
+    prizePoolDescription: "${input.prizePoolDescription}",
+    bannerImageUrl: "${input.bannerImageUrl}",
+    sponsorLogoUrl: "${input.sponsorLogoUrl}",
+    visibility: "${input.visibility}", 
+    customTags: "${input.customTags}", 
+    status: "${input.status}"
+  }) }`
+  const gqlQuery = JSON.stringify({ query: m })
+  return request(gqlQuery)
 }
 
 export function tournamentRegistration(tournamentId: string) {
@@ -173,10 +200,24 @@ export function tournamentRegistration(tournamentId: string) {
   return request(query)
 }
 
-export function updateTournament(tournamentId: string, updates: TournamentUpdate) {
-  const mutation = `mutation { updateTournament(tournamentId: "${tournamentId} update: ${JSON.stringify(updates)}") }`
-  let query = buildGraphQLQuery(mutation)
-  return request(query)
+export function updateTournament(
+  tournamentId: string,
+  updates: TournamentUpdate
+) {
+  const m = `mutation { updateTournament(tournamentId: "${tournamentId}" update: {
+      tournamentName: "${updates.tournamentName}",
+      tournamentDescription: "${updates.tournamentDescription}",
+      bannerImageUrl: "${updates.bannerImageUrl}",
+      sponsorLogoUrl: "${updates.sponsorLogoUrl}",
+      customTags: "${updates.customTags}",
+      status: "${updates.status}",
+      prizePool: ${updates.prizePool},
+      prizeType: "${updates.prizeType}",
+      visibility: "${updates.visibility}",
+    }) }`
+
+  const gqlQuery = JSON.stringify({ query: m })
+  return request(gqlQuery)
 }
 
 // Start a new game

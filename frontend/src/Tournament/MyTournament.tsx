@@ -13,14 +13,19 @@ import {
   Share2,
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { myTournament } from '@/api'
-import { TournamentStatus, Visibility } from './CreateTournament'
+import { myTournament, updateTournament } from '@/api'
+import { PrizeType, TournamentStatus, Visibility } from './CreateTournament'
+import { toast } from 'sonner'
 
 export type TournamentUpdate = {
+  tournamentName?: string
+  tournamentDescription?: string
   bannerImageUrl?: string
   sponsorLogoUrl?: string
   customTags?: string[]
   status: TournamentStatus
+  prizePool: number
+  prizeType?: PrizeType
   visibility: Visibility
 }
 
@@ -40,7 +45,6 @@ export default function ManageTournament() {
         setTournament(data)
         setFormData(data)
         setLoading(false)
-        console.log(data, 'here is the response')
       } catch (error) {
         console.error('Error fetching my tournaments:', error)
       }
@@ -62,7 +66,20 @@ export default function ManageTournament() {
     // Mock update API call
     setTournament(formData)
     setHasChanges(false)
-    alert('Tournament updated successfully!')
+    const submitData = {
+      ...formData,
+      prizeType: formData.prizeType || PrizeType.TOKENS,
+      prizePool: Number(formData.prizePool),
+      customTags: Array.isArray(formData.customTags) ? formData.customTags : [],
+    }
+
+    updateTournament(tournament.tournamentId, submitData)
+      .then(() => {
+        toast.success('Tournament Update Saved')
+      })
+      .catch(() => {
+        toast.error('Failed to Update')
+      })
   }
 
   const handlePublish = () => {
@@ -151,7 +168,7 @@ export default function ManageTournament() {
                 <div className="space-y-2">
                   <Label>Tournament Name</Label>
                   <Input
-                    name="tournament_name"
+                    name="tournamentName"
                     value={formData.tournamentName}
                     onChange={handleChange}
                     className="h-12 bg-[#262626] border-[#333] focus:border-yellow-600/50 text-base rounded-xl text-white"
@@ -160,8 +177,8 @@ export default function ManageTournament() {
                 <div className="space-y-2">
                   <Label>Description</Label>
                   <textarea
-                    name="tournament_description"
-                    value={formData.tournamentDescription}
+                    name="tournamentDescription"
+                    value={formData.tournamentDescription || ''}
                     onChange={handleChange}
                     className="w-full bg-[#262626] border border-[#333] rounded-xl p-4 text-white text-base focus:outline-none focus:border-yellow-600/50 min-h-[160px] resize-y placeholder:text-gray-500 transition-colors"
                   />
@@ -173,7 +190,7 @@ export default function ManageTournament() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <ImageUploadInput
                   label="Banner Image"
-                  name="banner_image_url"
+                  name="bannerImageUrl"
                   value={formData.bannerImageUrl}
                   onChange={(val) => {
                     setFormData((prev: any) => ({
@@ -186,7 +203,7 @@ export default function ManageTournament() {
                 />
                 <ImageUploadInput
                   label="Sponsor Logo"
-                  name="sponsor_logo_url"
+                  name="sponsorLogoUrl"
                   value={formData.sponsorLogoUrl}
                   onChange={(val) => {
                     setFormData((prev: any) => ({
@@ -209,10 +226,11 @@ export default function ManageTournament() {
                   <Shield className="w-5 h-5 text-yellow-500" /> Configuration
                 </h3>
                 <span
-                  className={`px-2 py-1 rounded text-xs font-bold uppercase ${formData.status === 'DRAFT'
-                    ? 'bg-green-500/20 text-green-500'
-                    : 'bg-yellow-500/20 text-yellow-500'
-                    }`}
+                  className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                    formData.status === 'DRAFT'
+                      ? 'bg-green-500/20 text-green-500'
+                      : 'bg-yellow-500/20 text-yellow-500'
+                  }`}
                 >
                   {formData.status}
                 </span>
@@ -259,7 +277,7 @@ export default function ManageTournament() {
                 <div className="space-y-2">
                   <Label>Start Date</Label>
                   <Input
-                    name="starting_time"
+                    name="startingTime"
                     type="datetime-local"
                     value={formData.starting_time}
                     onChange={handleChange}
@@ -280,22 +298,28 @@ export default function ManageTournament() {
                 <div className="pt-4 border-t border-[#333]">
                   <Label>Visibility</Label>
                   <div className="grid grid-cols-2 gap-2 mt-2">
-                    {['Public', 'Private'].map((opt) => (
+                    {Object.values(Visibility).map((opt) => (
                       <button
                         key={opt}
                         onClick={() => {
                           setFormData((prev: any) => ({
                             ...prev,
-                            visibility: opt,
+                            visibility: opt, // Sets actual enum value (e.g., "PUBLIC")
                           }))
                           setHasChanges(true)
                         }}
-                        className={`py-2 text-sm font-medium rounded-lg border transition-all ${formData.visibility === opt
-                          ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
-                          : 'bg-[#1f1f1f] border-[#333] text-gray-500 hover:border-[#444]'
-                          }`}
+                        className={`py-2 text-sm font-medium rounded-lg border transition-all ${
+                          formData.visibility === opt
+                            ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
+                            : 'bg-[#1f1f1f] border-[#333] text-gray-500 hover:border-[#444]'
+                        }`}
                       >
-                        {opt}
+                        {/* Display human-readable version */}
+                        {opt.toLowerCase() === 'public'
+                          ? 'Public'
+                          : opt.toLowerCase() === 'private'
+                            ? 'Private'
+                            : opt}
                       </button>
                     ))}
                   </div>

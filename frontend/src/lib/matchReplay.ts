@@ -533,13 +533,13 @@ type ReplayStateResult = {
   player_turn: 'w' | 'b'
 }
 
-const setSquare = (b: SquareToPieceMap, sq: Square, piece?: Piece) => {
-  if (piece === undefined) {
-    delete b[sq]
-  } else {
-    b[sq] = piece
-  }
-}
+// const setSquare = (b: SquareToPieceMap, sq: Square, piece?: Piece) => {
+//   if (piece === undefined) {
+//     delete b[sq]
+//   } else {
+//     b[sq] = piece
+//   }
+// }
 
 const bishopDirs = [
   [1, 1],

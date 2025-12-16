@@ -5,6 +5,7 @@ import { supabase } from '@/lib/utils'
 import { useParams } from 'react-router-dom'
 import { useUserStore } from '@/store/microchess'
 import { toast } from 'sonner'
+import { tournamentRegistration } from '@/api'
 
 type Participant = {
   id: string
@@ -51,133 +52,6 @@ type Tournament = {
   tournamentparticipants: Participant[]
 }
 
-// Mock Data
-const mockRounds = [
-  {
-    id: 1,
-    name: 'Quarter Finals',
-    matches: [
-      {
-        id: 'm1',
-        player1: {
-          name: 'Magnus Carlsen',
-          rank: 1,
-          avatar:
-            'https://images.chesscomfiles.com/uploads/v1/master_player/3b0ddf4e-e5df-11e9-94d0-8a06b5f9e89c.5d987468.250x250o.675f24.jpg',
-        },
-        player2: {
-          name: 'Hikaru Nakamura',
-          rank: 2,
-          avatar:
-            'https://images.chesscomfiles.com/uploads/v1/master_player/76f3f012-e5df-11e9-94d0-8a06b5f9e89c.8d172600.250x250o.c80b60.jpg',
-        },
-        winner: 'Magnus Carlsen',
-        status: 'completed',
-        score: '1 - 0',
-      },
-      {
-        id: 'm2',
-        player1: {
-          name: 'Fabiano Caruana',
-          rank: 3,
-          avatar:
-            'https://images.chesscomfiles.com/uploads/v1/master_player/47161198-e5df-11e9-94d0-8a06b5f9e89c.333065d4.250x250o.1607d0.jpg',
-        },
-        player2: {
-          name: 'Ian Nepomniachtchi',
-          rank: 4,
-          avatar:
-            'https://images.chesscomfiles.com/uploads/v1/master_player/4426558c-e5df-11e9-94d0-8a06b5f9e89c.57684072.250x250o.1607d0.jpg',
-        },
-        winner: 'Fabiano Caruana',
-        status: 'completed',
-        score: '1 - 0',
-      },
-      {
-        id: 'm3',
-        player1: {
-          name: 'Ding Liren',
-          rank: 5,
-          avatar:
-            'https://images.chesscomfiles.com/uploads/v1/master_player/3f822858-e5df-11e9-94d0-8a06b5f9e89c.43385627.250x250o.1607d0.jpg',
-        },
-        player2: {
-          name: 'Alireza Firouzja',
-          rank: 6,
-          avatar:
-            'https://images.chesscomfiles.com/uploads/v1/master_player/50269008-e5df-11e9-94d0-8a06b5f9e89c.04018870.250x250o.1607d0.jpg',
-        },
-        winner: null,
-        status: 'scheduled',
-        score: 'vs',
-      },
-      {
-        id: 'm4',
-        player1: {
-          name: 'Wesley So',
-          rank: 7,
-          avatar:
-            'https://images.chesscomfiles.com/uploads/v1/master_player/41261328-e5df-11e9-94d0-8a06b5f9e89c.89530466.250x250o.1607d0.jpg',
-        },
-        player2: {
-          name: 'Anish Giri',
-          rank: 8,
-          avatar:
-            'https://images.chesscomfiles.com/uploads/v1/master_player/48262238-e5df-11e9-94d0-8a06b5f9e89c.53032845.250x250o.1607d0.jpg',
-        },
-        winner: null,
-        status: 'scheduled',
-        score: 'vs',
-      },
-    ],
-  },
-  {
-    id: 2,
-    name: 'Semi Finals',
-    matches: [
-      {
-        id: 'm5',
-        player1: {
-          name: 'Magnus Carlsen',
-          rank: 1,
-          avatar:
-            'https://images.chesscomfiles.com/uploads/v1/master_player/3b0ddf4e-e5df-11e9-94d0-8a06b5f9e89c.5d987468.250x250o.675f24.jpg',
-        },
-        player2: {
-          name: 'Fabiano Caruana',
-          rank: 3,
-          avatar:
-            'https://images.chesscomfiles.com/uploads/v1/master_player/47161198-e5df-11e9-94d0-8a06b5f9e89c.333065d4.250x250o.1607d0.jpg',
-        },
-        winner: null,
-        status: 'scheduled',
-        score: 'vs',
-      },
-      {
-        id: 'm6',
-        player1: { name: 'TBD', rank: 0, avatar: '' },
-        player2: { name: 'TBD', rank: 0, avatar: '' },
-        winner: null,
-        status: 'locked',
-        score: 'vs',
-      },
-    ],
-  },
-  {
-    id: 3,
-    name: 'Finals',
-    matches: [
-      {
-        id: 'm7',
-        player1: { name: 'TBD', rank: 0, avatar: '' },
-        player2: { name: 'TBD', rank: 0, avatar: '' },
-        winner: null,
-        status: 'locked',
-        score: 'vs',
-      },
-    ],
-  },
-]
 function shortAddress(addr: string) {
   return addr.slice(0, 6) + '...' + addr.slice(-4)
 }
@@ -186,7 +60,7 @@ export default function TournamentPage() {
   const { id: tournamentId } = useParams<{ id: string }>()
   const [tournament, setTournament] = useState<Tournament | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
-  const [rounds, setRounds] = useState<any[]>([])
+  const [rounds, _setRounds] = useState<any[]>([])
 
   const name = useUserStore((s) => s.userProfile.state?.name)
 
@@ -246,8 +120,13 @@ export default function TournamentPage() {
       toast.error('Update your profile')
       return
     }
-    console.log('Register button clicked', tournamentId)
-    // await tournamentRegistration(tournamentId)
+    try {
+      await tournamentRegistration(tournamentId)
+      toast.success('Registered')
+    } catch {
+      toast.error('Failed to register')
+      return
+    }
   }
 
   return (
@@ -279,18 +158,21 @@ export default function TournamentPage() {
               <span
                 className={`
                     px-4 py-2 rounded-full text-sm font-bold uppercase tracking-wide backdrop-blur-md border border-white/10 shadow-lg
-                    ${tournament?.status === 'IN_PROGRESS'
-                    ? 'bg-red-500/80 text-white animate-pulse'
-                    : ''
-                  }
-                    ${tournament?.status === 'REGISTRATION_OPEN'
-                    ? 'bg-green-500/80 text-white'
-                    : ''
-                  }
-                    ${tournament?.status === 'COMPLETED'
-                    ? 'bg-gray-800/80 text-gray-400'
-                    : ''
-                  }
+                    ${
+                      tournament?.status === 'IN_PROGRESS'
+                        ? 'bg-red-500/80 text-white animate-pulse'
+                        : ''
+                    }
+                    ${
+                      tournament?.status === 'REGISTRATION_OPEN'
+                        ? 'bg-green-500/80 text-white'
+                        : ''
+                    }
+                    ${
+                      tournament?.status === 'COMPLETED'
+                        ? 'bg-gray-800/80 text-gray-400'
+                        : ''
+                    }
                 `}
               >
                 {tournament?.status === 'IN_PROGRESS' && (
@@ -390,8 +272,9 @@ export default function TournamentPage() {
                   />
                   <DetailItem
                     label="Registered"
-                    value={`${participants.length} / ${tournament?.maxPlayers || '∞'
-                      }`}
+                    value={`${participants.length} / ${
+                      tournament?.maxPlayers || '∞'
+                    }`}
                   />
                 </div>
               </div>
@@ -520,13 +403,15 @@ function MatchCard({ match, index }: { match: any; index: number }) {
         <span
           className={`
           px-2 py-0.5 rounded-full text-[10px] font-bold
-          ${match.status === 'live'
+          ${
+            match.status === 'live'
               ? 'bg-red-500/20 text-red-500 animate-pulse'
               : ''
-            }
+          }
           ${match.status === 'scheduled' ? 'bg-blue-500/20 text-blue-400' : ''}
-          ${match.status === 'completed' ? 'bg-green-500/20 text-green-400' : ''
-            }
+          ${
+            match.status === 'completed' ? 'bg-green-500/20 text-green-400' : ''
+          }
           ${match.status === 'locked' ? 'bg-gray-700 text-gray-500' : ''}
         `}
         >
@@ -572,8 +457,9 @@ function PlayerRow({
 
   return (
     <div
-      className={`flex items-center justify-between ${isWinner ? 'text-yellow-400' : 'text-gray-300'
-        }`}
+      className={`flex items-center justify-between ${
+        isWinner ? 'text-yellow-400' : 'text-gray-300'
+      }`}
     >
       <div className="flex items-center gap-3">
         {player?.avatar || player?.avatar_url ? (
@@ -589,8 +475,9 @@ function PlayerRow({
         )}
         <div className="flex flex-col">
           <span
-            className={`font-medium ${isWinner ? 'font-bold' : ''} ${isTBD ? 'text-gray-600 italic' : ''
-              }`}
+            className={`font-medium ${isWinner ? 'font-bold' : ''} ${
+              isTBD ? 'text-gray-600 italic' : ''
+            }`}
           >
             {player?.name || player?.username || (isTBD ? 'TBD' : 'Unknown')}
           </span>
@@ -602,8 +489,9 @@ function PlayerRow({
         </div>
       </div>
       <span
-        className={`text-lg font-mono ${isWinner ? 'text-yellow-400 font-bold' : 'text-gray-500'
-          }`}
+        className={`text-lg font-mono ${
+          isWinner ? 'text-yellow-400 font-bold' : 'text-gray-500'
+        }`}
       >
         {score}
       </span>
@@ -626,8 +514,9 @@ function DetailItem({
         {label}
       </span>
       <span
-        className={`font-medium text-lg ${highlight ? 'text-yellow-400 font-bold' : 'text-gray-200'
-          }`}
+        className={`font-medium text-lg ${
+          highlight ? 'text-yellow-400 font-bold' : 'text-gray-200'
+        }`}
       >
         {value}
       </span>

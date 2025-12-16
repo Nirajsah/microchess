@@ -162,18 +162,21 @@ function TournamentCard({
         <span
           className={`
                     px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide backdrop-blur-md border border-white/10
-                    ${tournament.status === 'IN_PROGRESS'
-              ? 'bg-red-500/80 text-white animate-pulse'
-              : ''
-            }
-                    ${tournament.status === 'REGISTRATION_OPEN'
-              ? 'bg-green-500/80 text-white'
-              : ''
-            }
-                    ${tournament.status === 'COMPLETED'
-              ? 'bg-gray-800/80 text-gray-400'
-              : ''
-            }
+                    ${
+                      tournament.status === 'IN_PROGRESS'
+                        ? 'bg-red-500/80 text-white animate-pulse'
+                        : ''
+                    }
+                    ${
+                      tournament.status === 'REGISTRATION_OPEN'
+                        ? 'bg-green-500/80 text-white'
+                        : ''
+                    }
+                    ${
+                      tournament.status === 'COMPLETED'
+                        ? 'bg-gray-800/80 text-gray-400'
+                        : ''
+                    }
                 `}
         >
           {tournament.status === 'IN_PROGRESS' && (
@@ -186,7 +189,20 @@ function TournamentCard({
       {/* Image */}
       <div className="h-48 w-full relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-t from-[#262626] via-transparent to-transparent z-[1]" />
-        <div className="w-full h-full object-cover"></div>
+        <img
+          src={
+            tournament.bannerImageUrl
+              ? decodeURIComponent(tournament.bannerImageUrl)
+              : 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=800&q=80'
+          }
+          alt="Tournament banner"
+          onError={(e) => {
+            console.error('Image load failed:', e.currentTarget.src)
+            e.currentTarget.src =
+              'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=800&q=80'
+          }}
+          className="w-full h-full object-cover"
+        />
       </div>
 
       {/* Content */}
