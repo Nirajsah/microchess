@@ -3,6 +3,7 @@ import { Trophy, Target, Edit2, Check, X, ThumbsUpIcon } from 'lucide-react'
 import { useUserStore } from '@/store/microchess'
 import { getMatchHistory, updateProfile } from '@/api'
 import { useWalletStore } from '@/store/wallet'
+import { useNavigate } from 'react-router-dom'
 
 const Skeleton = ({ className }: { className: string }) => (
   <div className={`animate-pulse bg-zinc-800/60 rounded-md ${className}`} />
@@ -25,9 +26,10 @@ export const PlayerProfile = () => {
   const setRefetch = useWalletStore((s) => s.setRefetch)
   const [tempName, setTempName] = React.useState('Player')
   const [isEditingName, setIsEditingName] = React.useState(false)
+  const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = React.useState<'stats' | 'matches'>('stats')
-  const [matcheHistory, setMatchHistory] = React.useState<MatchHistory[]>([
+  const [matchHistory, setMatchHistory] = React.useState<MatchHistory[]>([
     {
       you: {
         id: '',
@@ -46,7 +48,8 @@ export const PlayerProfile = () => {
   React.useEffect(() => {
     const fetchMatches = async () => {
       const data = await getMatchHistory()
-      setMatchHistory(JSON.parse(data.result).data.matchHistoryAll)
+      const matches = JSON.parse(data.result).data.matchHistoryAll
+      setMatchHistory(matches)
     }
     if (!user) return
     draws = user.matches - user.won - user.lost
@@ -232,15 +235,16 @@ export const PlayerProfile = () => {
               <Skeleton className="h-[66px] w-full rounded-lg" />
             </>
           ) : (
-            matcheHistory.length > 0 &&
-            matcheHistory.map((m: MatchHistory, index) => (
+            matchHistory.length > 0 &&
+            matchHistory.map((m: MatchHistory, index) => (
               <div
-                key={index}
+                onClick={() => navigate(`/replay/${m.blobHash}`)}
+                key={m.blobHash || index}
                 className="flex justify-between items-center p-3 rounded-lg bg-zinc-800/40 border border-zinc-700/40"
               >
                 <div>
                   <p className="font-medium truncate max-w-[300px] hover:data-[m.you.id]:">
-                    You
+                    {m.you.name || m.you.id}
                   </p>
                   <p className="text-sm text-zinc-400 truncate max-w-[300px]">
                     vs {m.opponent.id}

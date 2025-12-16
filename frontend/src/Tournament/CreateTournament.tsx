@@ -180,11 +180,12 @@ export default function CreateTournament() {
     const submitData = {
       ...formData,
       prizePool: Number(formData.prizePool),
+      status: TournamentStatus.REGISTRATION_OPEN,
       customTags: Array.isArray(formData.customTags) ? formData.customTags : [],
     }
     try {
       await hostTournament(submitData)
-      toast.success('Saved to Draft')
+      toast.success('Tournament Created')
     } catch (error) {
       console.error('Failed to create tournament:', error)
     }

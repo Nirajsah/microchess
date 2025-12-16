@@ -13,7 +13,7 @@ import {
   Share2,
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { myTournament, updateTournament } from '@/api'
+import { hostTournament, myTournament, updateTournament } from '@/api'
 import { PrizeType, TournamentStatus, Visibility } from './CreateTournament'
 import { toast } from 'sonner'
 
@@ -82,19 +82,28 @@ export default function ManageTournament() {
       })
   }
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     // Mock publish API call
-    const updated = { ...formData, status: 'Published' }
-    setFormData(updated)
-    setTournament(updated)
-    alert('Tournament published!')
+    const submitData = {
+      ...formData,
+      prizePool: Number(formData.prizePool),
+      status: TournamentStatus.REGISTRATION_OPEN,
+      customTags: Array.isArray(formData.customTags) ? formData.customTags : [],
+    }
+    try {
+      await hostTournament(submitData)
+      setTournament(submitData)
+      toast.success('Tournament Created')
+    } catch (error) {
+      console.error('Failed to create tournament:', error)
+    }
   }
 
   const deleteTournament = () => {
-    if (confirm('Are you sure you want to delete this tournament?')) {
-      alert('Tournament deleted')
-      navigate('/tournaments/my')
-    }
+    // if (confirm('Are you sure you want to delete this tournament?')) {
+    //   alert('Tournament deleted')
+    //   navigate('/tournaments/my')
+    // }
   }
 
   if (loading)
@@ -146,7 +155,7 @@ export default function ManageTournament() {
             >
               <Edit className="w-4 h-4 mr-2" /> Save Changes
             </Button>
-            {formData.status && formData.status !== 'DRAFT' && (
+            {!formData.status && formData.status == 'DRAFT' && (
               <Button
                 className="bg-yellow-600 hover:bg-yellow-500 text-white shadow-lg shadow-yellow-900/20"
                 onClick={handlePublish}

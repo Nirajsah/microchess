@@ -9,11 +9,11 @@ import { tournamentRegistration } from '@/api'
 
 type Participant = {
   id: string
-  tournamentId: string
-  playerName: string
-  playerElo: number
-  playerAth: number
-  playerMatches: number
+  tournament_id: string
+  player_name: string
+  player_elo: number
+  player_ath: number
+  player_matches: number
 }
 
 type Tournament = {
@@ -31,19 +31,14 @@ type Tournament = {
   timeControlModeLabel: string | null
   maxPlayers: number | null
   minPlayers: number | null
-  roundCount: number | null
-  allowLateJoin: boolean
   startingTime: number
   endTime: number
-  roundTimeLimitMinutes: number
-  checkInTime: number
   prizePoolDescription: string | null
   visibility: string
-  inviteOnly: boolean
-  accessCode: string | null
   bannerImageUrl: string | null
   sponsorLogoUrl: string | null
-  prizeType: string[]
+  prizeType: string
+  prizePool: number
   customTags: string[]
   version: string
   createdAt: number
@@ -71,17 +66,17 @@ export default function TournamentPage() {
         .select(
           `
         *,
-        tournamentparticipants (
+        tournament_participants (
           id,
-          tournamentId,
-          playerName,
-          playerElo,
-          playerAth,
-          playerMatches
+          tournament_id,
+          player_name,
+          player_elo,
+          player_ath,
+          player_matches
         )
       `
         )
-        .eq('tournamentId', tournamentId)
+        .eq('tournament_id', tournamentId)
         .single()
 
       if (error) {
@@ -90,7 +85,7 @@ export default function TournamentPage() {
       }
 
       setTournament(data)
-      setParticipants(data.tournamentparticipants ?? [])
+      setParticipants(data.tournament_participants ?? [])
     }
 
     getTournament()
@@ -267,7 +262,7 @@ export default function TournamentPage() {
                   />
                   <DetailItem
                     label="Prize Pool"
-                    value={tournament?.prizePoolDescription || 'N/A'}
+                    value={`$${tournament?.prizePool}` || 'N/A'}
                     highlight
                   />
                   <DetailItem
@@ -350,18 +345,18 @@ export default function TournamentPage() {
                     >
                       <div className="w-12 h-12 rounded-full bg-[#333] flex items-center justify-center overflow-hidden border border-[#444] group-hover:border-yellow-500/50 transition-colors">
                         <span className="font-bold text-gray-400 text-lg">
-                          {(p.playerName || 'P')[0]?.toUpperCase()}
+                          {(p.player_name || 'P')[0]?.toUpperCase()}
                         </span>
                       </div>
                       <div className="flex flex-col min-w-0">
                         <div className="font-semibold text-gray-200 truncate group-hover:text-yellow-400 transition-colors">
-                          {p.playerName
-                            ? p.playerName.toUpperCase()
+                          {p.player_name
+                            ? p.player_name.toUpperCase()
                             : shortAddress(p.id)}
                         </div>
-                        {p.playerElo != null && (
+                        {p.player_elo != null && (
                           <div className="text-xs text-gray-500">
-                            <span>Rating: {p.playerElo}</span>
+                            <span>Rating: {p.player_elo}</span>
                           </div>
                         )}
                       </div>
