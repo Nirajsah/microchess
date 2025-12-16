@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/utils'
 
 export type Tournaments = {
-  tournamentId: string
+  tournament_id: string
   tournamentName: string
   tournamentDescription: string
   tournamentFormat: string
@@ -15,11 +15,12 @@ export type Tournaments = {
   startingTime: number
   endTime: number
   prizePoolDescription: string
-  tournamentparticipants: { count: number }[]
+  tournament_participants: { count: number }[]
   visibility: string
   bannerImageUrl: string
   sponsorLogoUrl: string
-  prizeType: string[]
+  prizeType: string
+  prizePool: number
   createdAt: number
   status: string
 }
@@ -30,7 +31,7 @@ export default function TournamentList() {
   useEffect(() => {
     async function getTournaments() {
       const { data: tournaments } = await supabase.from('tournaments').select(`
-                    tournamentId,
+                    tournament_id,
                     tournamentName,
                     tournamentDescription,
                     tournamentFormat,
@@ -42,15 +43,16 @@ export default function TournamentList() {
                     bannerImageUrl,
                     sponsorLogoUrl,
                     prizeType,
+                    prizePool,
                     createdAt,
                     status,
-                    tournamentparticipants:tournamentparticipants(count)
+                    tournament_participants(count)
                 `)
       if (!tournaments) return
       setTournaments(
         tournaments.map((t) => ({
           ...t,
-          participantCount: t.tournamentparticipants?.[0]?.count ?? 0,
+          participantCount: t.tournament_participants?.[0]?.count ?? 0,
         }))
       )
     }
@@ -127,10 +129,10 @@ export default function TournamentList() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {tournaments.map((t, i) => (
               <TournamentCard
-                key={t.tournamentId}
+                key={t.tournament_id}
                 tournament={t}
                 index={i}
-                onClick={() => navigate(`/tournaments/${t.tournamentId}`)}
+                onClick={() => navigate(`/tournaments/${t.tournament_id}`)}
               />
             ))}
           </div>
@@ -219,11 +221,11 @@ function TournamentCard({
         <div className="flex justify-between gap-4 mt-auto">
           <div className="flex items-center gap-2 text-sm text-gray-300">
             <Trophy className="w-4 h-4 text-yellow-500" />
-            <span>{tournament.prizeType.join(', ')}</span>
+            <span>${tournament.prizePool}</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-300">
             <Users className="w-4 h-4 text-blue-500" />
-            <span>{tournament.tournamentparticipants[0].count}</span>/
+            <span>{tournament.tournament_participants[0].count}</span>/
             <span>{tournament.maxPlayers}</span>
           </div>
         </div>

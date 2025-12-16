@@ -15,9 +15,9 @@ import { Toaster } from 'sonner'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <div className="font-sansation text-white min-h-screen w-full flex justify-center">
-    <WalletSheet />
     <Toaster richColors position="bottom-right" theme="dark" />
     <BrowserRouter>
+      <WalletSheet />
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/chess" element={<ChessBoard />} />

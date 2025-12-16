@@ -55,7 +55,7 @@ export function myTournaments() {
 }
 
 export function myTournament(tournamentId: string) {
-  const query = `query { myTournament(tournamentId: "${tournamentId}") { organiserChain organiserId organiserName tournamentId bannerImageUrl sponsorLogoUrl tournamentName tournamentDescription tournamentFormat matchType gameMode maxPlayers minPlayers startingTime endTime status prizePool prizePoolDescription visibility } }`
+  const query = `query { myTournament(tournamentId: "${tournamentId}") { organiserChain organiserId organiserName tournamentId bannerImageUrl sponsorLogoUrl timeControl { baseMinutes incrementSeconds } tournamentName tournamentDescription tournamentFormat matchType gameMode maxPlayers minPlayers startingTime endTime status prizePool prizePoolDescription visibility } }`
   return request(buildGraphQLQuery(query))
 }
 
