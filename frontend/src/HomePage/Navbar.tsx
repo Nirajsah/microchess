@@ -27,7 +27,7 @@ export default function Navbar() {
 
       <button
         onClick={handleGetStarted}
-        className="px-6 py-2 rounded-3xl truncate lg:w-full lg:max-w-full text-end hover:scale-105 duration-300 transition-all"
+        className="px-6 py-2 rounded-3xl truncate lg:w-full lg:max-w-fit cursor-pointer text-end hover:scale-105 duration-300 transition-all"
       >
         {pubKey ? pubKey : 'Get Started'}
       </button>

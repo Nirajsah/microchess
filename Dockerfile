@@ -19,8 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN rustup target add wasm32-unknown-unknown
 
 # Install Linera binaries (Conway testnet version 0.15.5)
-RUN cargo install --locked linera-storage-service@0.15.5 && \
-    cargo install --locked linera-service@0.15.5
+RUN cargo install --locked linera-storage-service@0.15.7 && \
+    cargo install --locked linera-service@0.15.7
 
 # Set up working directory
 WORKDIR /app

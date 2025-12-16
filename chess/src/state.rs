@@ -2,9 +2,11 @@ use async_graphql::{ComplexObject, SimpleObject};
 use chess::{
     leaderboard::{Leaderboard, LeaderboardManager},
     playerprofile::{PlayerHash, PlayerProfile, Players},
+    tournament::Tournament,
     Clock, GameChain, GameWrapper, MatchHistory, MatchId,
 };
 use linera_sdk::{
+    linera_base_types::AccountOwner,
     views::{
         linera_views::{self},
         MapView, RegisterView, RootView,
@@ -39,6 +41,17 @@ pub struct ChessState {
     /// Used in app_chain, player_chain and subscriber_chain(pws)
     /// App chains and subscribers stores all the match history, but player_chain stores owner matches
     pub match_history: RegisterView<Vec<MatchHistory>>,
+    /// for app_chain
+    pub tournaments: MapView<String, Tournament>,
+    /// for subscribers
+    pub all_tournaments: RegisterView<Vec<Tournament>>,
+    /// for user_chain
+    pub my_tournaments: RegisterView<Vec<Tournament>>,
+    pub tournament_list: RegisterView<Vec<String>>,
+
+    /// on app_chain
+    pub tournament_players: MapView<AccountOwner, PlayerHash>,
+    pub participants: MapView<String, Vec<AccountOwner>>,
     /*
     /// Player Stats
     pub stats: RegisterView<PlayerProfile>,

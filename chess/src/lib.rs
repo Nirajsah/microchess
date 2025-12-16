@@ -15,11 +15,14 @@ use serde::{Deserialize, Serialize};
 pub struct ChessAbi;
 pub mod leaderboard;
 pub mod playerprofile;
+pub mod tournament;
+
 use linera_sdk::{
     abi::{ContractAbi, ServiceAbi},
     graphql::GraphQLMutationRoot,
     linera_base_types::{AccountOwner, ChainId, DataBlobHash, TimeDelta, Timestamp},
 };
+use tournament::{Tournament, TournamentInput, TournamentUpdate};
 
 use crate::playerprofile::Players;
 
@@ -62,6 +65,19 @@ pub enum ChessResponse {
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
     // setup operations
+    HostTournament {
+        value: TournamentInput,
+    },
+    TournamentRegistration {
+        tournament_id: String,
+    },
+    TournamentWithDraw {
+        tournament_id: String,
+    },
+    UpdateTournament {
+        tournament_id: String,
+        update: TournamentUpdate,
+    },
     NewGame,
     FrGame,
     FrGameHash {
@@ -91,6 +107,22 @@ pub enum Operation {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Message {
+    TournamentWithDraw {
+        tournament_id: String,
+        owner: AccountOwner,
+    },
+    TournamentRegister {
+        tournament_id: String,
+        owner: AccountOwner,
+        player: PlayerHash,
+    },
+    UpdateTournament {
+        tournament_id: String,
+        update: TournamentUpdate,
+    },
+    HostTournament {
+        value: TournamentInput,
+    },
     // game_chain receiving data to start a new game
     Start {
         match_id: MatchId,
@@ -189,9 +221,27 @@ impl TimedToken {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Event {
-    GameCount { value: u64 },
-    Leaderboard { leaderboard: Vec<Leaderboard> },
-    MatchHistory { history: MatchHistory },
+    GameCount {
+        value: u64,
+    },
+    Leaderboard {
+        leaderboard: Vec<Leaderboard>,
+    },
+    MatchHistory {
+        history: MatchHistory,
+    },
+    Tournament {
+        value: Tournament,
+    },
+    TournamentRegistration {
+        tournament_id: String,
+        owner: AccountOwner,
+        player: PlayerHash,
+    },
+    TournamentWithDraw {
+        tournament_id: String,
+        owner: AccountOwner,
+    },
 }
 
 #[derive(Debug, Deserialize, Serialize)]

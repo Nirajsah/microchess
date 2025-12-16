@@ -5,9 +5,7 @@
 use chess::{playerprofile::PlayerProfile, ChessAbi, GameChain, InstantiationArgument, Operation};
 use linera_chain::types::ConfirmedBlockCertificate;
 use linera_sdk::{
-    linera_base_types::{
-        AccountSecretKey, ApplicationId, BlobType, ChainDescription, Secp256k1SecretKey, TimeDelta,
-    },
+    linera_base_types::{ApplicationId, BlobType, ChainDescription, TimeDelta},
     serde_json,
     test::{ActiveChain, QueryOutcome, TestValidator},
 };
@@ -33,7 +31,6 @@ async fn application_test() {
     let app_id = app_chain
         .create_application(module_id, (), instantiation, vec![])
         .await;
-
     // Operation::Player
     let player_1_name = "John Doe".to_string();
     let player_2_name = "Jane Doe".to_string();
@@ -93,7 +90,6 @@ async fn application_test() {
     let QueryOutcome { response, .. } =
         game_chain.graphql_query(app_id, "query { mvString }").await;
 
-    
     // Player 1 processes messages from app_chain (receives GameChainData)
     player_1_chain.handle_received_messages().await;
 
