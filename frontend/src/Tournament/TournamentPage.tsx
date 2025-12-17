@@ -65,88 +65,6 @@ type Tournament = {
   tournamentparticipants: Participant[]
 }
 
-// Mock data for UI testing
-const MOCK_TOURNAMENT: Tournament = {
-  tournamentId: 'mock-123',
-  organiserChain: 'chain-123',
-  organiserId: 'user-456',
-  organiserName: 'ChessMaster Pro',
-  tournamentName: 'Winter Championship 2024',
-  tournamentDescription:
-    'Join the most prestigious winter chess tournament! Compete against top players from around the world in this exciting championship. Experience intense matches, strategic gameplay, and unforgettable moments as you battle for glory and amazing prizes.\n\nThis tournament features multiple rounds of competition with the best players advancing to the finals.',
-  tournamentFormat: 'SWISS',
-  matchType: 'BO_3',
-  gameMode: 'STANDARD',
-  timeControlBaseMinutes: 10,
-  timeControlIncrementSeconds: 5,
-  timeControlModeLabel: 'Rapid',
-  maxPlayers: 64,
-  minPlayers: 8,
-  startingTime: Date.now() + 7 * 24 * 60 * 60 * 1000,
-  endTime: Date.now() + 14 * 24 * 60 * 60 * 1000,
-  prizePoolDescription:
-    '1st Place: $2,500\n2nd Place: $1,500\n3rd Place: $700\n4th Place: $300',
-  visibility: 'PUBLIC',
-  bannerImageUrl:
-    'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=1200',
-  sponsorLogoUrl:
-    'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=200',
-  prizeType: 'TOKENS',
-  prizePool: 5000,
-  customTags: ['competitive', 'winter', 'championship', 'prizes'],
-  version: '1',
-  createdAt: Date.now(),
-  updatedAt: Date.now(),
-  status: 'REGISTRATION_OPEN',
-  tournamentparticipants: [],
-}
-
-const MOCK_PARTICIPANTS: Participant[] = [
-  {
-    id: '1',
-    tournament_id: 'mock-123',
-    player_name: 'GrandMaster42',
-    player_elo: 2450,
-    player_ath: 2500,
-    player_matches: 156,
-  },
-  {
-    id: '2',
-    tournament_id: 'mock-123',
-    player_name: 'ChessWizard',
-    player_elo: 2380,
-    player_ath: 2420,
-    player_matches: 203,
-  },
-  {
-    id: '3',
-    tournament_id: 'mock-123',
-    player_name: 'KnightRider',
-    player_elo: 2290,
-    player_ath: 2350,
-    player_matches: 89,
-  },
-  {
-    id: '4',
-    tournament_id: 'mock-123',
-    player_name: 'QueenSlayer',
-    player_elo: 2180,
-    player_ath: 2200,
-    player_matches: 67,
-  },
-  {
-    id: '5',
-    tournament_id: 'mock-123',
-    player_name: 'PawnStorm',
-    player_elo: 2050,
-    player_ath: 2100,
-    player_matches: 45,
-  },
-]
-
-// Set to true to use mock data
-const USE_MOCK_DATA = true
-
 function shortAddress(addr: string) {
   return addr.slice(0, 6) + '...' + addr.slice(-4)
 }
@@ -235,18 +153,11 @@ export default function TournamentPage() {
   const [participants, setParticipants] = useState<Participant[]>([])
   const [rounds, _setRounds] = useState<any[]>([])
   const [isRegistering, setIsRegistering] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   const name = useUserStore((s) => s.userProfile.state?.name)
 
   useEffect(() => {
-    if (USE_MOCK_DATA) {
-      setTimeout(() => {
-        setTournament(MOCK_TOURNAMENT)
-        setParticipants(MOCK_PARTICIPANTS)
-      }, 300)
-      return
-    }
-
     async function getTournament() {
       const { data, error } = await supabase
         .from('tournaments')
@@ -268,9 +179,7 @@ export default function TournamentPage() {
 
       if (error) {
         console.error('Error fetching tournament:', error)
-        // Fallback to mock data
-        setTournament(MOCK_TOURNAMENT)
-        setParticipants(MOCK_PARTICIPANTS)
+        setFailed(true)
         return
       }
 
@@ -322,13 +231,20 @@ export default function TournamentPage() {
         <Navbar />
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 border-4 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin" />
-            <p className="text-gray-400">Loading tournament...</p>
+            {failed ? (
+              <p className="text-gray-400">Tournament not Found</p>
+            ) : (
+              <>
+                <div className="w-12 h-12 border-4 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin" />
+                <p className="text-gray-400">Loading tournament...</p>
+              </>
+            )}
           </div>
         </div>
       </div>
     )
   }
+
 
   const statusConfig = getStatusConfig(tournament.status)
   const StatusIcon = statusConfig.icon
