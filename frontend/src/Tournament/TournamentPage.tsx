@@ -6,6 +6,24 @@ import { useParams } from 'react-router-dom'
 import { useUserStore } from '@/store/microchess'
 import { toast } from 'sonner'
 import { tournamentRegistration } from '@/api'
+import {
+  Trophy,
+  Users,
+  Clock,
+  Calendar,
+  MapPin,
+  Shield,
+  Zap,
+  Target,
+  Medal,
+  ChevronRight,
+  User,
+  Star,
+  Timer,
+  Gamepad2,
+  Crown,
+  Sparkles,
+} from 'lucide-react'
 
 type Participant = {
   id: string
@@ -47,8 +65,168 @@ type Tournament = {
   tournamentparticipants: Participant[]
 }
 
+// Mock data for UI testing
+const MOCK_TOURNAMENT: Tournament = {
+  tournamentId: 'mock-123',
+  organiserChain: 'chain-123',
+  organiserId: 'user-456',
+  organiserName: 'ChessMaster Pro',
+  tournamentName: 'Winter Championship 2024',
+  tournamentDescription:
+    'Join the most prestigious winter chess tournament! Compete against top players from around the world in this exciting championship. Experience intense matches, strategic gameplay, and unforgettable moments as you battle for glory and amazing prizes.\n\nThis tournament features multiple rounds of competition with the best players advancing to the finals.',
+  tournamentFormat: 'SWISS',
+  matchType: 'BO_3',
+  gameMode: 'STANDARD',
+  timeControlBaseMinutes: 10,
+  timeControlIncrementSeconds: 5,
+  timeControlModeLabel: 'Rapid',
+  maxPlayers: 64,
+  minPlayers: 8,
+  startingTime: Date.now() + 7 * 24 * 60 * 60 * 1000,
+  endTime: Date.now() + 14 * 24 * 60 * 60 * 1000,
+  prizePoolDescription:
+    '1st Place: $2,500\n2nd Place: $1,500\n3rd Place: $700\n4th Place: $300',
+  visibility: 'PUBLIC',
+  bannerImageUrl:
+    'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=1200',
+  sponsorLogoUrl:
+    'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=200',
+  prizeType: 'TOKENS',
+  prizePool: 5000,
+  customTags: ['competitive', 'winter', 'championship', 'prizes'],
+  version: '1',
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  status: 'REGISTRATION_OPEN',
+  tournamentparticipants: [],
+}
+
+const MOCK_PARTICIPANTS: Participant[] = [
+  {
+    id: '1',
+    tournament_id: 'mock-123',
+    player_name: 'GrandMaster42',
+    player_elo: 2450,
+    player_ath: 2500,
+    player_matches: 156,
+  },
+  {
+    id: '2',
+    tournament_id: 'mock-123',
+    player_name: 'ChessWizard',
+    player_elo: 2380,
+    player_ath: 2420,
+    player_matches: 203,
+  },
+  {
+    id: '3',
+    tournament_id: 'mock-123',
+    player_name: 'KnightRider',
+    player_elo: 2290,
+    player_ath: 2350,
+    player_matches: 89,
+  },
+  {
+    id: '4',
+    tournament_id: 'mock-123',
+    player_name: 'QueenSlayer',
+    player_elo: 2180,
+    player_ath: 2200,
+    player_matches: 67,
+  },
+  {
+    id: '5',
+    tournament_id: 'mock-123',
+    player_name: 'PawnStorm',
+    player_elo: 2050,
+    player_ath: 2100,
+    player_matches: 45,
+  },
+]
+
+// Set to true to use mock data
+const USE_MOCK_DATA = true
+
 function shortAddress(addr: string) {
   return addr.slice(0, 6) + '...' + addr.slice(-4)
+}
+
+function formatDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function formatTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function getTimeUntil(timestamp: number): string {
+  const now = Date.now()
+  const diff = timestamp - now
+  if (diff <= 0) return 'Started'
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+
+  if (days > 0) return `${days}d ${hours}h`
+  return `${hours}h`
+}
+
+function getStatusConfig(status: string) {
+  switch (status) {
+    case 'REGISTRATION_OPEN':
+      return {
+        label: 'Registration Open',
+        color: 'bg-emerald-500',
+        textColor: 'text-emerald-400',
+        bgColor: 'bg-emerald-500/10',
+        borderColor: 'border-emerald-500/30',
+        icon: Users,
+      }
+    case 'IN_PROGRESS':
+      return {
+        label: 'Live',
+        color: 'bg-red-500',
+        textColor: 'text-red-400',
+        bgColor: 'bg-red-500/10',
+        borderColor: 'border-red-500/30',
+        icon: Zap,
+      }
+    case 'COMPLETED':
+      return {
+        label: 'Completed',
+        color: 'bg-gray-500',
+        textColor: 'text-gray-400',
+        bgColor: 'bg-gray-500/10',
+        borderColor: 'border-gray-500/30',
+        icon: Trophy,
+      }
+    case 'REGISTRATION_CLOSED':
+      return {
+        label: 'Registration Closed',
+        color: 'bg-orange-500',
+        textColor: 'text-orange-400',
+        bgColor: 'bg-orange-500/10',
+        borderColor: 'border-orange-500/30',
+        icon: Shield,
+      }
+    default:
+      return {
+        label: status,
+        color: 'bg-gray-500',
+        textColor: 'text-gray-400',
+        bgColor: 'bg-gray-500/10',
+        borderColor: 'border-gray-500/30',
+        icon: Shield,
+      }
+  }
 }
 
 export default function TournamentPage() {
@@ -56,10 +234,19 @@ export default function TournamentPage() {
   const [tournament, setTournament] = useState<Tournament | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
   const [rounds, _setRounds] = useState<any[]>([])
+  const [isRegistering, setIsRegistering] = useState(false)
 
   const name = useUserStore((s) => s.userProfile.state?.name)
 
   useEffect(() => {
+    if (USE_MOCK_DATA) {
+      setTimeout(() => {
+        setTournament(MOCK_TOURNAMENT)
+        setParticipants(MOCK_PARTICIPANTS)
+      }, 300)
+      return
+    }
+
     async function getTournament() {
       const { data, error } = await supabase
         .from('tournaments')
@@ -81,6 +268,9 @@ export default function TournamentPage() {
 
       if (error) {
         console.error('Error fetching tournament:', error)
+        // Fallback to mock data
+        setTournament(MOCK_TOURNAMENT)
+        setParticipants(MOCK_PARTICIPANTS)
         return
       }
 
@@ -112,262 +302,538 @@ export default function TournamentPage() {
 
   const handleRegister = async (tournamentId: string) => {
     if (!name) {
-      toast.error('Update your profile')
+      toast.error('Please update your profile first')
       return
     }
+    setIsRegistering(true)
     try {
       await tournamentRegistration(tournamentId)
-      toast.success('Registered')
+      toast.success('Successfully registered for the tournament!')
     } catch {
       toast.error('Failed to register')
-      return
+    } finally {
+      setIsRegistering(false)
     }
   }
+
+  if (!tournament) {
+    return (
+      <div className="min-h-screen w-full bg-[#161616] text-white flex flex-col font-sansation">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin" />
+            <p className="text-gray-400">Loading tournament...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const statusConfig = getStatusConfig(tournament.status)
+  const StatusIcon = statusConfig.icon
+  const spotsLeft = tournament.maxPlayers
+    ? tournament.maxPlayers - participants.length
+    : null
+  const isRegistrationOpen = tournament.status === 'REGISTRATION_OPEN'
+  const progress = tournament.maxPlayers
+    ? (participants.length / tournament.maxPlayers) * 100
+    : 0
 
   return (
     <div className="min-h-screen w-full bg-[#161616] text-white flex flex-col font-sansation">
       <Navbar />
-      <div className="flex-1 flex flex-col items-center p-8 overflow-y-auto">
-        <div className="w-full max-w-7xl">
-          {/* Banner Image & Header Info */}
-          <div className="relative w-full h-[400px] md:h-[500px] rounded-2xl overflow-hidden mb-12 shadow-2xl border border-[#333] group">
-            {tournament?.bannerImageUrl ? (
-              <>
-                <div className="absolute inset-0 bg-gradient-to-t from-[#161616] via-[#161616]/40 to-transparent z-10" />
-                <img
-                  src={tournament.bannerImageUrl}
-                  alt="Tournament Banner"
-                  className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
-                />
-              </>
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-[#262626] to-[#1a1a1a] flex items-center justify-center">
-                <span className="text-gray-600 font-bold text-2xl">
-                  No Banner Available
+
+      <div className="flex-1 flex flex-col">
+        {/* Hero Section with Banner */}
+        <div className="relative w-full h-[450px] md:h-[500px] overflow-hidden">
+          {/* Background Image */}
+          {tournament.bannerImageUrl ? (
+            <img
+              src={tournament.bannerImageUrl}
+              alt="Tournament Banner"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-[#262626] via-[#1f1f1f] to-[#161616]" />
+          )}
+
+          {/* Gradient Overlays */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#161616] via-[#161616]/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#161616]/80 via-transparent to-transparent" />
+
+          {/* Content Container */}
+          <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-12 max-w-7xl mx-auto w-full">
+            {/* Status Badge & Tags */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full ${statusConfig.bgColor} ${statusConfig.borderColor} border backdrop-blur-md`}
+              >
+                <StatusIcon className={`w-4 h-4 ${statusConfig.textColor}`} />
+                <span
+                  className={`text-sm font-bold uppercase tracking-wide ${statusConfig.textColor}`}
+                >
+                  {statusConfig.label}
+                </span>
+                {tournament.status === 'IN_PROGRESS' && (
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                )}
+              </motion.div>
+
+              {tournament.customTags?.slice(0, 3).map((tag, i) => (
+                <span
+                  key={i}
+                  className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-gray-300 backdrop-blur-md"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+
+            {/* Tournament Title */}
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-4xl md:text-6xl lg:text-7xl font-black text-white tracking-tight mb-4 drop-shadow-2xl"
+            >
+              {tournament.tournamentName}
+            </motion.h1>
+
+            {/* Quick Info Row */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="flex flex-wrap items-center gap-4 md:gap-6 text-gray-300"
+            >
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-yellow-500" />
+                <span className="text-sm">
+                  Hosted by{' '}
+                  <span className="text-white font-medium">
+                    {tournament.organiserName}
+                  </span>
                 </span>
               </div>
-            )}
-
-            {/* Status Badge Over Banner (Top Right) */}
-            <div className="absolute top-6 right-6 z-20">
-              <span
-                className={`
-                    px-4 py-2 rounded-full text-sm font-bold uppercase tracking-wide backdrop-blur-md border border-white/10 shadow-lg
-                    ${
-                      tournament?.status === 'IN_PROGRESS'
-                        ? 'bg-red-500/80 text-white animate-pulse'
-                        : ''
-                    }
-                    ${
-                      tournament?.status === 'REGISTRATION_OPEN'
-                        ? 'bg-green-500/80 text-white'
-                        : ''
-                    }
-                    ${
-                      tournament?.status === 'COMPLETED'
-                        ? 'bg-gray-800/80 text-gray-400'
-                        : ''
-                    }
-                `}
-              >
-                {tournament?.status === 'IN_PROGRESS' && (
-                  <span className="mr-2">●</span>
-                )}
-                {tournament?.status}
-              </span>
-            </div>
-
-            {/* Title & Info Overlay (Bottom Left) */}
-            <div className="absolute bottom-0 left-0 w-full p-8 md:p-12 z-20 flex flex-col gap-4">
-              <div className="flex flex-col md:flex-row md:items-end gap-6">
-                <h1 className="text-5xl md:text-7xl font-black text-white tracking-tight drop-shadow-2xl">
-                  {tournament?.tournamentName || 'Tournament'}
-                </h1>
-
-                {tournament?.sponsorLogoUrl && (
-                  <div className="mb-2 md:mb-4 h-10 px-4 py-1.5 bg-black/40 rounded-lg border border-white/10 backdrop-blur-md flex items-center hover:bg-black/60 transition-colors cursor-pointer">
-                    <span className="text-[10px] uppercase text-gray-300 mr-2 font-bold tracking-wider">
-                      Sponsored by
-                    </span>
-                    <img
-                      src={tournament.sponsorLogoUrl}
-                      alt="Sponsor"
-                      className="h-full object-contain max-w-[100px] brightness-125"
-                    />
-                  </div>
-                )}
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-yellow-500" />
+                <span className="text-sm">
+                  {formatDate(tournament.startingTime)}
+                </span>
               </div>
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-yellow-500" />
+                <span className="text-sm">
+                  {participants.length}
+                  {tournament.maxPlayers && ` / ${tournament.maxPlayers}`}{' '}
+                  Players
+                </span>
+              </div>
+            </motion.div>
 
-              <p className="text-lg md:text-xl text-gray-200 max-w-4xl leading-relaxed drop-shadow-md font-medium">
-                {tournament?.tournamentDescription || ''}
-              </p>
-
-              {tournament?.status === 'REGISTRATION_OPEN' && (
-                <button
-                  onClick={() => handleRegister(tournament.tournamentId)}
-                  className="w-fit absolute self-end mt-4 px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-bold text-lg rounded-xl shadow-lg hover:shadow-yellow-500/40 transition-all duration-300 transform hover:-translate-y-1 active:scale-95"
-                >
-                  Register for Tournament
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Details Section - Always Visible */}
-          <div className="grid grid-cols-1 gap-8 mb-12">
-            <div className="bg-[#262626] p-8 rounded-2xl border border-[#333]">
-              <h3 className="text-2xl font-bold mb-6 text-gray-100 flex items-center gap-2">
-                Tournament Details
-              </h3>
-              <div className="space-y-6 text-gray-300">
-                <p className="leading-relaxed text-lg">
-                  {tournament?.tournamentDescription}
-                </p>
-
-                <div className="h-[1px] w-full bg-[#333]"></div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-4">
-                  <DetailItem
-                    label="Organiser"
-                    value={tournament?.organiserName || 'Unknown'}
-                  />
-                  <DetailItem
-                    label="Match Type"
-                    value={tournament?.matchType}
-                  />
-                  <DetailItem
-                    label="Format"
-                    value={tournament?.tournamentFormat}
-                  />
-                  <DetailItem
-                    label="Time Control"
-                    value={`${tournament?.timeControlBaseMinutes}+${tournament?.timeControlIncrementSeconds}`}
-                  />
-
-                  <DetailItem
-                    label="Start Date"
-                    value={
-                      tournament?.startingTime
-                        ? new Date(tournament.startingTime).toLocaleDateString()
-                        : 'TBA'
-                    }
-                  />
-                  <DetailItem
-                    label="End Date"
-                    value={
-                      tournament?.endTime
-                        ? new Date(tournament.endTime).toLocaleDateString()
-                        : 'TBA'
-                    }
-                  />
-                  <DetailItem
-                    label="Prize Pool"
-                    value={`$${tournament?.prizePool}` || 'N/A'}
-                    highlight
-                  />
-                  <DetailItem
-                    label="Registered"
-                    value={`${participants.length} / ${
-                      tournament?.maxPlayers || '∞'
-                    }`}
+            {/* Sponsor Badge */}
+            {tournament.sponsorLogoUrl && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="absolute top-6 right-6 md:top-12 md:right-12"
+              >
+                <div className="flex items-center gap-3 px-4 py-2 bg-black/40 backdrop-blur-md rounded-xl border border-white/10">
+                  <span className="text-[10px] uppercase text-gray-400 font-bold tracking-wider">
+                    Sponsored by
+                  </span>
+                  <img
+                    src={tournament.sponsorLogoUrl}
+                    alt="Sponsor"
+                    className="h-8 object-contain brightness-110"
                   />
                 </div>
-              </div>
-            </div>
+              </motion.div>
+            )}
           </div>
+        </div>
 
-          {/* Conditional Content: Rounds (InProgress) or Participants (Other) */}
-          {/* Content Section: Rounds (if InProgress) AND Participants (Always) */}
-          <div className="flex flex-col gap-12">
-            {/* Live Bracket - Only visible if InProgress */}
-            {tournament?.status === 'InProgress' && (
-              <div className="flex flex-col gap-6">
-                <h3 className="text-2xl font-bold mb-2 text-gray-100 flex items-center gap-2">
-                  Live Bracket
-                </h3>
-                <div className="flex flex-col lg:flex-row gap-8 justify-between items-start overflow-x-auto pb-8">
-                  {rounds.length > 0 ? (
-                    rounds.map((round, roundIndex) => (
-                      <div
-                        key={round.id}
-                        className="flex flex-col gap-6 min-w-[300px] w-full lg:w-1/3"
-                      >
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="h-8 w-1 bg-gradient-to-b from-yellow-400 to-orange-600 rounded-full"></div>
-                          <h2 className="text-xl font-semibold uppercase tracking-wider text-gray-200">
-                            {round.name}
-                          </h2>
-                        </div>
+        {/* Main Content */}
+        <div className="flex-1 max-w-7xl mx-auto w-full px-6 md:px-12 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left Column - Main Info */}
+            <div className="lg:col-span-2 space-y-8">
+              {/* Registration CTA Card - Only show when registration open */}
+              {isRegistrationOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="relative overflow-hidden bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-red-500/10 border border-yellow-500/20 rounded-2xl p-6"
+                >
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
 
-                        <div className="flex flex-col gap-6 relative">
-                          {/* Connecting Lines (Visual only, simplified) */}
-                          {roundIndex < rounds.length - 1 && (
-                            <div className="absolute top-1/2 -right-4 w-8 h-0.5 bg-gray-800 hidden lg:block"></div>
-                          )}
-
-                          {round.matches &&
-                            round.matches.map(
-                              (match: any, matchIndex: number) => (
-                                <MatchCard
-                                  key={match.id}
-                                  match={match}
-                                  index={matchIndex}
-                                />
-                              )
-                            )}
-                        </div>
+                  <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="w-5 h-5 text-yellow-500" />
+                        <span className="text-yellow-500 font-bold text-sm uppercase tracking-wide">
+                          Registration Open
+                        </span>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-gray-400 italic">
-                      No rounds scheduled yet.
+                      <h3 className="text-2xl font-bold text-white mb-2">
+                        Join the Competition!
+                      </h3>
+                      <p className="text-gray-400">
+                        {spotsLeft !== null ? (
+                          <>
+                            Only{' '}
+                            <span className="text-yellow-500 font-bold">
+                              {spotsLeft} spots
+                            </span>{' '}
+                            remaining. Don't miss your chance to compete!
+                          </>
+                        ) : (
+                          'Register now to secure your spot in this tournament.'
+                        )}
+                      </p>
+
+                      {/* Progress Bar */}
+                      {tournament.maxPlayers && (
+                        <div className="mt-4">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="text-gray-500">
+                              Registration Progress
+                            </span>
+                            <span className="text-yellow-500 font-medium">
+                              {Math.round(progress)}%
+                            </span>
+                          </div>
+                          <div className="h-2 bg-[#333] rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${progress}%` }}
+                              transition={{ duration: 1, ease: 'easeOut' }}
+                              className="h-full bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => handleRegister(tournament.tournamentId)}
+                      disabled={isRegistering}
+                      className="group relative px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-bold text-lg rounded-xl shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40 transition-all duration-300 transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 whitespace-nowrap"
+                    >
+                      {isRegistering ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                          Registering...
+                        </>
+                      ) : (
+                        <>
+                          <Trophy className="w-5 h-5" />
+                          Register Now
+                          <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* About Section */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-[#1f1f1f] border border-[#333] rounded-2xl p-6 md:p-8"
+              >
+                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                  <Target className="w-5 h-5 text-yellow-500" />
+                  About This Tournament
+                </h2>
+                <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                  {tournament.tournamentDescription ||
+                    'No description provided.'}
+                </p>
+              </motion.div>
+
+              {/* Tournament Details Grid */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="grid grid-cols-2 md:grid-cols-4 gap-4"
+              >
+                <InfoCard
+                  icon={Gamepad2}
+                  label="Format"
+                  value={tournament.tournamentFormat?.replace(/_/g, ' ')}
+                />
+                <InfoCard
+                  icon={Shield}
+                  label="Match Type"
+                  value={tournament.matchType?.replace(/_/g, ' ')}
+                />
+                <InfoCard
+                  icon={Zap}
+                  label="Game Mode"
+                  value={tournament.gameMode?.replace(/_/g, ' ')}
+                />
+                <InfoCard
+                  icon={Timer}
+                  label="Time Control"
+                  value={`${tournament.timeControlBaseMinutes}+${tournament.timeControlIncrementSeconds}`}
+                />
+              </motion.div>
+
+              {/* Schedule Section */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-[#1f1f1f] border border-[#333] rounded-2xl p-6 md:p-8"
+              >
+                <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-yellow-500" />
+                  Schedule
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                      <Clock className="w-6 h-6 text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-sm mb-1">Starts</p>
+                      <p className="text-white font-bold text-lg">
+                        {formatDate(tournament.startingTime)}
+                      </p>
+                      <p className="text-gray-400 text-sm">
+                        {formatTime(tournament.startingTime)}
+                      </p>
+                      {tournament.startingTime > Date.now() && (
+                        <p className="text-emerald-400 text-sm mt-1 font-medium">
+                          in {getTimeUntil(tournament.startingTime)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-6 h-6 text-red-400" />
+                    </div>
+                    <div>
+                      <p className="text-gray-500 text-sm mb-1">Ends</p>
+                      <p className="text-white font-bold text-lg">
+                        {formatDate(tournament.endTime)}
+                      </p>
+                      <p className="text-gray-400 text-sm">
+                        {formatTime(tournament.endTime)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Participants Section */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-[#1f1f1f] border border-[#333] rounded-2xl p-6 md:p-8"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Users className="w-5 h-5 text-yellow-500" />
+                    Participants
+                  </h2>
+                  <span className="px-3 py-1 rounded-full bg-[#333] text-gray-300 text-sm font-medium">
+                    {participants.length}
+                    {tournament.maxPlayers && ` / ${tournament.maxPlayers}`}
+                  </span>
+                </div>
+
+                {participants.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {participants.map((p, index) => (
+                      <motion.div
+                        key={p.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="group flex items-center gap-4 p-4 bg-[#262626] rounded-xl border border-[#333] hover:border-yellow-500/30 transition-all"
+                      >
+                        <div className="relative">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center border border-[#444] group-hover:border-yellow-500/50 transition-colors">
+                            <span className="font-bold text-yellow-500 text-lg">
+                              {(p.player_name || 'P')[0]?.toUpperCase()}
+                            </span>
+                          </div>
+                          {index < 3 && (
+                            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-yellow-500 flex items-center justify-center">
+                              <span className="text-[10px] font-bold text-black">
+                                {index + 1}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-white truncate group-hover:text-yellow-400 transition-colors">
+                            {p.player_name || shortAddress(p.id)}
+                          </p>
+                          <div className="flex items-center gap-3 text-sm">
+                            <span className="flex items-center gap-1 text-gray-500">
+                              <Star className="w-3 h-3" />
+                              {p.player_elo}
+                            </span>
+                            <span className="flex items-center gap-1 text-gray-500">
+                              <Gamepad2 className="w-3 h-3" />
+                              {p.player_matches} games
+                            </span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 px-4 bg-[#262626] rounded-xl border border-dashed border-[#444]">
+                    <Users className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                    <p className="text-gray-400 font-medium">
+                      No participants yet
+                    </p>
+                    <p className="text-gray-500 text-sm mt-1">
+                      Be the first to register!
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+
+              {/* Live Bracket - Only visible if InProgress */}
+              {tournament.status === 'IN_PROGRESS' && rounds.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="bg-[#1f1f1f] border border-[#333] rounded-2xl p-6 md:p-8"
+                >
+                  <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-red-500" />
+                    Live Bracket
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse ml-2" />
+                  </h2>
+                  {/* Bracket visualization would go here */}
+                  <div className="text-gray-400 text-center py-8">
+                    Bracket visualization coming soon...
+                  </div>
+                </motion.div>
+              )}
+            </div>
+
+            {/* Right Column - Sidebar */}
+            <div className="space-y-6">
+              {/* Prize Pool Card */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="relative overflow-hidden bg-gradient-to-br from-[#262626] to-[#1f1f1f] border border-[#333] rounded-2xl p-6"
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Trophy className="w-5 h-5 text-yellow-500" />
+                    <span className="text-gray-400 text-sm font-medium uppercase tracking-wide">
+                      Prize Pool
+                    </span>
+                  </div>
+                  <div className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2">
+                    ${tournament.prizePool?.toLocaleString() || '0'}
+                  </div>
+                  <span className="inline-block px-2 py-1 rounded-md bg-yellow-500/10 text-yellow-500 text-xs font-bold">
+                    {tournament.prizeType}
+                  </span>
+
+                  {tournament.prizePoolDescription && (
+                    <div className="mt-4 pt-4 border-t border-[#333]">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide mb-2">
+                        Distribution
+                      </p>
+                      <div className="space-y-2">
+                        {tournament.prizePoolDescription
+                          .split('\n')
+                          .map((line, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center gap-2 text-sm"
+                            >
+                              <Medal
+                                className={`w-4 h-4 ${i === 0 ? 'text-yellow-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-orange-600' : 'text-gray-600'}`}
+                              />
+                              <span className="text-gray-300">{line}</span>
+                            </div>
+                          ))}
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              </motion.div>
 
-            {/* Participants Section - Always Visible */}
-            <div className="animate-in fade-in slide-in-from-bottom-5 duration-500">
-              <h3 className="text-2xl font-bold mb-6 text-gray-100 flex items-center gap-2">
-                Participants
-                <span className="text-sm font-normal text-gray-500 bg-[#262626] px-2 py-1 rounded-full border border-[#333]">
-                  {participants.length}
-                </span>
-              </h3>
+              {/* Quick Stats Card */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-[#1f1f1f] border border-[#333] rounded-2xl p-6"
+              >
+                <h3 className="text-lg font-bold text-white mb-4">
+                  Quick Stats
+                </h3>
+                <div className="space-y-4">
+                  <StatRow
+                    label="Min Players"
+                    value={tournament.minPlayers?.toString() || 'N/A'}
+                  />
+                  <StatRow
+                    label="Max Players"
+                    value={tournament.maxPlayers?.toString() || 'Unlimited'}
+                  />
+                  <StatRow
+                    label="Visibility"
+                    value={tournament.visibility?.toLowerCase() || 'Public'}
+                    capitalize
+                  />
+                  <StatRow
+                    label="Created"
+                    value={formatDate(tournament.createdAt)}
+                  />
+                </div>
+              </motion.div>
 
-              {participants.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                  {participants.map((p: Participant) => (
-                    <div
-                      key={p.id}
-                      className="group bg-[#262626] p-4 rounded-xl border border-[#333] hover:border-yellow-500/30 transition-all hover:bg-[#2c2c2c] flex items-center gap-4"
-                    >
-                      <div className="w-12 h-12 rounded-full bg-[#333] flex items-center justify-center overflow-hidden border border-[#444] group-hover:border-yellow-500/50 transition-colors">
-                        <span className="font-bold text-gray-400 text-lg">
-                          {(p.player_name || 'P')[0]?.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <div className="font-semibold text-gray-200 truncate group-hover:text-yellow-400 transition-colors">
-                          {p.player_name
-                            ? p.player_name.toUpperCase()
-                            : shortAddress(p.id)}
-                        </div>
-                        {p.player_elo != null && (
-                          <div className="text-xs text-gray-500">
-                            <span>Rating: {p.player_elo}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+              {/* Organizer Card */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-[#1f1f1f] border border-[#333] rounded-2xl p-6"
+              >
+                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <Crown className="w-5 h-5 text-yellow-500" />
+                  Organizer
+                </h3>
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center border-2 border-yellow-500/30">
+                    <span className="font-bold text-yellow-500 text-xl">
+                      {tournament.organiserName?.[0]?.toUpperCase() || 'O'}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">
+                      {tournament.organiserName}
+                    </p>
+                    <p className="text-gray-500 text-sm">Tournament Host</p>
+                  </div>
                 </div>
-              ) : (
-                <div className="p-8 text-center text-gray-500 bg-[#262626] rounded-xl border border-[#333] border-dashed">
-                  No participants registered yet.
-                </div>
-              )}
+              </motion.div>
             </div>
           </div>
         </div>
@@ -376,142 +842,43 @@ export default function TournamentPage() {
   )
 }
 
-function MatchCard({ match, index }: { match: any; index: number }) {
-  const isCompleted = match.status === 'completed'
-  const isLocked = match.status === 'locked'
-
+// Helper Components
+function InfoCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType
+  label: string
+  value: string | undefined | null
+}) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 }}
-      className={`
-        relative flex flex-col bg-[#262626] rounded-xl border border-[#333] overflow-hidden shadow-lg
-        ${isCompleted ? 'opacity-60 grayscale-[0.5]' : 'opacity-100'}
-        ${isLocked ? 'opacity-40' : ''}
-        hover:border-yellow-500/50 transition-all duration-300 group
-      `}
-    >
-      {/* Match Header */}
-      <div className="px-4 py-2 bg-[#1f1f1f] flex justify-between items-center text-xs text-gray-500 uppercase tracking-wider">
-        <span>Match #{match.id}</span>
-        <span
-          className={`
-          px-2 py-0.5 rounded-full text-[10px] font-bold
-          ${
-            match.status === 'live'
-              ? 'bg-red-500/20 text-red-500 animate-pulse'
-              : ''
-          }
-          ${match.status === 'scheduled' ? 'bg-blue-500/20 text-blue-400' : ''}
-          ${
-            match.status === 'completed' ? 'bg-green-500/20 text-green-400' : ''
-          }
-          ${match.status === 'locked' ? 'bg-gray-700 text-gray-500' : ''}
-        `}
-        >
-          {match.status}
+    <div className="bg-[#1f1f1f] border border-[#333] rounded-xl p-4 hover:border-[#444] transition-colors">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="w-4 h-4 text-yellow-500" />
+        <span className="text-gray-500 text-xs uppercase tracking-wide">
+          {label}
         </span>
       </div>
-
-      {/* Players */}
-      <div className="p-4 flex flex-col gap-3">
-        <PlayerRow
-          player={match.player1}
-          isWinner={
-            match.winner === (match.player1?.name || match.player1?.username)
-          }
-          score={match.score?.split(' - ')[0] || '-'}
-        />
-        <div className="h-[1px] w-full bg-[#333]"></div>
-        <PlayerRow
-          player={match.player2}
-          isWinner={
-            match.winner === (match.player2?.name || match.player2?.username)
-          }
-          score={match.score?.split(' - ')[1] || '-'}
-        />
-      </div>
-
-      {/* Hover Effect Glow */}
-      <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/0 via-yellow-500/5 to-yellow-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-    </motion.div>
-  )
-}
-
-function PlayerRow({
-  player,
-  isWinner,
-  score,
-}: {
-  player: any
-  isWinner: boolean
-  score: string
-}) {
-  const isTBD = !player || player.name === 'TBD' || player.username === 'TBD'
-
-  return (
-    <div
-      className={`flex items-center justify-between ${
-        isWinner ? 'text-yellow-400' : 'text-gray-300'
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        {player?.avatar || player?.avatar_url ? (
-          <img
-            src={player.avatar || player.avatar_url}
-            alt={player.name || player.username}
-            className="w-8 h-8 rounded-full object-cover border border-[#444]"
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-[#333] flex items-center justify-center text-xs text-gray-500">
-            ?
-          </div>
-        )}
-        <div className="flex flex-col">
-          <span
-            className={`font-medium ${isWinner ? 'font-bold' : ''} ${
-              isTBD ? 'text-gray-600 italic' : ''
-            }`}
-          >
-            {player?.name || player?.username || (isTBD ? 'TBD' : 'Unknown')}
-          </span>
-          {!isTBD && (
-            <span className="text-[10px] text-gray-500">
-              Rank #{player.rank}
-            </span>
-          )}
-        </div>
-      </div>
-      <span
-        className={`text-lg font-mono ${
-          isWinner ? 'text-yellow-400 font-bold' : 'text-gray-500'
-        }`}
-      >
-        {score}
-      </span>
+      <p className="text-white font-bold">{value || 'N/A'}</p>
     </div>
   )
 }
-function DetailItem({
+
+function StatRow({
   label,
   value,
-  highlight = false,
+  capitalize = false,
 }: {
   label: string
-  value: string | undefined | null
-  highlight?: boolean
+  value: string
+  capitalize?: boolean
 }) {
-  if (!value) return null
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs uppercase tracking-wider text-gray-500 font-bold">
-        {label}
-      </span>
+    <div className="flex items-center justify-between">
+      <span className="text-gray-500 text-sm">{label}</span>
       <span
-        className={`font-medium text-lg ${
-          highlight ? 'text-yellow-400 font-bold' : 'text-gray-200'
-        }`}
+        className={`text-white font-medium ${capitalize ? 'capitalize' : ''}`}
       >
         {value}
       </span>
