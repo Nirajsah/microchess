@@ -169,7 +169,7 @@ impl From<TournamentInput> for Tournament {
             tournament_format: input.tournament_format.unwrap_or(TournamentFormat::Swiss),
             match_type: input.match_type.unwrap_or(MatchType::Bo1),
             game_mode: input.game_mode,
-            time_control: None,
+            time_control: input.time_control.map(Into::into),
             max_players: input.max_players,
             min_players: input.min_players,
 
@@ -227,7 +227,6 @@ pub enum TournamentFormat {
     DoubleElim,
 }
 
-
 /// Match type / series
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Copy, Enum, Eq)]
 pub enum MatchType {
@@ -246,7 +245,7 @@ pub struct TimeControl {
 }
 
 /// Simple time control representation (e.g., 3+2)
-#[derive(Debug, Serialize, Deserialize, Clone, InputObject)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, InputObject)]
 #[serde(rename_all = "camelCase")]
 pub struct TimeControlInput {
     pub base_minutes: u32,
@@ -272,7 +271,6 @@ pub enum GameMode {
     Crazyhouse,
 }
 
-
 /// Prize types supported
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Copy, Enum, Eq)]
 pub enum PrizeType {
@@ -280,14 +278,12 @@ pub enum PrizeType {
     Tokens,
 }
 
-
 /// Tournament visibility
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Copy, Enum, Eq)]
 pub enum Visibility {
     Public,
     Private,
 }
-
 
 /// Tournament status lifecycle
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Copy, Enum, Eq)]
@@ -299,4 +295,3 @@ pub enum TournamentStatus {
     Completed,
     Cancelled,
 }
-

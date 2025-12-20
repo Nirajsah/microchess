@@ -377,6 +377,9 @@ impl Contract for ChessContract {
                 self.on_msg_tournament_registration(tournament_id, owner, player)
                     .await;
             }
+            Message::PublishTournament { value } => {
+                self.on_msg_publish_tournament(value);
+            }
         }
     }
 

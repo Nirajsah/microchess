@@ -73,6 +73,13 @@ impl ChessContract {
             if tournament.status == TournamentStatus::Draft {
                 return;
             }
+
+            if tournament.status == TournamentStatus::RegistrationOpen {
+                let message = Message::PublishTournament {
+                    value: tournament.to_owned(),
+                };
+                self.runtime.send_message(app_chain, message);
+            }
         }
 
         // Always send message if not early return

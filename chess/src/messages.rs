@@ -1,6 +1,6 @@
 use chess::{
     playerprofile::PlayerHash,
-    tournament::{TournamentInput, TournamentStatus, TournamentUpdate},
+    tournament::{Tournament, TournamentInput, TournamentStatus, TournamentUpdate},
     Event, EventType,
 };
 use linera_sdk::linera_base_types::{AccountOwner, ChainId};
@@ -10,7 +10,7 @@ use crate::{ChessContract, STREAM_NAME};
 impl ChessContract {
     pub fn on_msg_host_tournament(&mut self, tournament: TournamentInput) {
         assert_eq!(self.runtime.chain_id(), self.app_chain());
-         if let Some(tournament_id) = tournament.tournament_id.clone() {
+        if let Some(tournament_id) = tournament.tournament_id.clone() {
             let _ = self
                 .state
                 .tournaments
@@ -164,5 +164,23 @@ impl ChessContract {
                 owner,
             },
         );
+    }
+
+    pub fn on_msg_publish_tournament(&mut self, tournament: Tournament) {
+        match self
+            .state
+            .tournaments
+            .insert(&tournament.tournament_id, tournament.clone().into())
+        {
+            Ok(_) => {
+                self.runtime.emit(
+                    STREAM_NAME.into(),
+                    &Event::Tournament {
+                        value: tournament.into(),
+                    },
+                );
+            }
+            Err(_) => return,
+        }
     }
 }

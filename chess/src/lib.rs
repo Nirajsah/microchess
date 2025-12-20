@@ -107,6 +107,9 @@ pub enum Operation {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Message {
+    PublishTournament {
+        value: Tournament,
+    },
     TournamentWithDraw {
         tournament_id: String,
         owner: AccountOwner,
