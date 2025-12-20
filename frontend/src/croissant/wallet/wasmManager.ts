@@ -1,4 +1,4 @@
-import * as wasm from '../linera_web'
+const wasm = await import("@client");
 
 export class WasmManager {
   private static wasm: typeof wasm | null = null
@@ -10,7 +10,7 @@ export class WasmManager {
     if (this.initialized && this.wasm) return
 
     try {
-      await wasm.default()
+      await wasm.initialize()
 
       this.wasm = wasm
       this.initialized = true

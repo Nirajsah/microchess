@@ -1,14 +1,17 @@
-import * as wasm from '../linera_web'
 import { WasmManager } from './wasmManager'
 import { ClientManager } from './clientManager'
 import { WalletManager } from './walletManager'
+import { Faucet } from '@client';
+
+const wasm = await import("@client");
 
 export type Result<T> =
   | { success: true; result: T }
   | { success: false; error: string }
 
 type OpType = 'CREATE_WALLET' | 'CLAIM_CHAIN'
-type FaucetHandler = (faucet: wasm.Faucet) => Promise<Result<string>>
+type FaucetHandler = (faucet: Faucet) => Promise<Result<string>>
+
 
 export type Request = {
   type: 'QUERY'
@@ -25,7 +28,7 @@ export class Server {
 
   public onNotification: ((data: any) => void) | null = null
 
-  constructor() {}
+  constructor() { }
 
   faucetHandlers: Record<OpType, FaucetHandler> = {
     CREATE_WALLET: async (faucet) => {

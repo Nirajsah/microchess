@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Result, Server } from '../../public/croissant/wallet'
+import { Result, Server } from '@/croissant/wallet'
 import { checkWalletExists } from '@/lib/checkWalletExist'
 import { ChainInfo, Convert } from '@/lib/chainsType'
 

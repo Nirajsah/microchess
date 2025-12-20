@@ -1,6 +1,6 @@
-import type { Client, Wallet } from '../linera_web'
-import type { Signer } from '../signer/signer'
-import type * as wasmType from '../linera_web'
+import type * as wasmType from '@client'
+import { Chain, Client, Wallet } from '@client'
+import { Signer } from '@client'
 
 export type Request = {
   type: 'QUERY'
@@ -11,6 +11,7 @@ export type Request = {
 export class ClientManager {
   private static _instance: ClientManager | null = null
   private client: Client | null = null
+  private chain: Chain | null = null
   private notificationHandlerRegistered = false
 
   public onNotificationCallback: ((data: any) => void) | null = null
@@ -30,7 +31,6 @@ export class ClientManager {
     wasmInstance: typeof wasmType,
     wallet: Wallet,
     signer: Signer,
-    skipBlockSync = false
   ): Promise<Client> {
     if (this.client) {
       return this.client
@@ -44,11 +44,11 @@ export class ClientManager {
       const client = await new wasmInstance.Client(
         wallet,
         signer,
-        skipBlockSync
       )
 
       this.client = client
-      this.registerNotificationHandler()
+      this.chain = await client.chain()
+      await this.registerNotificationHandler()
       return client
     } catch (err) {
       this.cleanup()
@@ -57,10 +57,10 @@ export class ClientManager {
   }
 
   /** Register handler only once */
-  registerNotificationHandler() {
-    if (!this.client || this.notificationHandlerRegistered) return
+  async registerNotificationHandler() {
+    if (!this.client || this.notificationHandlerRegistered || !this.chain) return
 
-    this.client.onNotification((notification: any) => {
+    this.chain.onNotification((notification: any) => {
       try {
         const parsed = this.parseNotification(notification)
 
@@ -141,7 +141,7 @@ export class ClientManager {
       return
     }
     try {
-      const balance = await this.client!.balance()
+      const balance = await this.chain!.balance()
       return balance
     } catch (error) {
       console.error(error)
@@ -150,7 +150,7 @@ export class ClientManager {
 
   async query(req: Request) {
     try {
-      const app = await this.client!.frontend().application(req.applicationId)
+      const app = await this.chain!.application(req.applicationId)
       const result = await app.query(req.query)
       return result
     } catch (err) {
@@ -162,7 +162,7 @@ export class ClientManager {
   async cleanup() {
     if (this.client) {
       try {
-        this.client.stop()
+        // this.client.stop()
         await new Promise((resolve) => setTimeout(resolve, 150))
         this.client.free()
         this.client = null

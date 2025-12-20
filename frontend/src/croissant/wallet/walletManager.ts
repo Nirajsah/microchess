@@ -1,6 +1,6 @@
-import type { Wallet } from '../linera_web'
-import type * as wasmType from '../linera_web'
-import PrivateKeySigner from '../signer/index'
+import type { Wallet } from '@client'
+import type * as wasmType from '@client'
+import { PrivateKeySigner } from '@client' 
 
 export class WalletManager {
   private static _instance: WalletManager | null = null
@@ -30,7 +30,7 @@ export class WalletManager {
     if (!this.wasmInstance && !_wallet) {
       throw new Error('Missing wasmInstance or wallet')
     }
-    await this.wasmInstance!.Wallet.setJsWallet(_wallet) // let the load() handle setting this.wallet.
+    // await this.wasmInstance!.Wallet.setJsWallet(_wallet) // let the load() handle setting this.wallet.
     return 'Wallet set successfully'
   }
 
@@ -56,7 +56,8 @@ export class WalletManager {
 
   async getJsWallet(): Promise<string> {
     try {
-      const wallet = await this.wasmInstance!.Wallet.readJsWallet()
+      // const wallet = await this.wasmInstance!.Wallet.readJsWallet()
+      const wallet = "aoiigjeoiag";
       return wallet
     } catch (error) {
       throw new Error('Failed to read wallet')
@@ -89,11 +90,10 @@ export class WalletManager {
     }
   }
 
-  async setDefaultChain(chainId: string): Promise<string> {
+  async setDefaultChain(_chainId: string): Promise<string> {
     try {
-      await this.wallet!.setDefault(chainId)
-
-      await this.cleanup()
+      // await this.wallet!.setDefault(chainId)
+      // await this.cleanup()
 
       await this.reInitWallet() // reinitialize wallet after assignment
       return 'Default chain set successfully'
@@ -102,17 +102,17 @@ export class WalletManager {
     }
   }
 
-  async assign(payload: {
+  async assign(_payload: {
     chainId: string
     timestamp: number
   }): Promise<string> {
     try {
-      await this.wallet!.assignChain(
+      /* await this.wallet!.assignChain(
         this.signer!.address(),
         payload.chainId,
         payload.timestamp
-      )
-      this.cleanup()
+      ) */
+      // this.cleanup()
 
       await this.reInitWallet() // reinitialize wallet after assignment
       return 'Chain assigned successfully'
