@@ -3,16 +3,19 @@
 #![cfg(not(target_arch = "wasm32"))]
 
 use chess::{
-    playerprofile::PlayerProfile,
+    player::PlayerProfile,
     tournament::{
-        GameMode, MatchType, PrizeType, TimeControlInput, TournamentFormat, TournamentInput,
-        TournamentStatus, Visibility,
+        utils::{Participants, TournamentParticipant},
+        {
+            GameMode, MatchType, PrizeType, TimeControlInput, Tournament, TournamentFormat,
+            TournamentInput, TournamentStatus, Visibility,
+        },
     },
     ChessAbi, InstantiationArgument, Operation,
 };
 use linera_chain::types::ConfirmedBlockCertificate;
 use linera_sdk::{
-    linera_base_types::{ApplicationId, TimeDelta},
+    linera_base_types::{ApplicationId, TimeDelta, Timestamp},
     test::{ActiveChain, QueryOutcome, TestValidator},
 };
 
@@ -25,7 +28,7 @@ fn create_default_instantiation_args() -> InstantiationArgument {
 }
 
 async fn create_player_profile(
-    chain: ActiveChain,
+    chain: &ActiveChain,
     app_id: ApplicationId<ChessAbi>,
     name: String,
 ) -> PlayerProfile {
@@ -70,29 +73,29 @@ async fn test_tournament() {
 
     let player_1_name = "John Doe".to_string();
 
-    let _player_1 =
-        create_player_profile(player_1_chain.clone(), app_id, player_1_name.clone()).await;
+    let _player_1 = create_player_profile(&player_1_chain, app_id, player_1_name.clone()).await;
 
-    let _value = TournamentInput {
+    let value = TournamentInput {
         organiser_chain: Some(player_1_chain.id()),
         organiser_id: Some(player_1_chain.public_key().into()),
-        organiser_name: player_1_name,
+        organiser_name: player_1_name.clone(),
         tournament_id: None,
-        tournament_name: "Test".to_string(),
+        tournament_name: "Teigjoeiagst".to_string(),
         tournament_description: None,
-        tournament_format: Some(TournamentFormat::Swiss),
-        max_players: Some(16),
-        min_players: Some(4),
-        match_type: Some(MatchType::Bo1),
-        time_control: Some(TimeControlInput {
-            base_minutes: 40,
-            increment_seconds: 50,
+        tournament_format: TournamentFormat::Swiss,
+        max_players: 16,
+        min_players: 4,
+        match_type: MatchType::Bo1,
+        round_count: None,
+        time_control: TimeControlInput {
+            base_minutes: 10,
+            increment_seconds: 5,
             mode_label: Some("Classic".to_string()),
-        }),
+        },
         game_mode: GameMode::Standard,
-        starting_time: Some(100u64),
-        end_time: Some(1000u64),
-        prize_type: Some(PrizeType::Tokens),
+        starting_time: 10u64,
+        end_time: 10u64,
+        prize_type: PrizeType::Tokens,
         prize_pool: 100,
         prize_pool_description: None,
         visibility: Visibility::Public,
@@ -104,24 +107,60 @@ async fn test_tournament() {
         updated_at: None,
         status: TournamentStatus::RegistrationOpen,
     };
-    // let certificate = test_host_tournament(player_1_chain.clone(), app_id, value.clone()).await;
 
-    /* let QueryOutcome { response, .. } = player_1_chain
-        .graphql_query(app_id, "query { myTournaments }")
-        .await;
+    let certificate = test_host_tournament(&player_1_chain, app_id, value.clone()).await;
+
+    let tournament_query = "
+        query {
+          myTournaments {
+            organiserChain
+            organiserId
+            organiserName
+            tournamentId
+            tournamentName
+            tournamentDescription
+            tournamentFormat
+            matchType
+            gameMode
+            timeControl {
+                baseMinutes
+                incrementSeconds
+                modeLabel
+            }
+            maxPlayers
+            minPlayers
+            roundCount
+            startingTime
+            endTime
+            prizeType
+            prizePool
+            prizePoolDescription
+            visibility
+            bannerImageUrl
+            sponsorLogoUrl
+            customTags
+            version
+            createdAt
+            updatedAt
+            status
+          }
+        }";
+
+    let QueryOutcome { response, .. } =
+        player_1_chain.graphql_query(app_id, tournament_query).await;
 
     let res: Vec<Tournament> = serde_json::from_value(response["myTournaments"].clone())
-        .expect("Failed to deserialize response"); */
+        .expect("Failed to deserialize response");
 
-    // let id = res[0].tournament_id.clone();
+    let id = res[0].tournament_id.clone();
 
-    /* app_chain
-    .add_block(|block| {
-        block.with_messages_from(&certificate);
-    })
-    .await; */
+    app_chain
+        .add_block(|block| {
+            block.with_messages_from(&certificate);
+        })
+        .await;
 
-    /* let query = format!(
+    let query = format!(
         r#"
             query {{
                 tournament(id: "{}") {{
@@ -170,46 +209,69 @@ async fn test_tournament() {
     assert_eq!(data.organiser_name, value.organiser_name);
     assert_eq!(data.tournament_id, id.to_owned());
     assert_eq!(data.tournament_name, value.tournament_name);
-    assert_eq!(data.tournament_format, value.tournament_format.unwrap());
-    assert_eq!(data.match_type, value.match_type.unwrap());
+    assert_eq!(data.tournament_format, value.tournament_format);
+    assert_eq!(data.match_type, value.match_type);
     assert_eq!(data.game_mode, value.game_mode);
 
     assert_eq!(
-        data.time_control.clone().unwrap().base_minutes,
-        value.time_control.clone().unwrap().base_minutes
+        data.time_control.clone().base_minutes,
+        value.time_control.clone().base_minutes
     );
     assert_eq!(
-        data.time_control.clone().unwrap().increment_seconds,
-        value.time_control.clone().unwrap().increment_seconds
+        data.time_control.clone().increment_seconds,
+        value.time_control.clone().increment_seconds
     );
-    assert_eq!(
-        data.time_control.unwrap().mode_label,
-        value.time_control.unwrap().mode_label
-    );
+    assert_eq!(data.time_control.mode_label, value.time_control.mode_label);
 
-    assert_eq!(
-        data.starting_time,
-        Timestamp::from(value.starting_time.unwrap())
-    );
+    assert_eq!(data.starting_time, Timestamp::from(value.starting_time));
 
-    assert_eq!(data.end_time, Timestamp::from(value.end_time.unwrap()));
+    assert_eq!(data.end_time, Timestamp::from(value.end_time));
 
     assert_eq!(data.prize_pool, value.prize_pool);
-    assert_eq!(data.prize_type, value.prize_type.unwrap());
+    assert_eq!(data.prize_type, value.prize_type);
     assert_eq!(data.visibility, value.visibility);
 
     assert_eq!(data.custom_tags, value.custom_tags);
     assert_eq!(data.status, value.status);
 
-    assert!(!data.version.is_empty()); */
+    assert!(!data.version.is_empty());
+
+    let query_participants = format!(
+        r#"
+            query {{ participants(id: "{}") }}
+        "#,
+        id
+    );
+
+    let QueryOutcome { response, .. } = app_chain.graphql_query(app_id, query_participants).await;
+
+    let data: String = serde_json::from_value(response["participants"].clone())
+        .expect("Failed to deserialize participants data");
+
+    let participants: Participants = Participants::decode(data);
+
+    process_players(&participants);
 }
 
-async fn _test_host_tournament(
-    chain: ActiveChain,
+pub fn process_players(participants: &Participants) {
+    match participants {
+        Participants::Swiss(p) => process_player_list(&p.players),
+        Participants::SingleElim(p) => process_player_list(&p.players),
+    }
+}
+
+fn process_player_list<T: TournamentParticipant>(players: &[T]) {
+    println!("Player ID: {:?}", players);
+}
+
+async fn test_host_tournament(
+    chain: &ActiveChain,
     app_id: ApplicationId<ChessAbi>,
     value: TournamentInput,
 ) -> ConfirmedBlockCertificate {
-    let operation = Operation::HostTournament { value };
+    let operation = Operation::HostTournament {
+        value: Box::new(value),
+    };
 
     chain
         .add_block(|block| {

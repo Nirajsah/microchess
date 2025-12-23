@@ -5,10 +5,30 @@ use std::ops::Deref;
 */
 use async_graphql::SimpleObject;
 use base64::{engine::general_purpose, Engine};
-use linera_sdk::linera_base_types::{AccountOwner, ChainId};
+use linera_sdk::linera_base_types::{AccountOwner, ChainId, DataBlobHash, TimeDelta};
 use serde::{Deserialize, Serialize};
 
 use crate::leaderboard::Leaderboard;
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
+pub struct PlayersTime {
+    pub white: TimeDelta,
+    pub black: TimeDelta,
+}
+
+// Struct to hold the entire match metadata
+#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
+pub struct MatchHistory {
+    pub you: Player,
+    pub opponent: Player,
+    pub blob_hash: DataBlobHash, // we only store moves here
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
+pub struct Player {
+    pub id: AccountOwner,
+    pub name: Option<String>,
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]

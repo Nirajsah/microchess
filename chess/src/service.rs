@@ -7,9 +7,9 @@ use std::sync::Arc;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use chess::{
     leaderboard::Leaderboard,
-    playerprofile::{PlayerInfo, PlayerProfile},
+    player::{MatchHistory, PlayerInfo, PlayerProfile, PlayersTime},
     tournament::Tournament,
-    GameChain, LastMove, MatchHistory, Operation, PlayersTime,
+    GameChain, LastMove, Operation,
 };
 use linera_sdk::{
     abi::WithServiceAbi,
@@ -66,12 +66,6 @@ struct GameData {
     game_state: String,     // State of the Game, NotStarted, OnGoing, StaleMate or CheckMate
     winner: Option<AccountOwner>,
     last_move: Option<LastMove>,
-}
-
-#[derive(Deserialize, Serialize, SimpleObject)]
-struct TournamentParticipant {
-    id: AccountOwner,
-    player: PlayerInfo,
 }
 
 #[Object]
@@ -171,71 +165,38 @@ impl ChessService {
 
     /// Read moves from datablob
     async fn read_moves(&self, hash: DataBlobHash) -> Vec<String> {
-        if let Ok(moves) = postcard::from_bytes::<Vec<String>>(&self.runtime.read_data_blob(hash)) {
-            moves
-        } else {
-            vec![]
-        }
+        postcard::from_bytes::<Vec<String>>(&self.runtime.read_data_blob(hash)).unwrap_or_default()
     }
 
     async fn tournament(&self, id: String) -> Option<Tournament> {
-        let data = self
-            .state
+        self.state
             .tournaments
             .get(&id)
             .await
-            .expect("failed to get data");
-
-        data
-    }
-
-    async fn my_tournaments(&self) -> &Vec<Tournament> {
-        self.state.my_tournaments.get()
+            .expect("failed to get data")
     }
 
     async fn my_tournament(&self, tournament_id: String) -> Option<&Tournament> {
-        if let Some(tournament) = self
-            .state
+        self.state
             .my_tournaments
             .get()
             .iter()
-            .find(|t| t.tournament_id == tournament_id)
-        {
-            Some(tournament)
-        } else {
-            None
-        }
+            .find(|t| t.tournament_id.clone() == tournament_id)
     }
 
     async fn all_tournaments(&self) -> &Vec<Tournament> {
         self.state.all_tournaments.get()
     }
 
-    async fn participants(&self, tournament_id: String) -> Vec<TournamentParticipant> {
-        let mut participants = Vec::new();
+    async fn participants(&self, id: String) -> Option<String> {
+        let participants = self.state.participants.get(&id).await.ok().flatten()?;
+        Some(participants.encode())
+    }
 
-        let Some(player_ids) = self
-            .state
-            .participants
-            .get(&tournament_id)
-            .await
-            .ok()
-            .flatten()
-        else {
-            return participants;
-        };
-
-        for id in player_ids {
-            let Some(p) = self.state.tournament_players.get(&id).await.ok().flatten() else {
-                continue; // skip missing player instead of panicking
-            };
-
-            participants.push(TournamentParticipant {
-                id,
-                player: p.decode().info(),
-            });
-        }
-
-        participants
+    async fn my_tournaments(&self) -> &Vec<Tournament> {
+        self.state.my_tournaments.get()
+    }
+    async fn tournaments(&self) -> &Vec<String> {
+        self.state.tournament_list.get()
     }
 }

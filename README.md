@@ -56,12 +56,44 @@ https://github.com/Nirajsah/croissant
   - Queens
   - Kings
 
+### Tournament System Requirements
+
+**Core Tournament Management**
+
+- [ ] Enable users to create and host tournaments
+- [ ] Allow users to register for tournaments
+- [ ] Allow participants to withdraw from tournaments
+- [ ] Maintain and progress tournament state through defined phases (registration, active rounds, completed)
+
+**Pairings and Structure**
+
+- [ ] Automatically generate participant pairings
+- [ ] Automatically generate round brackets
+- [ ] Support multiple tournament formats:
+  - [ ] Swiss System
+  - [ ] Round Robin
+
+**Match and Round Execution**
+
+- [ ] Create on-chain game instances for all matches and rounds
+- [ ] Track match results and advance rounds accordingly
+
+**Participant Experience**
+
+- [ ] Send notifications to participants for:
+  - [ ] Registration status
+  - [ ] Round start
+  - [ ] Match assignments
+  - [ ] Tournament completion
+
+**Persistence and Archival**
+
+- [ ] Persist completed tournaments to blob storage for long-term retention
+- [ ] Ensure historical tournament data remains accessible and verifiable
+
 ### Future Features
 
-- [ ] Develop a tournament feature.
 - [ ] Implement AI opponent for single-player mode.
-
-To be added...
 
 ## License
 

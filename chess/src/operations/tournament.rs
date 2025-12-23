@@ -1,9 +1,6 @@
-use chess::{
-    tournament::{TournamentInput, TournamentStatus, TournamentUpdate},
-    Message,
-};
+use chess::tournament::{Tournament, TournamentInput, TournamentStatus, TournamentUpdate};
 
-use crate::ChessContract;
+use crate::{messages::Message, ChessContract};
 
 impl ChessContract {
     pub fn on_op_tournament_registration(&mut self, tournament_id: String) {
@@ -45,11 +42,14 @@ impl ChessContract {
         let now = self.runtime.system_time();
         let owner = self.runtime.authenticated_signer().unwrap();
         let chain_id = self.runtime.chain_id();
-        let tournament = TournamentInput::new(value, chain_id, now, owner);
+        let tournament: Tournament = TournamentInput::new(value, chain_id, now, owner).into();
+
+        self.state.my_tournaments.get_mut().push(tournament.clone());
+
         self.state
-            .my_tournaments
+            .tournament_list
             .get_mut()
-            .push(tournament.clone().into());
+            .push(tournament.tournament_id.clone());
 
         if tournament.status == TournamentStatus::RegistrationOpen {
             let message = Message::HostTournament { value: tournament };
@@ -63,13 +63,14 @@ impl ChessContract {
 
     pub fn on_op_update_tournament(&mut self, tournament_id: String, update: TournamentUpdate) {
         let app_chain = self.app_chain();
+        let now = self.runtime.system_time();
         let my_tournaments = self.state.my_tournaments.get_mut();
 
         if let Some(tournament) = my_tournaments
             .iter_mut()
             .find(|v| tournament_id == v.tournament_id)
         {
-            tournament.update(update.clone());
+            tournament.update(&update, now);
             if tournament.status == TournamentStatus::Draft {
                 return;
             }

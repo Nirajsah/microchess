@@ -2,7 +2,7 @@
 
 #![cfg(not(target_arch = "wasm32"))]
 
-use chess::{playerprofile::PlayerProfile, ChessAbi, GameChain, InstantiationArgument, Operation};
+use chess::{player::PlayerProfile, ChessAbi, GameChain, InstantiationArgument, Operation};
 use linera_chain::types::ConfirmedBlockCertificate;
 use linera_sdk::{
     linera_base_types::{ApplicationId, BlobType, ChainDescription, TimeDelta},

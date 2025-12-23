@@ -1,3 +1,5 @@
+pub mod utils;
+
 use async_graphql::{Enum, InputObject, SimpleObject};
 use linera_sdk::linera_base_types::{AccountOwner, ChainId, Timestamp};
 use serde::{Deserialize, Serialize};
@@ -18,9 +20,10 @@ pub struct Tournament {
     pub tournament_format: TournamentFormat,
     pub match_type: MatchType,
     pub game_mode: GameMode,
-    pub time_control: Option<TimeControl>,
-    pub max_players: Option<u32>,
-    pub min_players: Option<u32>,
+    pub time_control: TimeControl,
+    pub max_players: u32,
+    pub min_players: u32,
+    pub round_count: Option<u8>,
 
     // --- Schedule ---
     pub starting_time: Timestamp,
@@ -46,26 +49,26 @@ pub struct Tournament {
 }
 
 impl Tournament {
-    pub fn update(&mut self, update: TournamentUpdate) {
-        if let Some(tournament_name) = update.tournament_name {
-            self.tournament_name = tournament_name;
+    pub fn update(&mut self, update: &TournamentUpdate, now: Timestamp) {
+        if let Some(tournament_name) = &update.tournament_name {
+            self.tournament_name = tournament_name.to_string();
         }
 
-        if let Some(tournament_desc) = update.tournament_description {
-            self.tournament_description = Some(tournament_desc);
+        if let Some(tournament_desc) = &update.tournament_description {
+            self.tournament_description = Some(tournament_desc.to_string());
         }
 
-        if let Some(banner) = update.banner_image_url {
-            self.banner_image_url = Some(banner);
+        if let Some(banner) = &update.banner_image_url {
+            self.banner_image_url = Some(banner.to_string());
         }
 
-        if let Some(logo) = update.sponsor_logo_url {
-            self.sponsor_logo_url = Some(logo);
+        if let Some(logo) = &update.sponsor_logo_url {
+            self.sponsor_logo_url = Some(logo.to_string());
         }
 
-        if let Some(custom_tags) = update.custom_tags {
+        if let Some(custom_tags) = &update.custom_tags {
             if !custom_tags.is_empty() {
-                self.custom_tags = custom_tags;
+                self.custom_tags = custom_tags.to_vec();
             }
         }
 
@@ -90,6 +93,7 @@ impl Tournament {
         if let Some(visibility) = update.visibility {
             self.visibility = visibility;
         }
+        self.updated_at = now
     }
 }
 
@@ -100,23 +104,24 @@ pub struct TournamentInput {
     pub organiser_chain: Option<ChainId>,
     pub organiser_id: Option<AccountOwner>,
     pub organiser_name: String,
-    pub tournament_id: Option<String>, // Generated system-side if not provided
+    pub tournament_id: Option<String>, // Generated system-side
     pub tournament_name: String,
     pub tournament_description: Option<String>,
     // --- Format & Rules ---
-    pub tournament_format: Option<TournamentFormat>,
-    pub match_type: Option<MatchType>,
+    pub tournament_format: TournamentFormat,
+    pub match_type: MatchType,
     pub game_mode: GameMode,
-    pub time_control: Option<TimeControlInput>,
-    pub max_players: Option<u32>,
-    pub min_players: Option<u32>,
+    pub time_control: TimeControlInput,
+    pub max_players: u32,
+    pub min_players: u32,
+    pub round_count: Option<u8>,
 
     // --- Schedule ---
-    pub starting_time: Option<u64>,
-    pub end_time: Option<u64>,
+    pub starting_time: u64,
+    pub end_time: u64,
 
     // --- Rewards ---
-    pub prize_type: Option<PrizeType>,
+    pub prize_type: PrizeType,
     pub prize_pool: u32,
     pub prize_pool_description: Option<String>,
 
@@ -158,7 +163,7 @@ impl From<TournamentInput> for Tournament {
     fn from(input: TournamentInput) -> Self {
         Tournament {
             // Identity
-            organiser_chain: input.organiser_chain.unwrap(),
+            organiser_chain: input.organiser_chain.expect("failed to get oraniser_chain"),
             organiser_id: input.organiser_id.unwrap(),
             organiser_name: input.organiser_name,
             tournament_id: input.tournament_id.unwrap_or_default(), // Should be set before conversion if using new(), otherwise default
@@ -166,19 +171,20 @@ impl From<TournamentInput> for Tournament {
             tournament_description: input.tournament_description,
 
             // Format
-            tournament_format: input.tournament_format.unwrap_or(TournamentFormat::Swiss),
-            match_type: input.match_type.unwrap_or(MatchType::Bo1),
+            tournament_format: input.tournament_format,
+            match_type: input.match_type,
             game_mode: input.game_mode,
-            time_control: input.time_control.map(Into::into),
+            time_control: input.time_control.into(),
             max_players: input.max_players,
             min_players: input.min_players,
+            round_count: input.round_count,
 
             // Schedule
-            starting_time: Timestamp::from(input.starting_time.unwrap_or(0)),
-            end_time: Timestamp::from(input.end_time.unwrap_or(0)),
+            starting_time: Timestamp::from(input.starting_time),
+            end_time: Timestamp::from(input.end_time),
 
             // Rewards
-            prize_type: input.prize_type.unwrap_or(PrizeType::Tokens),
+            prize_type: input.prize_type,
             prize_pool: input.prize_pool,
             prize_pool_description: input.prize_pool_description,
 
@@ -219,6 +225,7 @@ impl TournamentInput {
 
 /// Supported tournament formats
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Copy, Enum, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TournamentFormat {
     Swiss,
     RoundRobin,
@@ -230,8 +237,11 @@ pub enum TournamentFormat {
 /// Match type / series
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Copy, Enum, Eq)]
 pub enum MatchType {
+    #[serde(rename = "BO_1")]
     Bo1,
+    #[serde(rename = "BO_3")]
     Bo3,
+    #[serde(rename = "BO_5")]
     Bo5,
 }
 
@@ -265,6 +275,7 @@ impl From<TimeControlInput> for TimeControl {
 
 /// Optional game mode (for variants)
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Copy, Enum, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GameMode {
     Standard,
     Microchess,
@@ -273,6 +284,7 @@ pub enum GameMode {
 
 /// Prize types supported
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Copy, Enum, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PrizeType {
     Nft,
     Tokens,
@@ -280,6 +292,7 @@ pub enum PrizeType {
 
 /// Tournament visibility
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Copy, Enum, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Visibility {
     Public,
     Private,
@@ -287,6 +300,7 @@ pub enum Visibility {
 
 /// Tournament status lifecycle
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Copy, Enum, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TournamentStatus {
     Draft,
     RegistrationOpen,

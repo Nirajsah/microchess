@@ -1,26 +1,25 @@
+use std::str::FromStr;
+
 use chess::{
-    playerprofile::PlayerHash,
-    tournament::{Tournament, TournamentInput, TournamentStatus, TournamentUpdate},
-    Event, EventType,
+    player::PlayerHash,
+    tournament::{
+        utils::{Participants, TParticipants},
+        {Tournament, TournamentInput, TournamentStatus, TournamentUpdate},
+    },
 };
 use linera_sdk::linera_base_types::{AccountOwner, ChainId};
 
-use crate::{ChessContract, STREAM_NAME};
+use crate::{event::Event, ChessContract, STREAM_NAME};
 
 impl ChessContract {
-    pub fn on_msg_host_tournament(&mut self, tournament: TournamentInput) {
+    pub async fn on_msg_host_tournament(&mut self, tournament: Tournament) {
         assert_eq!(self.runtime.chain_id(), self.app_chain());
-        if let Some(tournament_id) = tournament.tournament_id.clone() {
-            let _ = self
-                .state
-                .tournaments
-                .insert(&tournament_id.clone(), tournament.clone().into());
-        }
+        self.state.save_tournament(tournament.clone()).await;
 
         self.runtime.emit(
             STREAM_NAME.into(),
             &Event::Tournament {
-                value: tournament.into(),
+                value: Box::new(tournament),
             },
         );
         // emit events
@@ -34,29 +33,51 @@ impl ChessContract {
         update: TournamentUpdate,
     ) {
         assert_eq!(self.runtime.chain_id(), self.app_chain());
-        if let Ok(Some(tournament)) = self.state.tournaments.get_mut(&tournament_id).await {
-            if tournament.organiser_chain == sender {
-                tournament.update(update.clone());
-                /* if let Some(status) = update.status {
-                    tournament.status = status;
-                    match status {
-                        TournamentStatus::RegistrationClosed => todo!(), // we start the tournament and switch to inprogress
-                        TournamentStatus::InProgress => todo!(),         // we update to completed
-                        TournamentStatus::Completed => todo!(),
-                        TournamentStatus::Cancelled => todo!(), // we update to cancelled
-                        _ => (),
-                    }
-                } */
-            }
+        let now = self.runtime.system_time();
+        let Some(mut tournament) = self
+            .state
+            .tournaments
+            .get(&tournament_id)
+            .await
+            .ok()
+            .flatten()
+        else {
+            return;
+        };
 
+        if tournament.organiser_chain != sender {
+            return;
+        }
+
+        tournament.update(&update, now);
+
+        if let Some(status) = update.status {
+            tournament.status = status;
+            match status {
+                TournamentStatus::RegistrationClosed => {
+                    self.state.start_tournament(&tournament_id).await;
+                    tournament.status = TournamentStatus::InProgress;
+                } // we start the tournament and switch to inprogress
+                TournamentStatus::InProgress => todo!(), // we update to completed
+                TournamentStatus::Completed => todo!(),
+                TournamentStatus::Cancelled => todo!(), // we update to cancelled
+                _ => (),
+            }
+        }
+
+        if self
+            .state
+            .tournaments
+            .insert(&tournament_id, tournament.clone())
+            .is_ok()
+        {
             self.runtime.emit(
                 STREAM_NAME.into(),
                 &Event::Tournament {
-                    value: tournament.to_owned(),
+                    value: Box::new(tournament),
                 },
             );
         }
-
         // update should be an enum with fields to update
         // emit events
         // app chain is responsible to emitting events to update supabase
@@ -84,35 +105,32 @@ impl ChessContract {
             return;
         }
 
-        let mut participants = self
+        let Some(mut participants) = self
             .state
             .participants
             .get(&tournament_id)
             .await
             .ok()
             .flatten()
-            .unwrap_or_default();
-
-        if participants.contains(&owner) {
+        else {
             return;
+        };
+
+        let res = participants.try_add_player(owner);
+
+        if res {
+            let _ = self.state.participants.insert(&tournament_id, participants);
+            let _ = self.state.t_players.insert(&owner, player.clone());
+
+            self.runtime.emit(
+                STREAM_NAME.into(),
+                &Event::TournamentRegistration {
+                    tournament_id: tournament_id.clone(),
+                    owner,
+                    player,
+                },
+            );
         }
-
-        if (participants.len() as u32) >= tournament.max_players.unwrap_or(16) {
-            return;
-        }
-        participants.push(owner.clone()); // Clone for storage
-        let _ = self.state.participants.insert(&tournament_id, participants);
-
-        let _ = self.state.tournament_players.insert(&owner, player.clone());
-
-        self.runtime.emit(
-            STREAM_NAME.into(),
-            &Event::TournamentRegistration {
-                tournament_id: tournament_id.clone(),
-                owner,
-                player,
-            },
-        );
     }
 
     pub async fn on_msg_tournament_withdraw(&mut self, tournament_id: String, owner: AccountOwner) {
@@ -134,28 +152,25 @@ impl ChessContract {
             return;
         }
 
-        let mut participants = self
+        let Some(mut participants) = self
             .state
             .participants
             .get(&tournament_id)
             .await
             .ok()
             .flatten()
-            .unwrap_or_default();
-
-        let before_len = participants.len();
-        participants.retain(|v| v != &owner);
-
-        if participants.len() == before_len {
+        else {
             return;
-        }
+        };
+
+        participants.remove_player(owner);
+
+        self.state.t_players.remove(&owner).ok();
 
         self.state
             .participants
             .insert(&tournament_id, participants)
             .ok();
-
-        self.state.tournament_players.remove(&owner).ok();
 
         self.runtime.emit(
             STREAM_NAME.into(),
@@ -167,20 +182,18 @@ impl ChessContract {
     }
 
     pub fn on_msg_publish_tournament(&mut self, tournament: Tournament) {
-        match self
+        if self
             .state
             .tournaments
-            .insert(&tournament.tournament_id, tournament.clone().into())
+            .insert(&tournament.tournament_id.clone(), tournament.clone())
+            .is_ok()
         {
-            Ok(_) => {
-                self.runtime.emit(
-                    STREAM_NAME.into(),
-                    &Event::Tournament {
-                        value: tournament.into(),
-                    },
-                );
-            }
-            Err(_) => return,
+            self.runtime.emit(
+                STREAM_NAME.into(),
+                &Event::Tournament {
+                    value: Box::new(tournament),
+                },
+            );
         }
     }
 }
