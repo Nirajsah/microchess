@@ -7,14 +7,15 @@ use std::sync::Arc;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use chess::{
     leaderboard::Leaderboard,
+    notifications::Notification,
     player::{MatchHistory, PlayerInfo, PlayerProfile, PlayersTime},
-    tournament::Tournament,
+    tournament::{utils::Match, Tournament},
     GameChain, LastMove, Operation,
 };
 use linera_sdk::{
     abi::WithServiceAbi,
     graphql::GraphQLMutationRoot,
-    linera_base_types::{AccountOwner, DataBlobHash, TimeDelta},
+    linera_base_types::{AccountOwner, ChainId, DataBlobHash, TimeDelta},
     views::View,
     Service, ServiceRuntime,
 };
@@ -133,6 +134,7 @@ impl ChessService {
         self.state.game_count.get()
     }
 
+    // we need to encode the profile here, with timedToken
     async fn friend_id(&self) -> &str {
         self.state.game_token.get()
     }
@@ -168,12 +170,8 @@ impl ChessService {
         postcard::from_bytes::<Vec<String>>(&self.runtime.read_data_blob(hash)).unwrap_or_default()
     }
 
-    async fn tournament(&self, id: String) -> Option<Tournament> {
-        self.state
-            .tournaments
-            .get(&id)
-            .await
-            .expect("failed to get data")
+    async fn my_tournaments(&self) -> &Vec<Tournament> {
+        self.state.my_tournaments.get()
     }
 
     async fn my_tournament(&self, tournament_id: String) -> Option<&Tournament> {
@@ -184,19 +182,35 @@ impl ChessService {
             .find(|t| t.tournament_id.clone() == tournament_id)
     }
 
-    async fn all_tournaments(&self) -> &Vec<Tournament> {
-        self.state.all_tournaments.get()
+    async fn tournament(&self) -> &Option<Tournament> {
+        self.state.tournament.get()
     }
 
-    async fn participants(&self, id: String) -> Option<String> {
-        let participants = self.state.participants.get(&id).await.ok().flatten()?;
-        Some(participants.encode())
+    async fn participants(&self) -> Option<String> {
+        let p = self.state.participants.get();
+        match p {
+            Some(p) => Some(p.encode()),
+            None => None,
+        }
     }
 
-    async fn my_tournaments(&self) -> &Vec<Tournament> {
-        self.state.my_tournaments.get()
+    async fn tournament_matches(&self, id: String) -> Option<Vec<Match>> {
+        let matches = self
+            .state
+            .tournament_matches
+            .get(&id)
+            .await
+            .ok()
+            .flatten()?;
+
+        Some(matches)
     }
-    async fn tournaments(&self) -> &Vec<String> {
-        self.state.tournament_list.get()
+
+    async fn notifications(&self) -> &Vec<Notification> {
+        self.state.notifications.get()
+    }
+
+    async fn tournament_chains(&self) -> &Vec<ChainId> {
+        self.state.tournament_chains.get()
     }
 }

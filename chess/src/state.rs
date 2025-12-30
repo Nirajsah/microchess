@@ -2,15 +2,16 @@ use chess::{
     clock::Clock,
     leaderboard::{Leaderboard, LeaderboardManager},
     matches::MatchId,
+    notifications::Notification,
     player::{MatchHistory, PlayerHash, PlayerProfile, Players},
     tournament::{
-        utils::{Participants, SingleElimParticipants, SwissParticipants, TParticipants},
-        {Tournament, TournamentFormat},
+        utils::{Match, Participants, SingleElimParticipants, SwissParticipants},
+        Tournament, TournamentFormat,
     },
     GameChain, GameWrapper,
 };
 use linera_sdk::{
-    linera_base_types::AccountOwner,
+    linera_base_types::{AccountOwner, ChainId},
     views::{
         linera_views::{self},
         MapView, RegisterView, RootView,
@@ -33,7 +34,8 @@ pub struct ChessState {
     // LeaderBoard (max 10)
     pub leaderboard: RegisterView<Vec<Leaderboard>>,
     /// for app_chain
-    pub tournaments: MapView<String, Tournament>,
+    pub tournaments: MapView<String, Tournament>, // we don't need this
+    /// tournament matches
 
     /* Player Chain */
     /// Holds Newly created game chain, only for player_chain
@@ -42,9 +44,17 @@ pub struct ChessState {
     pub profile: RegisterView<Option<PlayerProfile>>,
     /// Friendly game token stored only on user's chain
     pub game_token: RegisterView<String>,
+    /// notifications for player
+    pub notifications: RegisterView<Vec<Notification>>,
     /// for user_chain
-    pub my_tournaments: RegisterView<Vec<Tournament>>,
-    pub tournament_list: RegisterView<Vec<String>>,
+    pub my_tournaments: RegisterView<Vec<Tournament>>, // holds all the tournaments the player has created, DRAFT or PUBLISHED
+
+    /* Tournament Chain */
+    pub tournament: RegisterView<Option<Tournament>>,
+    pub participants: RegisterView<Option<Participants>>,
+    /// store player metadata for match making in tournaments
+    pub players_data: MapView<AccountOwner, PlayerHash>,
+    pub tournament_matches: MapView<String, Vec<Match>>,
 
     /* Game Chain */
     /// The current game state
@@ -56,48 +66,59 @@ pub struct ChessState {
     /// App chains and subscribers stores all the match history, but player_chain stores owner matches
     pub match_history: RegisterView<Vec<MatchHistory>>,
     /// for subscribers
-    pub all_tournaments: RegisterView<Vec<Tournament>>,
-    /// on app_chain
-    pub t_players: MapView<AccountOwner, PlayerHash>, // store player metadata for match making in tournaments
-    pub participants: MapView<String, Participants>,
+    pub all_tournaments: RegisterView<Vec<Tournament>>, // we don't be needing this, Once we setup pws to update supabase from tournament_chains
+    // on app_chain
+    // pub participants: MapView<String, Participants>,
     /*
     /// Player Stats
     pub stats: RegisterView<PlayerProfile>,
     // store the betting amount on temp chain.
     // pub bet_amount: RegisterView<Amount>,
     */
+    /// for subscribers only
+    pub tournament_chains: RegisterView<Vec<ChainId>>,
 }
 
 #[allow(dead_code)]
 impl ChessState {
     /// Responsible for saving tournament in state as well as creating an empty participants list
     pub async fn save_tournament(&mut self, tournament: Tournament) {
-        let max_players = tournament.max_players;
-        let tournament_id = tournament.tournament_id.clone();
-        let _ = self.tournaments.insert(&tournament_id, tournament.clone());
+        self.tournament.set(Some(tournament.clone()));
 
+        let max_players = tournament.max_players as usize;
         let participants: Participants = match tournament.tournament_format {
             TournamentFormat::Swiss => Participants::Swiss(SwissParticipants {
-                players: Vec::with_capacity(max_players as usize),
+                players: Vec::with_capacity(max_players),
+                max_players,
             }),
             TournamentFormat::SingleElim => Participants::SingleElim(SingleElimParticipants {
-                players: Vec::with_capacity(max_players as usize),
+                players: Vec::with_capacity(max_players),
+                max_players,
             }),
             _ => todo!(),
         };
-        self.participants
-            .insert(&tournament_id, participants)
-            .expect("failed to add participants");
+        self.participants.set(Some(participants))
     }
 
-    pub async fn start_tournament(&self, tournament_id: &str) {
-        let Some(participants) = self.participants.get(tournament_id).await.ok().flatten() else {
-            return;
-        };
+    /// Used on tournament_chain for starting a tournament
+    pub async fn start_tournament_and_persist(
+        &mut self,
+        _tournament_id: &str,
+    ) -> Option<Vec<Match>> {
+        todo!()
+        // let Some(participants) = self.participants.get(tournament_id).await.ok().flatten() else {
+        //     return None;
+        // };
 
-        match participants {
-            Participants::Swiss(p) => p.generate_pairings(tournament_id, 1),
-            Participants::SingleElim(p) => p.generate_pairings(tournament_id, 1),
-        };
+        // let matches = match participants {
+        //     Participants::Swiss(p) => p.generate_pairings(tournament_id, 1),
+        //     Participants::SingleElim(p) => p.generate_pairings(tournament_id, 1),
+        // };
+
+        // let _ = self
+        //     .tournament_matches
+        //     .insert(tournament_id, matches.clone());
+
+        // Some(matches)
     }
 }

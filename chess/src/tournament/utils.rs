@@ -1,4 +1,4 @@
-use async_graphql::{SimpleObject, Union};
+use async_graphql::SimpleObject;
 use base64::{engine::general_purpose, Engine};
 use linera_sdk::linera_base_types::AccountOwner;
 use serde::{Deserialize, Serialize};
@@ -44,14 +44,16 @@ impl TournamentParticipant for SingleElimPlayer {
 #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject, PartialEq)]
 pub struct SwissParticipants {
     pub players: Vec<SwissPlayer>,
+    pub max_players: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject, PartialEq)]
 pub struct SingleElimParticipants {
     pub players: Vec<SingleElimPlayer>,
+    pub max_players: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Union, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum Participants {
     Swiss(SwissParticipants),
     SingleElim(SingleElimParticipants),
@@ -59,14 +61,15 @@ pub enum Participants {
 
 impl Participants {
     pub fn encode(&self) -> String {
-        let bytes = bincode::serialize(self).unwrap(); // Serialize full enum
+        let bytes = postcard::to_allocvec(self).expect("postcard serialization failed");
         general_purpose::STANDARD.encode(&bytes)
     }
+    pub fn decode(encoded: String) -> Self {
+        let bytes = general_purpose::STANDARD
+            .decode(encoded)
+            .expect("invalid base64 input");
 
-    pub fn decode(data: String) -> Self {
-        let bytes = general_purpose::STANDARD.decode(data).unwrap();
-        let participants: Participants = bincode::deserialize(&bytes).unwrap();
-        participants
+        postcard::from_bytes::<Participants>(&bytes).expect("postcard deserialization failed")
     }
 
     pub fn try_add_player(&mut self, player: AccountOwner) -> bool {
@@ -87,7 +90,7 @@ impl Participants {
 pub trait TParticipants {
     fn try_add_player(&mut self, id: AccountOwner) -> bool;
     fn remove_player(&mut self, id: AccountOwner);
-    fn generate_pairings(&self, tournament_id: &str, round: u8);
+    fn generate_pairings(&self, tournament_id: &str, round: u8) -> Vec<Match>;
 }
 
 impl TParticipants for SwissParticipants {
@@ -97,7 +100,7 @@ impl TParticipants for SwissParticipants {
             return false;
         }
 
-        if self.players.len() >= self.players.capacity() {
+        if self.players.len() >= self.max_players {
             return false;
         }
 
@@ -111,30 +114,36 @@ impl TParticipants for SwissParticipants {
     }
 
     /// generate pairing is a pure function of player state to generate matches, the round number only selects the pairing strategy.
-    fn generate_pairings(&self, tournament_id: &str, round: u8) {
+    fn generate_pairings(&self, tournament_id: &str, round: u8) -> Vec<Match> {
         let mut swiss_players = self.players.clone();
 
         swiss_players.sort_by(|a, b| a.player_id.cmp(&b.player_id));
 
         let mut matches = Vec::new();
+        let mut match_count = 1;
 
         for i in (0..swiss_players.len()).step_by(2) {
             let p1 = &swiss_players[i];
             let p2 = &swiss_players[i + 1];
 
             matches.push(Match {
+                match_id: match_count,
                 tournament_id: tournament_id.to_string(),
                 round,
                 player_a: p1.player_id,
                 player_b: p2.player_id,
                 result: None,
             });
+
+            match_count += 1;
         }
+
+        matches
     }
 }
 
 impl TParticipants for SingleElimParticipants {
-    fn generate_pairings(&self, _tournament_id: &str, _round: u8) {
+    fn generate_pairings(&self, _tournament_id: &str, _round: u8) -> Vec<Match> {
         todo!()
     }
 
@@ -147,7 +156,7 @@ impl TParticipants for SingleElimParticipants {
             return false;
         }
 
-        if self.players.len() >= 256 {
+        if self.players.len() >= self.max_players {
             return false;
         }
 
@@ -158,7 +167,9 @@ impl TParticipants for SingleElimParticipants {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
-struct Match {
+#[serde(rename_all = "camelCase")]
+pub struct Match {
+    match_id: u8,
     tournament_id: String,
     round: u8,
     player_a: AccountOwner,

@@ -1,5 +1,6 @@
 use chess::{
     matches::{MatchId, MatchMetaData, MatchType},
+    notifications::Notification,
     player::{MatchHistory, PlayerHash, Players},
     tournament::{Tournament, TournamentInput, TournamentUpdate},
     GameChain,
@@ -11,8 +12,8 @@ pub mod tournament;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Message {
-    PublishTournament {
-        value: Tournament,
+    ProcessTournament {
+        value: Box<Tournament>,
     },
     TournamentWithDraw {
         tournament_id: String,
@@ -28,7 +29,7 @@ pub enum Message {
         update: TournamentUpdate,
     },
     HostTournament {
-        value: Tournament,
+        value: Box<Tournament>,
     },
     // game_chain receiving data to start a new game
     Start {
@@ -57,5 +58,8 @@ pub enum Message {
     MatchUpdate {
         player_hash: PlayerHash,
         match_history: MatchHistory,
+    },
+    Notification {
+        notification: Notification,
     },
 }

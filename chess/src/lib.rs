@@ -13,10 +13,10 @@ pub struct ChessAbi;
 pub mod clock;
 pub mod leaderboard;
 pub mod matches;
+pub mod notifications;
 pub mod player;
 pub mod tournament;
-use matches::MatchId;
-use matches::MatchType;
+use matches::{MatchId, MatchType};
 
 use linera_sdk::{
     abi::{ContractAbi, ServiceAbi},
@@ -63,6 +63,7 @@ pub enum Operation {
     },
     TournamentRegistration {
         tournament_id: String,
+        organiser_chain: ChainId,
     },
     TournamentWithDraw {
         tournament_id: String,
@@ -71,8 +72,11 @@ pub enum Operation {
         tournament_id: String,
         update: Box<TournamentUpdate>,
     },
+    UpdateTournamentLocal {
+        tournament_id: String,
+        update: Box<TournamentUpdate>,
+    },
     NewGame,
-    FrGame,
     FrGameHash {
         token: String,
     },
