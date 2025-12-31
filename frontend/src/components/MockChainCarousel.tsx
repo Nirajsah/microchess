@@ -1,3 +1,4 @@
+import { ChainEntry } from '@/lib/chainsType'
 import { useWalletStore } from '@/store/wallet'
 import { ChevronLeft, ChevronRight, Copy, RefreshCw } from 'lucide-react'
 import { useRef } from 'react'
@@ -95,7 +96,7 @@ export function MockChainCarousel() {
         }}
         className="flex w-full h-full overflow-y-hidden overflow-x-auto scroll-smooth snap-x snap-mandatory no-scrollbar gap-2"
       >
-        {chains?.map((chain, i) => (
+        {chains?.map((chain: ChainEntry, i) => (
           <div
             key={i}
             className="relative w-full min-w-[94%] bg-transparent flex items-center justify-center snap-center"
@@ -245,18 +246,17 @@ export function MockChainCarousel() {
                     <span className="flex w-full gap-1 items-center">
                       Account:
                       <p className="truncate text-xs bg-[#454545] px-2 py-0.5 rounded-xl">
-                        {chain.owner}
+                        {chain.chainInfo.owner}
                       </p>
                       <Copy
                         size={20}
                         className="cursor-pointer text-gray-500 hover:text-gray-300"
-                        onClick={() => handleCopy(chain.owner)}
+                        onClick={() => handleCopy(chain.chainInfo.owner)}
                       />
                     </span>
                   </span>
                 </div>
               </div>
-
               <div className="absolute w-full h-10 flex justify-end items-center">
                 {defaultChain === chain.chainId ? (
                   <button

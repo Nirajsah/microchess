@@ -8,24 +8,44 @@
 // match the expected interface, even if the JSON is valid.
 
 // Branded type for ChainId to ensure type safety
-export type ChainId = string & { readonly __brand: 'ChainId' }
+//
 
-export interface Wallet {
-  chains: Chains
-  defaultChain: ChainId
-}
+// To parse this data:
+//
+//   import { Convert, Wallet } from "./file";
+//
+//   const wallet = Convert.toWallet(json);
+//
+// These functions will throw an error if the JSON doesn't
+// match the expected interface, even if the JSON is valid.
+export type ChainId = string & { readonly __brand: 'ChainId' }
 
 export interface Chains {
   [key: string]: ChainInfo
 }
 
+export interface Wallet {
+  chains: Chains
+  default: ChainId
+}
+
 export interface ChainInfo {
   blockHash: null | string
-  chainId: ChainId
+  epoch: string
   nextBlockHeight: number
   owner: string
   pendingProposal: null | string
   timestamp: number
+}
+
+export type ChainEntry = {
+  chainId: ChainId
+  chainInfo: ChainInfo
+}
+
+export type WalletChainList = {
+  default: ChainId
+  chains: ChainEntry[]
 }
 
 // Converts JSON strings to/from your types
@@ -38,6 +58,22 @@ export class Convert {
   public static walletToJson(value: Wallet): string {
     return JSON.stringify(uncast(value, r('Wallet')), null, 2)
   }
+
+  public static chainsAsList(json: string): WalletChainList {
+    const wallet = this.toWallet(json)
+
+    const chains: ChainEntry[] = Object.entries(wallet.chains).map(
+      ([id, info]) => ({
+        chainId: id.toLowerCase() as ChainId,
+        chainInfo: info,
+      })
+    )
+
+    return {
+      default: wallet.default,
+      chains,
+    }
+  }
 }
 
 function invalidValue(typ: any, val: any, key: any, parent: any = ''): never {
@@ -45,9 +81,7 @@ function invalidValue(typ: any, val: any, key: any, parent: any = ''): never {
   const parentText = parent ? ` on ${parent}` : ''
   const keyText = key ? ` for key "${key}"` : ''
   throw Error(
-    `Invalid value${keyText}${parentText}. Expected ${prettyTyp} but got ${JSON.stringify(
-      val
-    )}`
+    `Invalid value${keyText}${parentText}. Expected ${prettyTyp} but got ${JSON.stringify(val)}`
   )
 }
 
@@ -202,6 +236,10 @@ function l(typ: any) {
   return { literal: typ }
 }
 
+function a(typ: any) {
+  return { arrayItems: typ }
+}
+
 function u(...typs: any[]) {
   return { unionMembers: typs }
 }
@@ -222,18 +260,29 @@ const typeMap: any = {
   Wallet: o(
     [
       { json: 'chains', js: 'chains', typ: r('Chains') },
-      { json: 'default', js: 'defaultChain', typ: '' },
+      { json: 'default', js: 'default', typ: '' },
     ],
     false
   ),
-  Chains: m(r('ChainInfo')),
-  ChainInfo: o(
+  Chains: o(
     [
-      { json: 'block_hash', js: 'blockHash', typ: u(null, '') },
-      { json: 'chain_id', js: 'chainId', typ: '' },
+      {
+        json: 'e7c1566d7de69888f75e4d948e0d68f30086d7b72ac7d5e13fdef33941685729',
+        js: 'e7C1566D7De69888F75E4D948E0D68F30086D7B72Ac7D5E13Fdef33941685729',
+        typ: r(
+          'E7C1566D7De69888F75E4D948E0D68F30086D7B72Ac7D5E13Fdef33941685729'
+        ),
+      },
+    ],
+    false
+  ),
+  E7C1566D7De69888F75E4D948E0D68F30086D7B72Ac7D5E13Fdef33941685729: o(
+    [
+      { json: 'block_hash', js: 'blockHash', typ: null },
+      { json: 'epoch', js: 'epoch', typ: '' },
       { json: 'next_block_height', js: 'nextBlockHeight', typ: 0 },
       { json: 'owner', js: 'owner', typ: '' },
-      { json: 'pending_proposal', js: 'pendingProposal', typ: u(null, '') },
+      { json: 'pending_proposal', js: 'pendingProposal', typ: null },
       { json: 'timestamp', js: 'timestamp', typ: 0 },
     ],
     false

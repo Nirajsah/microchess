@@ -60,17 +60,17 @@ https://github.com/Nirajsah/croissant
 
 **Core Tournament Management**
 
-- [ ] Enable users to create and host tournaments
-- [ ] Allow users to register for tournaments
+- [x] Enable users to create and host tournaments
+- [x] Allow users to register for tournaments
 - [ ] Allow participants to withdraw from tournaments
 - [ ] Maintain and progress tournament state through defined phases (registration, active rounds, completed)
 
 **Pairings and Structure**
 
-- [ ] Automatically generate participant pairings
+- [x] Automatically generate participant pairings
 - [ ] Automatically generate round brackets
 - [ ] Support multiple tournament formats:
-  - [ ] Swiss System
+  - [x] Swiss System
   - [ ] Round Robin
 
 **Match and Round Execution**

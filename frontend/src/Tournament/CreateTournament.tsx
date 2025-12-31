@@ -30,74 +30,15 @@ import { useNavigate } from 'react-router-dom'
 import { hostTournament } from '@/api'
 import { useUserStore } from '@/store/microchess'
 import { toast } from 'sonner'
-
-// Define input types matching the GraphQL schema
-export interface TimeControlInput {
-  baseMinutes: number
-  incrementSeconds: number
-}
-
-export interface TournamentInput {
-  organiserName: string
-  tournamentName: string
-  tournamentDescription: string
-  tournamentFormat: TournamentFormat
-  matchType: MatchType
-  gameMode: GameMode
-  timeControl: TimeControlInput
-  maxPlayers: number
-  minPlayers: number
-  startingTime: number // ISO timestamp
-  endTime: number // ISO timestamp
-  prizeType: PrizeType
-  prizePool: number
-  prizePoolDescription?: string
-  visibility: Visibility
-  bannerImageUrl?: string
-  sponsorLogoUrl?: string
-  status: TournamentStatus
-  customTags: string[]
-}
-
-// Enums matching GraphQL schema
-export enum TournamentFormat {
-  SWISS = 'SWISS',
-  ROUND_ROBIN = 'ROUND_ROBIN',
-  ARENA = 'ARENA',
-  SINGLE_ELIM = 'SINGLE_ELIM',
-  DOUBLE_ELIM = 'DOUBLE_ELIM',
-}
-
-export enum MatchType {
-  BO_1 = 'BO_1',
-  BO_3 = 'BO_3',
-  BO_5 = 'BO_5',
-}
-
-export enum GameMode {
-  MICROCHESS = 'MICROCHESS',
-  STANDARD = 'STANDARD',
-  CRAZYHOUSE = 'CRAZYHOUSE',
-}
-
-export enum PrizeType {
-  NFT = 'NFT',
-  TOKENS = 'TOKENS',
-}
-
-export enum Visibility {
-  PUBLIC = 'PUBLIC',
-  PRIVATE = 'PRIVATE',
-}
-
-export enum TournamentStatus {
-  DRAFT = 'DRAFT',
-  REGISTRATION_OPEN = 'REGISTRATION_OPEN',
-  REGISTRATION_CLOSED = 'REGISTRATION_CLOSED',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
-}
+import {
+  GameMode,
+  MatchType,
+  PrizeType,
+  TournamentFormat,
+  TournamentInput,
+  TournamentStatus,
+  Visibility,
+} from '@/graphql/graphql'
 
 // Validation errors type
 type ValidationErrors = {
@@ -117,9 +58,9 @@ export default function CreateTournament() {
     organiserName: name || '',
     tournamentName: '',
     tournamentDescription: '',
-    tournamentFormat: TournamentFormat.SWISS,
-    matchType: MatchType.BO_1,
-    gameMode: GameMode.STANDARD,
+    tournamentFormat: TournamentFormat.Swiss,
+    matchType: MatchType.Bo_1,
+    gameMode: GameMode.Standard,
     timeControl: {
       baseMinutes: 10,
       incrementSeconds: 5,
@@ -128,13 +69,13 @@ export default function CreateTournament() {
     minPlayers: 4,
     startingTime: 0,
     endTime: 0,
-    prizeType: PrizeType.TOKENS,
+    prizeType: PrizeType.Tokens,
     prizePool: 0,
     prizePoolDescription: '',
-    visibility: Visibility.PUBLIC,
+    visibility: Visibility.Public,
     bannerImageUrl: '',
     sponsorLogoUrl: '',
-    status: TournamentStatus.DRAFT,
+    status: TournamentStatus.Draft,
     customTags: [],
   })
 
@@ -295,14 +236,16 @@ export default function CreateTournament() {
     const submitData = {
       ...formData,
       prizePool: Number(formData.prizePool),
-      status: asDraft ? TournamentStatus.DRAFT : TournamentStatus.REGISTRATION_OPEN,
+      status: asDraft
+        ? TournamentStatus.Draft
+        : TournamentStatus.RegistrationOpen,
       customTags: Array.isArray(formData.customTags) ? formData.customTags : [],
     }
 
     try {
       await hostTournament(submitData)
       toast.success(asDraft ? 'Saved as Draft' : 'Tournament Created!')
-      navigate('/tournaments/my')
+      // navigate('/tournaments/my')
     } catch (error) {
       console.error('Failed to create tournament:', error)
       toast.error('Failed to create tournament')
@@ -341,10 +284,11 @@ export default function CreateTournament() {
             <div className="flex items-center bg-[#262626] p-1.5 rounded-xl border border-[#333]">
               <button
                 onClick={() => setPreviewMode(false)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${!previewMode
-                  ? 'bg-[#333] text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-300'
-                  }`}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  !previewMode
+                    ? 'bg-[#333] text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
               >
                 <Settings className="w-4 h-4" /> Editor
               </button>
@@ -352,10 +296,11 @@ export default function CreateTournament() {
                 onClick={() => {
                   if (validateForm()) setPreviewMode(true)
                 }}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${previewMode
-                  ? 'bg-[#333] text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-300'
-                  }`}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  previewMode
+                    ? 'bg-[#333] text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
               >
                 <Eye className="w-4 h-4" /> Preview
               </button>
@@ -400,20 +345,22 @@ export default function CreateTournament() {
                               setCurrentStep(index)
                             }
                           }}
-                          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all ${isActive
-                            ? 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-500'
-                            : isCompleted
-                              ? 'text-gray-300 hover:bg-[#262626]'
-                              : 'text-gray-500 hover:bg-[#262626] hover:text-gray-300'
-                            }`}
+                          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all ${
+                            isActive
+                              ? 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-500'
+                              : isCompleted
+                                ? 'text-gray-300 hover:bg-[#262626]'
+                                : 'text-gray-500 hover:bg-[#262626] hover:text-gray-300'
+                          }`}
                         >
                           <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive
-                              ? 'bg-yellow-500/20'
-                              : isCompleted
-                                ? 'bg-emerald-500/20'
-                                : 'bg-[#333]'
-                              }`}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                              isActive
+                                ? 'bg-yellow-500/20'
+                                : isCompleted
+                                  ? 'bg-emerald-500/20'
+                                  : 'bg-[#333]'
+                            }`}
                           >
                             {isCompleted ? (
                               <Check className="w-4 h-4 text-emerald-400" />
@@ -595,7 +542,9 @@ function StepBasicInfo({
         <FormField label="Description" hint="Optional but recommended">
           <textarea
             name="tournamentDescription"
-            value={formData.tournamentDescription}
+            value={
+              formData.tournamentDescription || 'Basic Tournament Description'
+            }
             onChange={handleChange}
             placeholder="Tell players about the format, rules, and what makes this tournament special..."
             className="w-full bg-[#262626] border border-[#333] rounded-xl p-4 text-white text-base focus:outline-none focus:border-yellow-500/50 min-h-[160px] resize-y placeholder:text-gray-500 transition-colors"
@@ -606,13 +555,13 @@ function StepBasicInfo({
           <div className="grid grid-cols-2 gap-3">
             {[
               {
-                value: Visibility.PUBLIC,
+                value: Visibility.Public,
                 label: 'Public',
                 desc: 'Anyone can view and join',
                 icon: Users,
               },
               {
-                value: Visibility.PRIVATE,
+                value: Visibility.Private,
                 label: 'Private',
                 desc: 'Invite-only tournament',
                 icon: Shield,
@@ -629,10 +578,11 @@ function StepBasicInfo({
                       visibility: opt.value,
                     }))
                   }
-                  className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${formData.visibility === opt.value
-                    ? 'bg-yellow-500/10 border-yellow-500/50 text-white'
-                    : 'bg-[#262626] border-[#333] text-gray-400 hover:border-[#444]'
-                    }`}
+                  className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
+                    formData.visibility === opt.value
+                      ? 'bg-yellow-500/10 border-yellow-500/50 text-white'
+                      : 'bg-[#262626] border-[#333] text-gray-400 hover:border-[#444]'
+                  }`}
                 >
                   <Icon
                     className={`w-5 h-5 mt-0.5 ${formData.visibility === opt.value ? 'text-yellow-500' : 'text-gray-500'}`}
@@ -684,9 +634,21 @@ function StepFormatRules({
         <FormField label="Game Mode" required error={errors.gameMode}>
           <div className="grid grid-cols-3 gap-3">
             {[
-              { value: GameMode.STANDARD, label: 'Standard', desc: 'Classic chess' },
-              { value: GameMode.MICROCHESS, label: 'Microchess', desc: '5x5 board' },
-              { value: GameMode.CRAZYHOUSE, label: 'Crazyhouse', desc: 'Drop pieces' },
+              {
+                value: GameMode.Standard,
+                label: 'Standard',
+                desc: 'Classic chess',
+              },
+              {
+                value: GameMode.Microchess,
+                label: 'Microchess',
+                desc: '5x5 board',
+              },
+              {
+                value: GameMode.Crazyhouse,
+                label: 'Crazyhouse',
+                desc: 'Drop pieces',
+              },
             ].map((opt) => (
               <button
                 key={opt.value}
@@ -694,10 +656,11 @@ function StepFormatRules({
                 onClick={() =>
                   setFormData((prev) => ({ ...prev, gameMode: opt.value }))
                 }
-                className={`p-4 rounded-xl border-2 text-center transition-all ${formData.gameMode === opt.value
-                  ? 'bg-yellow-500/10 border-yellow-500/50 text-white'
-                  : 'bg-[#262626] border-[#333] text-gray-400 hover:border-[#444]'
-                  }`}
+                className={`p-4 rounded-xl border-2 text-center transition-all ${
+                  formData.gameMode === opt.value
+                    ? 'bg-yellow-500/10 border-yellow-500/50 text-white'
+                    : 'bg-[#262626] border-[#333] text-gray-400 hover:border-[#444]'
+                }`}
               >
                 <p className="font-medium">{opt.label}</p>
                 <p className="text-xs text-gray-500 mt-1">{opt.desc}</p>
@@ -713,11 +676,17 @@ function StepFormatRules({
               value={formData.tournamentFormat}
               onChange={handleChange}
               options={[
-                { label: 'Swiss System', value: TournamentFormat.SWISS },
-                { label: 'Round Robin', value: TournamentFormat.ROUND_ROBIN },
-                { label: 'Single Elimination', value: TournamentFormat.SINGLE_ELIM },
-                { label: 'Double Elimination', value: TournamentFormat.DOUBLE_ELIM },
-                { label: 'Arena', value: TournamentFormat.ARENA },
+                { label: 'Swiss System', value: TournamentFormat.Swiss },
+                { label: 'Round Robin', value: TournamentFormat.RoundRobin },
+                {
+                  label: 'Single Elimination',
+                  value: TournamentFormat.SingleElim,
+                },
+                {
+                  label: 'Double Elimination',
+                  value: TournamentFormat.DoubleElim,
+                },
+                { label: 'Arena', value: TournamentFormat.Arena },
               ]}
             />
           </FormField>
@@ -728,9 +697,9 @@ function StepFormatRules({
               value={formData.matchType}
               onChange={handleChange}
               options={[
-                { label: 'Best of 1', value: MatchType.BO_1 },
-                { label: 'Best of 3', value: MatchType.BO_3 },
-                { label: 'Best of 5', value: MatchType.BO_5 },
+                { label: 'Best of 1', value: MatchType.Bo_1 },
+                { label: 'Best of 3', value: MatchType.Bo_3 },
+                { label: 'Best of 5', value: MatchType.Bo_5 },
               ]}
             />
           </FormField>
@@ -857,7 +826,11 @@ function StepSchedule({
             />
           </FormField>
 
-          <FormField label="End Date & Time" hint="Optional" error={errors.endTime}>
+          <FormField
+            label="End Date & Time"
+            hint="Optional"
+            error={errors.endTime}
+          >
             <Input
               name="endTime"
               type="datetime-local"
@@ -929,8 +902,8 @@ function StepPrizes({
           <FormField label="Prize Type" hint="Optional">
             <div className="grid grid-cols-2 gap-3">
               {[
-                { value: PrizeType.TOKENS, label: 'Tokens', icon: DollarSign },
-                { value: PrizeType.NFT, label: 'NFT', icon: Sparkles },
+                { value: PrizeType.Tokens, label: 'Tokens', icon: DollarSign },
+                { value: PrizeType.Nft, label: 'NFT', icon: Sparkles },
               ].map((opt) => {
                 const Icon = opt.icon
                 return (
@@ -940,10 +913,11 @@ function StepPrizes({
                     onClick={() =>
                       setFormData((prev) => ({ ...prev, prizeType: opt.value }))
                     }
-                    className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.prizeType === opt.value
-                      ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500'
-                      : 'bg-[#262626] border-[#333] text-gray-400 hover:border-[#444]'
-                      }`}
+                    className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                      formData.prizeType === opt.value
+                        ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500'
+                        : 'bg-[#262626] border-[#333] text-gray-400 hover:border-[#444]'
+                    }`}
                   >
                     <Icon className="w-4 h-4" />
                     <span className="font-medium">{opt.label}</span>
@@ -978,7 +952,7 @@ function StepPrizes({
         <FormField label="Prize Distribution" hint="Optional">
           <textarea
             name="prizePoolDescription"
-            value={formData.prizePoolDescription}
+            value={formData.prizePoolDescription || ''}
             onChange={handleChange}
             placeholder="1st Place: $500&#10;2nd Place: $300&#10;3rd Place: $200"
             className="w-full bg-[#262626] border border-[#333] rounded-xl p-4 text-white text-base focus:outline-none focus:border-yellow-500/50 min-h-[120px] resize-y placeholder:text-gray-500 transition-colors"

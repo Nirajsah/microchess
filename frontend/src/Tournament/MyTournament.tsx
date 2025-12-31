@@ -16,27 +16,15 @@ import {
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { myTournament, updateTournament } from '@/api'
+import { toast } from 'sonner'
 import {
+  GameMode,
+  MatchType,
   PrizeType,
+  TournamentFormat,
   TournamentStatus,
   Visibility,
-  TournamentFormat,
-  MatchType,
-  GameMode,
-} from './CreateTournament'
-import { toast } from 'sonner'
-
-export type TournamentUpdate = {
-  tournamentName?: string
-  tournamentDescription?: string
-  bannerImageUrl?: string
-  sponsorLogoUrl?: string
-  customTags?: string[]
-  status: TournamentStatus
-  prizePool: number
-  prizeType?: PrizeType
-  visibility: Visibility
-}
+} from '@/graphql/graphql'
 
 // Fields that can be updated when tournament is in REGISTRATION_OPEN state
 const REGISTRATION_OPEN_EDITABLE_FIELDS = [
@@ -60,16 +48,16 @@ export default function ManageTournament() {
 
   // Check if tournament is in a state where status can be changed to open registration
   const isTransitioningToOpen =
-    tournament?.status === TournamentStatus.DRAFT &&
-    formData?.status === TournamentStatus.REGISTRATION_OPEN
+    tournament?.status === TournamentStatus.Draft &&
+    formData?.status === TournamentStatus.RegistrationClosed
 
   // Check if a field is editable based on tournament status
   const isFieldEditable = (fieldName: string): boolean => {
     if (!tournament) return false
     // In DRAFT state, all fields are editable
-    if (tournament.status === TournamentStatus.DRAFT) return true
+    if (tournament.status === TournamentStatus.Draft) return true
     // In REGISTRATION_OPEN state, only certain fields are editable
-    if (tournament.status === TournamentStatus.REGISTRATION_OPEN) {
+    if (tournament.status === TournamentStatus.RegistrationOpen) {
       return REGISTRATION_OPEN_EDITABLE_FIELDS.includes(fieldName)
     }
     // In other states, nothing is editable
@@ -81,15 +69,11 @@ export default function ManageTournament() {
       try {
         const response = await myTournament(id!)
         const data = JSON.parse(response.result).data.myTournament
-        console.log(data)
         setTournament(data)
         setFormData(data)
         setLoading(false)
       } catch (error) {
         console.error('Error fetching my tournaments:', error)
-        // Fallback to mock data on error
-        // setTournament(MOCK_TOURNAMENT)
-        // setFormData(MOCK_TOURNAMENT)
         setLoading(false)
       }
     }
@@ -133,7 +117,7 @@ export default function ManageTournament() {
     setHasChanges(false)
     const submitData = {
       ...formData,
-      prizeType: formData.prizeType || PrizeType.TOKENS,
+      prizeType: formData.prizeType || PrizeType.Tokens,
       prizePool: Number(formData.prizePool),
       customTags: Array.isArray(formData.customTags) ? formData.customTags : [],
     }
@@ -150,7 +134,7 @@ export default function ManageTournament() {
 
   const deleteTournament = () => {
     // TODO: Implement delete functionality
-    alert("not yet implemented")
+    alert('not yet implemented')
   }
 
   if (loading)
@@ -166,7 +150,7 @@ export default function ManageTournament() {
       </div>
     )
 
-  const isDraft = tournament.status === TournamentStatus.DRAFT
+  const isDraft = tournament.status === TournamentStatus.Draft
 
   return (
     <div className="min-h-screen w-full bg-[#161616] text-white flex flex-col font-sansation selection:bg-yellow-500/30 p-6 md:p-8">
@@ -346,12 +330,12 @@ export default function ManageTournament() {
                   )}
                   <Select
                     name="prizeType"
-                    value={formData.prizeType || PrizeType.TOKENS}
+                    value={formData.prizeType || PrizeType.Tokens}
                     onChange={handleChange}
                     disabled={!isFieldEditable('prizeType')}
                     options={[
-                      { label: 'Tokens', value: PrizeType.TOKENS },
-                      { label: 'NFT', value: PrizeType.NFT },
+                      { label: 'Tokens', value: PrizeType.Tokens },
+                      { label: 'NFT', value: PrizeType.Nft },
                     ]}
                   />
                 </div>
@@ -376,7 +360,6 @@ export default function ManageTournament() {
                   <span className="text-gray-500 text-xs">(Locked)</span>
                 )}
                 <textarea
-
                   name="prizePoolDescription"
                   value={formData.prizePoolDescription || ''}
                   onChange={handleChange}
@@ -452,14 +435,15 @@ export default function ManageTournament() {
                   <Shield className="w-5 h-5 text-yellow-500" /> Configuration
                 </h3>
                 <span
-                  className={`px-2 py-1 rounded text-xs font-bold uppercase ${formData.status === 'DRAFT'
-                    ? 'bg-green-500/20 text-green-500'
-                    : formData.status === 'REGISTRATION_OPEN'
-                      ? 'bg-yellow-500/20 text-yellow-500'
-                      : formData.status === 'IN_PROGRESS'
-                        ? 'bg-blue-500/20 text-blue-500'
-                        : 'bg-gray-500/20 text-gray-500'
-                    }`}
+                  className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                    formData.status === 'DRAFT'
+                      ? 'bg-green-500/20 text-green-500'
+                      : formData.status === 'REGISTRATION_OPEN'
+                        ? 'bg-yellow-500/20 text-yellow-500'
+                        : formData.status === 'IN_PROGRESS'
+                          ? 'bg-blue-500/20 text-blue-500'
+                          : 'bg-gray-500/20 text-gray-500'
+                  }`}
                 >
                   {formData.status?.replace(/_/g, ' ')}
                 </span>
@@ -476,10 +460,10 @@ export default function ManageTournament() {
                       onChange={handleChange}
                       disabled={!isFieldEditable('status')}
                       options={[
-                        { label: 'Draft', value: TournamentStatus.DRAFT },
+                        { label: 'Draft', value: TournamentStatus.Draft },
                         {
                           label: 'Open Registration',
-                          value: TournamentStatus.REGISTRATION_OPEN,
+                          value: TournamentStatus.RegistrationOpen,
                         },
                         // { label: 'In Progress', value: TournamentStatus.IN_PROGRESS },
                         // {
@@ -509,20 +493,20 @@ export default function ManageTournament() {
                     onChange={handleChange}
                     disabled={!isFieldEditable('tournamentFormat')}
                     options={[
-                      { label: 'Swiss', value: TournamentFormat.SWISS },
+                      { label: 'Swiss', value: TournamentFormat.Swiss },
                       {
                         label: 'Round Robin',
-                        value: TournamentFormat.ROUND_ROBIN,
+                        value: TournamentFormat.RoundRobin,
                       },
                       {
                         label: 'Single Elimination',
-                        value: TournamentFormat.SINGLE_ELIM,
+                        value: TournamentFormat.SingleElim,
                       },
                       {
                         label: 'Double Elimination',
-                        value: TournamentFormat.DOUBLE_ELIM,
+                        value: TournamentFormat.DoubleElim,
                       },
-                      { label: 'Arena', value: TournamentFormat.ARENA },
+                      { label: 'Arena', value: TournamentFormat.Arena },
                     ]}
                   />
                 </div>
@@ -541,9 +525,9 @@ export default function ManageTournament() {
                       onChange={handleChange}
                       disabled={!isFieldEditable('gameMode')}
                       options={[
-                        { label: 'Standard', value: GameMode.STANDARD },
-                        { label: 'Microchess', value: GameMode.MICROCHESS },
-                        { label: 'CrazyHouse', value: GameMode.CRAZYHOUSE },
+                        { label: 'Standard', value: GameMode.Standard },
+                        { label: 'Microchess', value: GameMode.Microchess },
+                        { label: 'CrazyHouse', value: GameMode.Crazyhouse },
                       ]}
                     />
                   </div>
@@ -560,9 +544,9 @@ export default function ManageTournament() {
                       onChange={handleChange}
                       disabled={!isFieldEditable('matchType')}
                       options={[
-                        { label: 'Bo1', value: MatchType.BO_1 },
-                        { label: 'Bo3', value: MatchType.BO_3 },
-                        { label: 'Bo5', value: MatchType.BO_5 },
+                        { label: 'Bo1', value: MatchType.Bo_1 },
+                        { label: 'Bo3', value: MatchType.Bo_3 },
+                        { label: 'Bo5', value: MatchType.Bo_5 },
                       ]}
                     />
                   </div>
@@ -674,8 +658,8 @@ export default function ManageTournament() {
                       value={
                         formData.startingTime
                           ? new Date(formData.startingTime)
-                            .toISOString()
-                            .slice(0, 16)
+                              .toISOString()
+                              .slice(0, 16)
                           : ''
                       }
                       onChange={handleChange}
@@ -695,7 +679,9 @@ export default function ManageTournament() {
                       type="datetime-local"
                       value={
                         formData.endTime
-                          ? new Date(formData.endTime).toISOString().slice(0, 16)
+                          ? new Date(formData.endTime)
+                              .toISOString()
+                              .slice(0, 16)
                           : ''
                       }
                       onChange={handleChange}
@@ -720,10 +706,11 @@ export default function ManageTournament() {
                           setHasChanges(true)
                         }}
                         disabled={!isFieldEditable('visibility')}
-                        className={`py-2 text-sm font-medium rounded-lg border transition-all ${formData.visibility === opt
-                          ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
-                          : 'bg-[#1f1f1f] border-[#333] text-gray-500 hover:border-[#444]'
-                          } ${!isFieldEditable('visibility') ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`py-2 text-sm font-medium rounded-lg border transition-all ${
+                          formData.visibility === opt
+                            ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
+                            : 'bg-[#1f1f1f] border-[#333] text-gray-500 hover:border-[#444]'
+                        } ${!isFieldEditable('visibility') ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {opt.toLowerCase() === 'public'
                           ? 'Public'
@@ -743,8 +730,7 @@ export default function ManageTournament() {
                 <p className="text-sm text-gray-400">
                   <span className="text-yellow-500 font-medium">Note:</span>{' '}
                   Some fields are locked because this tournament is no longer in
-                  draft mode. Only cosmetic settings can be
-                  modified.
+                  draft mode. Only cosmetic settings can be modified.
                 </p>
               </div>
             )}

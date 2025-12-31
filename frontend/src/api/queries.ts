@@ -1,7 +1,6 @@
 import { useWalletStore } from '@/store/wallet.ts'
 import { Piece, Square } from '../ChessBoard/types.ts'
-import { TournamentUpdate } from '@/Tournament/MyTournament.tsx'
-import { TournamentInput } from '@/Tournament/CreateTournament.tsx'
+import { TournamentInput, TournamentUpdate } from '@/graphql/graphql.ts'
 
 // export function connect_wallet(): Promise<any> {
 //   if (!window.linera) throw new Error('Linera extension not found.')
@@ -166,6 +165,7 @@ function buildGraphQLQuery(queryBody: string): string {
 /** ---------------------------------------Mutation---------------------- */
 
 export function hostTournament(input: TournamentInput) {
+  console.log('host', input)
   const m = `mutation { hostTournament(value: {
     organiserName: "${input.organiserName}", 
     tournamentName: "${input.tournamentName}", 

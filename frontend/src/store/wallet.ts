@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { Result, Server } from '@/croissant/wallet'
 import { checkWalletExists } from '@/lib/checkWalletExist'
-import { ChainInfo, Convert } from '@/lib/chainsType'
+import { ChainEntry, Convert } from '@/lib/chainsType'
 
 type Request = {
   type: 'QUERY'
@@ -26,7 +26,7 @@ type WalletStore = {
   chainBalance: string
   pubKey: string | null
   defaultChain: string | null
-  chains: ChainInfo[] | null
+  chains: ChainEntry[] | null
   setRefetch: () => void
 
   /** User methods */
@@ -63,11 +63,11 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     if (!walletExists || !server) return
     try {
       const res = await server.JsWallet()
-      const wallet = Convert.toWallet(res)
-      const defaultChain = wallet.defaultChain
+      const wallet = Convert.chainsAsList(res)
+      const defaultChain = wallet.default
       const chains = Object.values(wallet.chains)
       const bal = (await server.getBalance()) || '0'
-      const id = chains[0].owner
+      const id = chains[0].chainInfo.owner
       set({ chains, pubKey: id, defaultChain, chainBalance: bal })
     } catch (e: any) {
       return e

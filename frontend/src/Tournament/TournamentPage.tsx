@@ -245,7 +245,6 @@ export default function TournamentPage() {
     )
   }
 
-
   const statusConfig = getStatusConfig(tournament.status)
   const StatusIcon = statusConfig.icon
   const spotsLeft = tournament.maxPlayers
