@@ -1,12 +1,13 @@
-//! Tournament tests for the MicroChess.
+//! Participants Registration tests for the MicroChess's Tournaments.
 
 #![cfg(not(target_arch = "wasm32"))]
 
 use chess::{
     player::PlayerProfile,
     tournament::{
+        utils::{Match, Participants, TournamentParticipant},
         GameMode, MatchType, PrizeType, TimeControlInput, Tournament, TournamentFormat,
-        TournamentInput, TournamentStatus, Visibility,
+        TournamentInput, TournamentStatus, TournamentUpdate, Visibility,
     },
     ChessAbi, InstantiationArgument, Operation,
 };
@@ -232,6 +233,75 @@ async fn test_tournament() {
     assert_eq!(data.status, value.status);
 
     assert!(!data.version.is_empty());
+
+    let participants_chains = create_participants(&validator, app_id).await;
+
+    for chain in participants_chains {
+        let certificate = test_participant_registration(&chain, app_id, &id).await;
+        app_chain
+            .add_block(|block| {
+                block.with_messages_from(&certificate);
+            })
+            .await;
+    }
+
+    let query_participants = format!(
+        r#"
+            query {{ participants(id: "{}") }}
+        "#,
+        id
+    );
+
+    let QueryOutcome { response, .. } = app_chain.graphql_query(app_id, query_participants).await;
+
+    let data: String = serde_json::from_value(response["participants"].clone())
+        .expect("Failed to deserialize participants data");
+
+    let participants: Participants = Participants::decode(data);
+
+    process_players(&participants);
+
+    let certificate = test_update_tournament(&player_1_chain, app_id, id.clone()).await;
+
+    app_chain
+        .add_block(|block| {
+            block.with_messages_from(&certificate);
+        })
+        .await;
+
+    let query_tournament_matches = format!(
+        r#"
+            query {{ tournamentMatches(id: "{}") {{
+                matchId
+                tournamentId
+                playerA
+                playerB
+                round
+                result
+            }} }}
+        "#,
+        id
+    );
+
+    let QueryOutcome { response, .. } = app_chain
+        .graphql_query(app_id, query_tournament_matches)
+        .await;
+
+    let data: Vec<Match> = serde_json::from_value(response["tournamentMatches"].clone())
+        .expect("Failed to deserialize participants data");
+
+    assert_eq!(data.len(), 8);
+}
+
+pub fn process_players(participants: &Participants) {
+    match participants {
+        Participants::Swiss(p) => process_player_list(&p.players),
+        Participants::SingleElim(p) => process_player_list(&p.players),
+    }
+}
+
+fn process_player_list<T: TournamentParticipant>(players: &[T]) {
+    assert_eq!(players.len(), 16);
 }
 
 async fn test_host_tournament(
@@ -241,6 +311,65 @@ async fn test_host_tournament(
 ) -> ConfirmedBlockCertificate {
     let operation = Operation::HostTournament {
         value: Box::new(value),
+    };
+
+    chain
+        .add_block(|block| {
+            block.with_operation(app_id, operation);
+        })
+        .await
+}
+
+async fn test_update_tournament(
+    chain: &ActiveChain,
+    app_id: ApplicationId<ChessAbi>,
+    tournament_id: String,
+) -> ConfirmedBlockCertificate {
+    let operation = Operation::UpdateTournament {
+        tournament_id,
+        update: Box::new(TournamentUpdate {
+            status: Some(TournamentStatus::RegistrationClosed),
+            banner_image_url: None,
+            custom_tags: None,
+            prize_pool: None,
+            prize_type: None,
+            sponsor_logo_url: None,
+            tournament_description: None,
+            tournament_name: None,
+            visibility: None,
+        }),
+    };
+
+    chain
+        .add_block(|block| {
+            block.with_operation(app_id, operation);
+        })
+        .await
+}
+
+async fn create_participants(
+    validator: &TestValidator,
+    app_id: ApplicationId<ChessAbi>,
+) -> Vec<ActiveChain> {
+    let mut participants_chains = Vec::with_capacity(16);
+
+    for number in 0..16 {
+        let player_name = format!("{}{}", "John Done", number);
+        let player_chain = validator.new_chain().await;
+        let _player = create_player_profile(&player_chain, app_id, player_name.clone()).await;
+        participants_chains.push(player_chain);
+    }
+
+    participants_chains
+}
+
+async fn test_participant_registration(
+    chain: &ActiveChain,
+    app_id: ApplicationId<ChessAbi>,
+    tournament_id: &str,
+) -> ConfirmedBlockCertificate {
+    let operation = Operation::TournamentRegistration {
+        tournament_id: tournament_id.to_string(),
     };
 
     chain

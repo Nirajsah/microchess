@@ -51,7 +51,7 @@ async fn application_test() {
     let player2_certificate = test_request_new_game(player_2_chain.clone(), app_id).await;
 
     let key_pair1 = player_1_chain.key_pair();
-    let key_pair2 = player_2_chain.key_pair();
+    let _key_pair2 = player_2_chain.key_pair();
 
     // App chain processes player 2's request
     let certificate = app_chain
@@ -71,7 +71,7 @@ async fn application_test() {
         .next()
         .unwrap();
 
-    let mut game_chain = ActiveChain::new(key_pair1.copy(), description, validator);
+    let game_chain = ActiveChain::new(key_pair1.copy(), description, validator);
 
     game_chain
         .add_block(|block| {
@@ -89,6 +89,16 @@ async fn application_test() {
 
     let QueryOutcome { response, .. } =
         game_chain.graphql_query(app_id, "query { mvString }").await;
+
+    let res: Vec<String> = serde_json::from_value(response["mvString"].clone())
+        .expect("Failed to deserialize response");
+
+    let single_move = res[0].clone();
+
+    assert_eq!(
+        "e4", single_move,
+        "Both players should have the same game chain"
+    );
 
     // Player 1 processes messages from app_chain (receives GameChainData)
     player_1_chain.handle_received_messages().await;
@@ -220,13 +230,7 @@ async fn test_request_new_game(
 }
 
 async fn test_request_friend_id(chain: ActiveChain, app_id: ApplicationId<ChessAbi>) -> String {
-    let operation = Operation::FrGame;
-    chain
-        .add_block(|block| {
-            block.with_operation(app_id, operation);
-        })
-        .await;
-
+    // This should work after we update `friendId` query
     let QueryOutcome { response, .. } = chain.graphql_query(app_id, "query { friendId }").await;
 
     response["friendId"]
@@ -278,36 +282,3 @@ async fn create_player_profile(
 
     profile
 }
-
-/*
-1. Operations:
-
-        /*
-            Profile {
-                name: String,
-            },
-            NewGame,
-            FrGame,
-            FrGameHash {
-                token: String,
-            },
-        */
-
-        // match operations
-        MakeMove {
-            from: String,
-            to: String,
-            piece: String,
-        },
-        PawnPromotion {
-            from: String,
-            to: String,
-            piece: String,
-            promoted_piece: String,
-        },
-        Resign,
-        DeleteChainMetadata,
-        // basic user operations
-        Subscribe,
-
-*/
