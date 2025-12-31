@@ -1,6 +1,6 @@
 import type { Wallet } from '@client'
 import type * as wasmType from '@client'
-import { PrivateKeySigner } from '@client' 
+import { PrivateKeySigner } from '@client'
 
 export class WalletManager {
   private static _instance: WalletManager | null = null
@@ -56,8 +56,7 @@ export class WalletManager {
 
   async getJsWallet(): Promise<string> {
     try {
-      // const wallet = await this.wasmInstance!.Wallet.readJsWallet()
-      const wallet = "aoiigjeoiag";
+      const wallet = await this.wasmInstance!.Wallet.readJsWallet()
       return wallet
     } catch (error) {
       throw new Error('Failed to read wallet')

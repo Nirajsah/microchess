@@ -17,6 +17,8 @@ export enum SignerError {
  * *This API requires the following crate features to be activated: `ReadableStreamType`*
  */
 type ReadableStreamType = "bytes";
+import type { Signer } from '../signer/index.js';
+
 export interface TransferParams {
     donor?: AccountOwner | undefined;
     amount: number;
@@ -26,8 +28,6 @@ export interface TransferParams {
 export interface AddOwnerOptions {
     weight?: number;
 }
-
-import type { Signer } from '../signer/index.js';
 
 export interface QueryOptions {
     blockHash?: string | undefined;
@@ -303,6 +303,11 @@ export class Client {
    * unavailable, or if `options` is incorrectly structured.
    */
   constructor(w: Wallet, signer: Signer, options?: Options | null);
+  assignAndSetDefault(chain_id: ChainId, owner: AccountOwner): Promise<Chain>;
+  /**
+   * Assigns a new chain and returns the ChainClient for use
+   */
+  assignChain(chain_id: ChainId, owner: AccountOwner): Promise<Chain>;
   /**
    * Connect to a chain on the Linera network.
    * If no chain is provided, Default chain is used
@@ -384,12 +389,20 @@ export class Wallet {
    * If storage is inaccessible.
    */
   static get(): Promise<Wallet | undefined>;
+  /**
+   * This methods returns the Wallet stored in string format, that could be parsed into json.
+   */
+  static readJsWallet(): Promise<string>;
   save_to_storage(gn_flag: boolean): Promise<void>;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
+  readonly __wbg_secret_free: (a: number, b: number) => void;
+  readonly secret_set: (a: number, b: number, c: number, d: any) => any;
+  readonly secret_get: (a: number, b: number, c: number) => any;
+  readonly secret_new: () => number;
   readonly __wbg_chain_free: (a: number, b: number) => void;
   readonly chain_onNotification: (a: number, b: any) => [number, number];
   readonly chain_transfer: (a: number, b: any) => any;
@@ -402,19 +415,18 @@ export interface InitOutput {
   readonly faucet_new: (a: number, b: number) => number;
   readonly faucet_createWallet: (a: number) => any;
   readonly faucet_claimChain: (a: number, b: number, c: any) => any;
-  readonly __wbg_wallet_free: (a: number, b: number) => void;
-  readonly wallet_get: () => any;
-  readonly wallet_save_to_storage: (a: number, b: number) => any;
   readonly __wbg_client_free: (a: number, b: number) => void;
   readonly client_new: (a: number, b: any, c: number) => any;
+  readonly client_assignAndSetDefault: (a: number, b: any, c: any) => any;
+  readonly client_assignChain: (a: number, b: any, c: any) => any;
   readonly client_chain: (a: number, b: number) => any;
   readonly main: () => void;
   readonly __wbg_application_free: (a: number, b: number) => void;
   readonly application_query: (a: number, b: number, c: number, d: number) => any;
-  readonly __wbg_secret_free: (a: number, b: number) => void;
-  readonly secret_set: (a: number, b: number, c: number, d: any) => any;
-  readonly secret_get: (a: number, b: number, c: number) => any;
-  readonly secret_new: () => number;
+  readonly __wbg_wallet_free: (a: number, b: number) => void;
+  readonly wallet_get: () => any;
+  readonly wallet_readJsWallet: () => any;
+  readonly wallet_save_to_storage: (a: number, b: number) => any;
   readonly __web_thread_worker_entry_point: (a: any, b: any) => any;
   readonly __wbg_intounderlyingbytesource_free: (a: number, b: number) => void;
   readonly intounderlyingbytesource_type: (a: number) => number;
@@ -440,8 +452,8 @@ export interface InitOutput {
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_export_7: WebAssembly.Table;
   readonly __externref_table_dealloc: (a: number) => void;
-  readonly closure1252_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure1322_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure1098_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure1327_externref_shim: (a: number, b: number, c: any) => void;
   readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__haf1205b389f3f51f: (a: number, b: number) => void;
   readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h18ca806deb6aeb38_multivalue_shim: (a: number, b: number) => [number, number];
   readonly closure3467_externref_shim: (a: number, b: number, c: any) => void;

@@ -1,9 +1,9 @@
 import { WasmManager } from './wasmManager'
 import { ClientManager } from './clientManager'
 import { WalletManager } from './walletManager'
-import { Faucet } from '@client';
+import { Faucet } from '@client'
 
-const wasm = await import("@client");
+const wasm = await import('@client')
 
 export type Result<T> =
   | { success: true; result: T }
@@ -11,7 +11,6 @@ export type Result<T> =
 
 type OpType = 'CREATE_WALLET' | 'CLAIM_CHAIN'
 type FaucetHandler = (faucet: Faucet) => Promise<Result<string>>
-
 
 export type Request = {
   type: 'QUERY'
@@ -28,7 +27,7 @@ export class Server {
 
   public onNotification: ((data: any) => void) | null = null
 
-  constructor() { }
+  constructor() {}
 
   faucetHandlers: Record<OpType, FaucetHandler> = {
     CREATE_WALLET: async (faucet) => {
@@ -37,7 +36,7 @@ export class Server {
       this.wallet.setWasmInstance(this.wasmInstance!) // Now wallet manager can safely load or create wallets
       this.wallet.create(wallet)
 
-      let chainId = await faucet.claimChain(
+      const chainId = await faucet.claimChain(
         wallet,
         this.wallet.getSigner().address()
       )
@@ -56,8 +55,8 @@ export class Server {
   }
 
   private async _faucetAction(op: OpType): Promise<Result<string>> {
-    // const FAUCET_URL = 'http://localhost:8079'
-    const FAUCET_URL = 'https://faucet.testnet-conway.linera.net/'
+    const FAUCET_URL = 'http://localhost:8079'
+    // const FAUCET_URL = 'https://faucet.testnet-conway.linera.net/'
     const faucet = new wasm.Faucet(FAUCET_URL)
     const handler = this.faucetHandlers[op]
     if (!handler) return { success: false, error: 'Invalid operation' }
