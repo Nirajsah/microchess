@@ -18,13 +18,13 @@ export default function Navbar() {
     checkWalletExistsAsync()
     const stroage_theme = storage.getTheme()
     updateTheme(stroage_theme as ThemeName)
-  }, [])
+  })
 
   React.useEffect(() => {
     if (walletExists && !ready) {
       initAsync()
     }
-  }, [walletExists])
+  }, [walletExists, ready, initAsync])
 
   return (
     <div className="w-full h-14 p-3 flex justify-center">

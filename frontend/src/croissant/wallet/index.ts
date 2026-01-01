@@ -1,7 +1,8 @@
 import { WasmManager } from './wasmManager'
 import { ClientManager } from './clientManager'
 import { WalletManager } from './walletManager'
-import { Faucet } from '@client'
+import { Chain, Faucet } from '@client'
+import { ChainId } from '@/lib/chainsType'
 
 const wasm = await import('@client')
 
@@ -24,8 +25,6 @@ export class Server {
 
   private client: ClientManager = ClientManager.instance
   private wallet: WalletManager = WalletManager.instance
-
-  public onNotification: ((data: any) => void) | null = null
 
   constructor() {}
 
@@ -54,38 +53,35 @@ export class Server {
     },
   }
 
-  private async _faucetAction(op: OpType): Promise<Result<string>> {
+  private async _faucetAction(op: OpType): Promise<Result<Chain>> {
     const FAUCET_URL = 'http://localhost:8079'
     // const FAUCET_URL = 'https://faucet.testnet-conway.linera.net/'
     const faucet = new wasm.Faucet(FAUCET_URL)
     const handler = this.faucetHandlers[op]
     if (!handler) return { success: false, error: 'Invalid operation' }
     try {
-      const result = await handler.call(this, faucet)
-      await this._initClient() // Initialize client after faucet action
-      return result
+      await handler.call(this, faucet)
+      return { success: true, result: await this._initClient() }
     } catch (err) {
       return { success: false, error: `${err}` }
     }
   }
 
-  private async _initClient() {
+  private async _initClient(): Promise<Chain> {
     if (!this.wallet.getWallet() || !this.wallet.getSigner()) {
-      return
+      throw new Error('Missing wallet, or signer')
     }
-    await new Promise((resolve) => setTimeout(resolve, 300)) // just for a small delay, might not have any impact.
     try {
-      // Initialize a fresh one
-      await this.client.init(
+      // Initialize a fresh one, default chain is returned
+      const chain = await this.client.init(
         this.wasmInstance!,
         this.wallet.getWallet(),
         this.wallet.getSigner()
       )
 
-      await this.wallet.reInitWallet() // reinitialize wallet after client init
-      this.client.onNotificationCallback = this.onNotification
+      return chain
     } catch (error) {
-      await this.wallet.reInitWallet() // reinitialize wallet after client init
+      // await this.wallet.reInitWallet() // reinitialize wallet after client init
       console.warn('Failed to initialize client:', error)
       throw error
     }
@@ -129,35 +125,30 @@ export class Server {
   }
 
   // TODO: use wallet manager to assign chain
-  private async _handleAssignment(body: any) {
-    try {
-      const result = await this.wallet.assign(body) // assign chain in wallet manager, this will also reinitialize wallet
-      // reinitialize client after assignment
-      await this.client.cleanup()
-      await this._initClient()
-      return result
-    } catch (err) {
-      console.error(err)
-    }
+  private async _handleAssignment(chainId: string): Promise<Chain> {
+    return await this.client.assign(chainId, this.wallet.getSigner().address())
   }
 
   async JsWallet(): Promise<string> {
     try {
-      return await this.wallet.getJsWallet()
+      const w = await this.wallet.getJsWallet()
+      return w
     } catch {
       return 'Failed to get wallet'
     }
   }
 
-  async create(fn: (data: any) => void): Promise<void> {
-    this.onNotification = fn
-    await this._faucetAction('CREATE_WALLET')
+  async create(): Promise<Result<Chain>> {
+    return await this._faucetAction('CREATE_WALLET')
   }
 
-  async initClient(fn: (data: any) => void): Promise<void> {
-    this.onNotification = fn
+  async initClient(): Promise<Chain> {
     await this._initWallet()
-    await this._initClient()
+    return await this._initClient()
+  }
+
+  async initChainClient(chainId: ChainId): Promise<Chain> {
+    return await this.client.initChainClient(chainId)
   }
 
   async request(req: Request): Promise<Result<string>> {
@@ -165,22 +156,13 @@ export class Server {
     return { success: true, result: res as string }
   }
 
-  async assign(data: {
-    chainId: string
-    timestamp: number
-  }): Promise<Result<string>> {
-    const res = await this._handleAssignment(data)
-    return { success: true, result: res as string }
+  async assign(chainId: string): Promise<Chain> {
+    return await this._handleAssignment(chainId)
   }
 
   async setDefault(chainId: string): Promise<Result<string>> {
     const res = await this._handleSetDefaultChain(chainId)
     return { success: true, result: res as string }
-  }
-
-  async getBalance(): Promise<string> {
-    const res = await this.client.getBalance()
-    return res as string
   }
 
   static async init(): Promise<Server> {

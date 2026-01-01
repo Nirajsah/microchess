@@ -30,7 +30,7 @@ const MatchDataUI = (data: MatchData) => {
       const getMoves = async () => {
         try {
           const data = await getMvString()
-          const res = JSON.parse(data.result).data.mvString
+          const res = JSON.parse(data).data.mvString
           setMoves(res)
         } catch (e) {
           console.error('failed', e)

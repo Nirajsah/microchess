@@ -73,6 +73,7 @@ const MatchSelect = () => {
 
   const notification = useWalletStore((s) => s.notification)
   const ready = useWalletStore((s) => s.ready)
+  const refetch = useWalletStore((s) => s.refetch)
 
   let saved = storage.getGameState()
   if (saved === 'friendly.share' || saved === 'random.ready') {
@@ -108,7 +109,7 @@ const MatchSelect = () => {
   // fetch gameChainInfo(chainId, timestamp)
   const fetchGameChainInfo = async () => {
     const chain = await getGameChainInfo()
-    const data = JSON.parse(chain.result).data.gameChain
+    const data = JSON.parse(chain).data.gameChain
     if (data && data.chainId) {
       dispatch({ type: 'RANDOM_ASSIGNED', ...data })
     }
@@ -126,7 +127,7 @@ const MatchSelect = () => {
   const getPersonalId = async () => {
     await friendId()
       .then((chain) => {
-        const data = JSON.parse(chain.result).data.friendId
+        const data = JSON.parse(chain).data.friendId
         if (data) {
           dispatch({ type: 'FRIENDLY_READY', gameHash: data })
         }
@@ -152,7 +153,7 @@ const MatchSelect = () => {
     if (state.status === 'friendly.loading') {
       getPersonalId()
     }
-  }, [state.status, notification])
+  }, [state.status, notification, refetch])
 
   React.useEffect(() => {
     if (state.status === 'friendly.share' || state.status === 'friendly.join') {
@@ -161,7 +162,7 @@ const MatchSelect = () => {
     if (state.status === 'friendly.loading') {
       getPersonalId()
     }
-  }, [notification])
+  }, [notification, refetch, state.status])
 
   return (
     <div className="h-full w-full mx-auto">
@@ -345,11 +346,11 @@ function RandomAssignScreen({ chainId, timestamp, back }: any) {
   const assignChain = useWalletStore((s) => s.assignChainAsync)
   const handleStart = async () => {
     try {
-      const res = await assignChain({ chainId, timestamp })
+      const res = await assignChain(chainId)
       back() // just to reset the state
-      if (res.success) {
-        window.location.reload()
-      }
+      // if (res.success) {
+      //   window.location.reload()
+      // }
     } catch (e) {
       console.log(e)
     }

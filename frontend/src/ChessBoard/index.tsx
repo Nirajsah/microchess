@@ -20,22 +20,24 @@ const ChessBoard = () => {
     localMakeMove,
     updateAsync,
   } = useBoard((s) => s)
+
   const notification = useWalletStore((s) => s.notification)
   const pubKey = useWalletStore((s) => s.pubKey)
   const ready = useWalletStore((s) => s.pubKey)
+  const refetch = useWalletStore((s) => s.refetch)
 
   const [isGameChain, setIsGameChain] = React.useState<boolean | null>(null)
   const [capturedPieces, setCapturedPieces] = React.useState<string[]>([])
 
   React.useEffect(() => {
     initDefaultAsync() // init board wasm
-  }, [])
+  }, [initDefaultAsync])
 
   React.useEffect(() => {
     const getCapturedPieces = async () => {
       try {
         const data = await capturedPiece()
-        const res = JSON.parse(data.result).data.capturedPieces
+        const res = JSON.parse(data).data.capturedPieces
         setCapturedPieces(res)
       } catch (e) {
         console.error('failed', e)
@@ -48,7 +50,7 @@ const ChessBoard = () => {
       getCapturedPieces()
       fetchAndUpdateBoard()
     }
-  }, [notification, ready, isGameChain])
+  }, [notification, ready, isGameChain, refetch, pubKey, updateAsync])
 
   function localMove(selectedSquare: Square, to_square: Square, piece: Piece) {
     if (board.color === 'White' && piece.charAt(0) === 'b') return

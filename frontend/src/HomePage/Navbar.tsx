@@ -11,13 +11,13 @@ export default function Navbar() {
 
   React.useEffect(() => {
     checkWalletExistsAsync()
-  }, [])
+  })
 
   React.useEffect(() => {
     if (walletExists) {
       initAsync()
     }
-  }, [walletExists])
+  }, [walletExists, initAsync])
 
   return (
     <div className="fixed z-20 bg-transparent backdrop-blur-lg w-full gap-2 px-3 py-2 lg:h-[60px] lg:px-14 lg:py-6 flex items-center justify-between max-w-[1440px]">

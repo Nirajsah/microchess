@@ -50,7 +50,7 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
     const checkGameChain = async () => {
       try {
         const res = await isGameChain()
-        const check = JSON.parse(res.result).data.isGameChain
+        const check = JSON.parse(res).data.isGameChain
 
         if (setIsGameChain) {
           setIsGameChain(check)

@@ -1,20 +1,34 @@
-import { ChainEntry } from '@/lib/chainsType'
+import { ChainId } from '@/lib/chainsType'
 import { useWalletStore } from '@/store/wallet'
 import { ChevronLeft, ChevronRight, Copy, RefreshCw } from 'lucide-react'
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export function MockChainCarousel() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const chains = useWalletStore((s) => s.chains)
   const defaultChain = useWalletStore((s) => s.defaultChain)
-  const balance = useWalletStore((s) => s.chainBalance)
+  const getBalanceAsync = useWalletStore((s) => s.getBalanceAsync)
   const setRefetch = useWalletStore((s) => s.setRefetch)
   const setDefault = useWalletStore((s) => s.setDefaultAsync)
+  const [balances, setBalances] = useState<Record<ChainId, string>>({})
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text)
     console.log('Copied:', text)
   }
+
+  useEffect(() => {
+    async function fetchAllBalances() {
+      if (!chains) return
+      const result: Record<ChainId, string> = {}
+      for (const { chainId } of chains) {
+        const bal = await getBalanceAsync(chainId)
+        result[chainId] = bal
+      }
+      setBalances(result)
+    }
+    fetchAllBalances()
+  }, [chains, getBalanceAsync])
 
   const handleSetDefault = async (chainId: string) => {
     await setDefault(chainId).then(() => setRefetch())
@@ -96,9 +110,9 @@ export function MockChainCarousel() {
         }}
         className="flex w-full h-full overflow-y-hidden overflow-x-auto scroll-smooth snap-x snap-mandatory no-scrollbar gap-2"
       >
-        {chains?.map((chain: ChainEntry, i) => (
+        {chains?.map(({ chainId, chainInfo }) => (
           <div
-            key={i}
+            key={chainId}
             className="relative w-full min-w-[94%] bg-transparent flex items-center justify-center snap-center"
           >
             <svg
@@ -225,7 +239,9 @@ export function MockChainCarousel() {
             <div className="absolute font-sansation w-full top-0 inset-0 flex flex-col justify-between z-10 text-white">
               <div className="bottom-0 absolute top-10 w-full py-4 mb-4 px-5">
                 <div className="flex mb-2">
-                  <div className="text-[40px] font-bold">{balance}</div>
+                  <div className="text-[40px] font-bold">
+                    {balances[chainId]}
+                  </div>
                 </div>
 
                 <div className="flex w-full space-y-2 flex-col justify-between items-start">
@@ -233,12 +249,12 @@ export function MockChainCarousel() {
                     <span className="flex w-full gap-1 items-center">
                       ChainId:
                       <p className="truncate text-xs bg-[#454545] px-2 py-0.5 rounded-xl">
-                        {chain.chainId}
+                        {chainId}
                       </p>
                       <Copy
                         size={20}
                         className="cursor-pointer text-gray-500 hover:text-gray-300"
-                        onClick={() => handleCopy(chain.chainId)}
+                        onClick={() => handleCopy(chainId)}
                       />
                     </span>
                   </span>
@@ -246,19 +262,19 @@ export function MockChainCarousel() {
                     <span className="flex w-full gap-1 items-center">
                       Account:
                       <p className="truncate text-xs bg-[#454545] px-2 py-0.5 rounded-xl">
-                        {chain.chainInfo.owner}
+                        {chainInfo.owner}
                       </p>
                       <Copy
                         size={20}
                         className="cursor-pointer text-gray-500 hover:text-gray-300"
-                        onClick={() => handleCopy(chain.chainInfo.owner)}
+                        onClick={() => handleCopy(chainInfo.owner)}
                       />
                     </span>
                   </span>
                 </div>
               </div>
               <div className="absolute w-full h-10 flex justify-end items-center">
-                {defaultChain === chain.chainId ? (
+                {defaultChain === chainId ? (
                   <button
                     disabled
                     className="text-black text-xs border mr-4 mb-0.5 px-4 py-0.5 rounded-3xl flex gap-1 items-center bg-white/90"
@@ -268,7 +284,7 @@ export function MockChainCarousel() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => handleSetDefault(chain.chainId)}
+                    onClick={() => handleSetDefault(chainId)}
                     className="text-black text-xs border mr-1.5 mb-0.5 px-2 py-0.5 rounded-3xl flex gap-1 items-center bg-white/90"
                   >
                     <RefreshCw width={15} />

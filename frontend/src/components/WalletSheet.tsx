@@ -23,20 +23,20 @@ export default function WalletSheet() {
   const JsWallet = useWalletStore((s) => s.getJsWalletAsync)
 
   React.useEffect(() => {
-    if (!walletExists) return
+    if (!walletExists || !ready) return
     const fetchWallet = async () => {
       await JsWallet()
     }
     const fetchProfile = async () => {
       const res = await getProfile()
-      setProfile(JSON.parse(res.result).data.profile)
+      setProfile(JSON.parse(res).data.profile)
     }
 
     fetchWallet()
     if (ready) {
       fetchProfile()
     }
-  }, [walletExists, ready, refetch])
+  }, [walletExists, ready, refetch, setProfile, JsWallet])
 
   return (
     <Sheet open={isOpen} onOpenChange={toggle}>
@@ -113,8 +113,8 @@ const LoadingState = () => {
                   isDone
                     ? 'bg-green-500/20 border-green-500/50 text-green-400'
                     : isActive
-                    ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
-                    : 'border-zinc-800'
+                      ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
+                      : 'border-zinc-800'
                 }`}
               >
                 {isDone ? (

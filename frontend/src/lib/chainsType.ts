@@ -54,11 +54,6 @@ export class Convert {
   public static toWallet(json: string): Wallet {
     return cast(JSON.parse(json), r('Wallet'))
   }
-
-  public static walletToJson(value: Wallet): string {
-    return JSON.stringify(uncast(value, r('Wallet')), null, 2)
-  }
-
   public static chainsAsList(json: string): WalletChainList {
     const wallet = this.toWallet(json)
 
@@ -264,25 +259,18 @@ const typeMap: any = {
     ],
     false
   ),
-  Chains: o(
+
+  // *** fix: accept arbitrary chainId keys ***
+  Chains: m(r('ChainInfo')), // "map of string -> ChainInfo"
+
+  // *** fix: convert snake_case to camelCase ***
+  ChainInfo: o(
     [
-      {
-        json: 'e7c1566d7de69888f75e4d948e0d68f30086d7b72ac7d5e13fdef33941685729',
-        js: 'e7C1566D7De69888F75E4D948E0D68F30086D7B72Ac7D5E13Fdef33941685729',
-        typ: r(
-          'E7C1566D7De69888F75E4D948E0D68F30086D7B72Ac7D5E13Fdef33941685729'
-        ),
-      },
-    ],
-    false
-  ),
-  E7C1566D7De69888F75E4D948E0D68F30086D7B72Ac7D5E13Fdef33941685729: o(
-    [
-      { json: 'block_hash', js: 'blockHash', typ: null },
+      { json: 'block_hash', js: 'blockHash', typ: u(null, '') },
       { json: 'epoch', js: 'epoch', typ: '' },
       { json: 'next_block_height', js: 'nextBlockHeight', typ: 0 },
       { json: 'owner', js: 'owner', typ: '' },
-      { json: 'pending_proposal', js: 'pendingProposal', typ: null },
+      { json: 'pending_proposal', js: 'pendingProposal', typ: u(null, '') },
       { json: 'timestamp', js: 'timestamp', typ: 0 },
     ],
     false

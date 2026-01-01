@@ -30,10 +30,10 @@ export class ClientManager {
   async init(
     wasmInstance: typeof wasmType,
     wallet: Wallet,
-    signer: Signer,
-  ): Promise<Client> {
+    signer: Signer
+  ): Promise<Chain> {
     if (this.client) {
-      return this.client
+      return this.client.chain()
     }
 
     if (!wasmInstance || !wallet || !signer) {
@@ -41,24 +41,31 @@ export class ClientManager {
     }
 
     try {
-      const client = await new wasmInstance.Client(
-        wallet,
-        signer,
-      )
+      const client = await new wasmInstance.Client(wallet, signer)
 
       this.client = client
-      this.chain = await client.chain()
-      await this.registerNotificationHandler()
-      return client
+      const chain = await client.chain()
+      this.chain = chain
+      return chain
     } catch (err) {
       this.cleanup()
       throw err
     }
   }
 
+  async initChainClient(chain: string): Promise<Chain> {
+    if (!this.client) {
+      throw new Error('Missing Client')
+    }
+
+    const chainClient = await this.client.chain(chain)
+    return chainClient
+  }
+
   /** Register handler only once */
   async registerNotificationHandler() {
-    if (!this.client || this.notificationHandlerRegistered || !this.chain) return
+    if (!this.client || this.notificationHandlerRegistered || !this.chain)
+      return
 
     this.chain.onNotification((notification: any) => {
       try {
@@ -149,12 +156,18 @@ export class ClientManager {
   }
 
   async query(req: Request) {
+    const app = await this.chain!.application(req.applicationId)
+    const result = await app.query(req.query)
+    return result
+  }
+
+  async assign(chainId: string, owner: string): Promise<Chain> {
+    if (!this.client) throw new Error('Failure...')
+
     try {
-      const app = await this.chain!.application(req.applicationId)
-      const result = await app.query(req.query)
-      return result
-    } catch (err) {
-      throw err
+      return await this.client.assignChain(chainId, owner)
+    } catch (e) {
+      throw new Error('Failure...')
     }
   }
 

@@ -39,8 +39,8 @@ export const useBoard = create<BoardState>((set) => ({
         throw new Error('No response from API')
       }
 
-      const data = JSON.parse(res.result).data.gameData
-      const { white, black } = JSON.parse(playerClock.result).data.timer
+      const data = JSON.parse(res).data.gameData
+      const { white, black } = JSON.parse(playerClock).data.timer
       const boardData: any = chessWasm.initBoard(data.fen)
 
       if (boardData) {

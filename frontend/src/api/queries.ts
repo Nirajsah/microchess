@@ -22,7 +22,7 @@ import { TournamentInput, TournamentUpdate } from '@/graphql/graphql.ts'
 // }
 
 function request(query: string): Promise<any> {
-  let APP_ID = import.meta.env.VITE_MICROCHESS_APPLICATION_ID
+  const APP_ID = import.meta.env.VITE_MICROCHESS_APPLICATION_ID
 
   const ready = useWalletStore.getState().ready
   const requestAsync = useWalletStore.getState().requestAsync
@@ -89,7 +89,7 @@ export function gameData(player: string): Promise<any> {
       gameState
       winner
       lastMove {
-        from 
+        from
         to
       }
     }
@@ -136,7 +136,7 @@ export function getMatchHistory() {
       }
       opponent {
         id
-        name	
+        name
       }
       blobHash
     }
@@ -167,12 +167,12 @@ function buildGraphQLQuery(queryBody: string): string {
 export function hostTournament(input: TournamentInput) {
   console.log('host', input)
   const m = `mutation { hostTournament(value: {
-    organiserName: "${input.organiserName}", 
-    tournamentName: "${input.tournamentName}", 
+    organiserName: "${input.organiserName}",
+    tournamentName: "${input.tournamentName}",
     tournamentDescription: "${input.tournamentDescription}",
     tournamentFormat: "${input.tournamentFormat}"
     matchType: "${input.matchType}",
-    gameMode: "${input.gameMode}", 
+    gameMode: "${input.gameMode}",
     timeControl: {
       baseMinutes: ${input.timeControl.baseMinutes},
       incrementSeconds: ${input.timeControl.incrementSeconds},
@@ -181,13 +181,13 @@ export function hostTournament(input: TournamentInput) {
     minPlayers: ${input.minPlayers},
     startingTime: ${input.startingTime},
     endTime: ${input.endTime},
-    prizeType: "${input.prizeType}", 
-    prizePool: ${input.prizePool}, 
+    prizeType: "${input.prizeType}",
+    prizePool: ${input.prizePool},
     prizePoolDescription: "${input.prizePoolDescription}",
     bannerImageUrl: "${input.bannerImageUrl}",
     sponsorLogoUrl: "${input.sponsorLogoUrl}",
-    visibility: "${input.visibility}", 
-    customTags: "${input.customTags}", 
+    visibility: "${input.visibility}",
+    customTags: "${input.customTags}",
     status: "${input.status}"
   }) }`
   const gqlQuery = JSON.stringify({ query: m })
@@ -196,7 +196,7 @@ export function hostTournament(input: TournamentInput) {
 
 export function tournamentRegistration(tournamentId: string) {
   const mutation = `mutation { tournamentRegistration(tournamentId: "${tournamentId}") }`
-  let query = buildGraphQLQuery(mutation)
+  const query = buildGraphQLQuery(mutation)
   return request(query)
 }
 
@@ -223,38 +223,38 @@ export function updateTournament(
 // Start a new game
 export function startGame() {
   const mutation = `mutation { newGame }`
-  let query = buildGraphQLQuery(mutation)
+  const query = buildGraphQLQuery(mutation)
   return request(query)
 }
 // Request a friendly match
 export function reqFriendlyGame() {
   const mutation = `mutation { frGame }`
-  let query = buildGraphQLQuery(mutation)
+  const query = buildGraphQLQuery(mutation)
   return request(query)
 }
 
 export function resign() {
   const mutation = `mutation { resign }`
-  let query = buildGraphQLQuery(mutation)
+  const query = buildGraphQLQuery(mutation)
   return request(query)
 }
 
 // Deletes chain metadata from user's state
 export function deleteInfo() {
   const mutation = `mutation { deleteChainMetadata }`
-  let query = buildGraphQLQuery(mutation)
+  const query = buildGraphQLQuery(mutation)
   request(query).then((_) => console.log('chain info metadata deleted'))
 }
 
 export function gameWithToken(token: string) {
   const mutation = `mutation { frGameHash(token: "${token}") }`
-  let query = buildGraphQLQuery(mutation)
+  const query = buildGraphQLQuery(mutation)
   return request(query)
 }
 
 export function updateProfile(name: string) {
   const mutation = `mutation { profile(name: "${name}") }`
-  let query = buildGraphQLQuery(mutation)
+  const query = buildGraphQLQuery(mutation)
   return request(query)
 }
 
