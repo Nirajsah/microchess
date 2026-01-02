@@ -68,7 +68,7 @@ export default function ManageTournament() {
     const fetchMyTournament = async () => {
       try {
         const response = await myTournament(id!)
-        const data = JSON.parse(response.result).data.myTournament
+        const data = JSON.parse(response).data.myTournament
         setTournament(data)
         setFormData(data)
         setLoading(false)

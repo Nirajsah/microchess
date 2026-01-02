@@ -1,6 +1,6 @@
 import { Color } from './types'
 import React from 'react'
-import { isGameChain } from '@/api'
+import { _isGameChain } from '@/api'
 import MatchSelect from './MatchSelect'
 import MatchDataUI from './MatchData'
 import { PieceRow } from './CapturedPieces'
@@ -49,7 +49,7 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
   React.useEffect(() => {
     const checkGameChain = async () => {
       try {
-        const res = await isGameChain()
+        const res = await _isGameChain()
         const check = JSON.parse(res).data.isGameChain
 
         if (setIsGameChain) {

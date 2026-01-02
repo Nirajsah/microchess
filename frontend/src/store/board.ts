@@ -35,7 +35,7 @@ export const useBoard = create<BoardState>((set) => ({
       const res = await gameData(pubKey)
       const playerClock = await timer()
 
-      if (!res?.result || !playerClock?.result) {
+      if (!res || !playerClock) {
         throw new Error('No response from API')
       }
 

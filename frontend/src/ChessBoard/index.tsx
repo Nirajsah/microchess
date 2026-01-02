@@ -5,7 +5,7 @@ import { Color, Piece, PromoteData, Square } from './types'
 import { RightSideMenu } from './RightSideMenu'
 import { useBoard } from '@/store/board'
 import Board from './Board'
-import { capturedPiece, makeMove } from '@/api'
+import { _isGameChain, capturedPiece, makeMove } from '@/api'
 import { PlayerInfo } from './PlayerInfo'
 
 import { useWalletStore } from '@/store/wallet'
@@ -23,7 +23,7 @@ const ChessBoard = () => {
 
   const notification = useWalletStore((s) => s.notification)
   const pubKey = useWalletStore((s) => s.pubKey)
-  const ready = useWalletStore((s) => s.pubKey)
+  const ready = useWalletStore((s) => s.ready)
   const refetch = useWalletStore((s) => s.refetch)
 
   const [isGameChain, setIsGameChain] = React.useState<boolean | null>(null)
@@ -32,6 +32,19 @@ const ChessBoard = () => {
   React.useEffect(() => {
     initDefaultAsync() // init board wasm
   }, [initDefaultAsync])
+
+  React.useEffect(() => {
+    const checkGameChain = async () => {
+      try {
+        const data = await _isGameChain()
+        const res = JSON.parse(data).data.isGameChain
+        setIsGameChain(res)
+      } catch (e) {
+        console.error('failed', e)
+      }
+    }
+    checkGameChain()
+  }, [refetch])
 
   React.useEffect(() => {
     const getCapturedPieces = async () => {

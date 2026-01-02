@@ -21,7 +21,7 @@ use matches::{MatchId, MatchType};
 use linera_sdk::{
     abi::{ContractAbi, ServiceAbi},
     graphql::GraphQLMutationRoot,
-    linera_base_types::{AccountOwner, ChainId, TimeDelta, Timestamp},
+    linera_base_types::{AccountOwner, ChainId, TimeDelta},
 };
 use tournament::{TournamentInput, TournamentUpdate};
 
@@ -181,16 +181,4 @@ impl DerefMut for GameWrapper {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
-}
-
-/// The ID and timestamp of a temporary chain for a single game.
-///
-/// Register View needs this struct to impl Default trait. but ChainId does not, we use Option<ChainId<ChainId>
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject)]
-#[serde(rename_all = "camelCase")]
-pub struct GameChain {
-    /// The Timestamp of the `OpenChain` message that created the chain.
-    pub timestamp: Timestamp,
-    /// The ID of the temporary game chain itself.
-    pub chain_id: ChainId,
 }

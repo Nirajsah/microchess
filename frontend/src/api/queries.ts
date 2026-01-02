@@ -64,12 +64,12 @@ export function getSanFromBlob(blobHash: string) {
   return request(gqlQuery)
 }
 
-export function isGameChain() {
+export function _isGameChain() {
   return request(`{ "query": "query { isGameChain }" }`)
 }
 
 export function getGameChainInfo() {
-  return request(`{ "query": "query { gameChain { chainId timestamp } }" }`)
+  return request(`{ "query": "query { gameChain }" }`)
 }
 
 export function getMvString() {
@@ -223,12 +223,6 @@ export function updateTournament(
 // Start a new game
 export function startGame() {
   const mutation = `mutation { newGame }`
-  const query = buildGraphQLQuery(mutation)
-  return request(query)
-}
-// Request a friendly match
-export function reqFriendlyGame() {
-  const mutation = `mutation { frGame }`
   const query = buildGraphQLQuery(mutation)
   return request(query)
 }

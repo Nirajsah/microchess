@@ -14,7 +14,7 @@ use chess::{
     notifications::Notification,
     player::{MatchHistory, Player, PlayerHash, PlayerProfile, Players},
     tournament::TournamentInput,
-    ChessResponse, GameChain, GameWrapper, InstantiationArgument, Operation,
+    ChessResponse, GameWrapper, InstantiationArgument, Operation,
 };
 use chess_lib::{game::game::GameState, ChessError, Result};
 use event::{Event, EventType};
@@ -148,9 +148,9 @@ impl Contract for ChessContract {
                 match_type,
                 timer,
             } => self.start_new_game(players, match_id, timer, match_type),
-            Message::GameChainData { game_chain_data } => {
+            Message::GameChainData { game_chain } => {
                 // create a new notification here and update the state
-                self.state.game_chain.set(Some(game_chain_data))
+                self.state.game_chain.set(Some(game_chain))
             }
             Message::NewGameReq { player } => self.new_match(player),
             Message::FriendlyGameReq { players } => self.start_friendly_match(players).await,
@@ -310,9 +310,7 @@ impl ChessContract {
         match_time: TimeDelta,
         match_type: MatchType,
         players: &Players,
-    ) -> Result<GameChain> {
-        let timestamp: Timestamp = self.runtime.system_time();
-
+    ) -> Result<ChainId> {
         let (player_1, player_2) = players.get_players();
         if player_1.id == player_2.id {
             return Err(ChessError::new("Found Players with same id, returning..."));
@@ -343,29 +341,22 @@ impl ChessContract {
             },
         );
 
-        let game_chain = GameChain {
-            chain_id,
-            timestamp,
-        };
-
-        Ok(game_chain)
+        Ok(chain_id)
     }
 
     // Method to send required chain data to players.
     // this is required, the web-client needs to assign player's wallet with new chain
-    pub fn send_game_chain_data_2players(&mut self, game_chain_data: GameChain, players: Players) {
+    pub fn send_game_chain_data_2players(&mut self, game_chain: ChainId, players: Players) {
         let (player_1, player_2) = players.get_players();
         self.runtime.send_message(
             player_1.chain_id,
             Message::GameChainData {
-                game_chain_data: game_chain_data.clone(),
+                game_chain: game_chain.clone(),
             },
         );
 
-        self.runtime.send_message(
-            player_2.chain_id,
-            Message::GameChainData { game_chain_data },
-        );
+        self.runtime
+            .send_message(player_2.chain_id, Message::GameChainData { game_chain });
         // this means a game has started on a chain, we can increase the count,
         // in the future when a game starts on a multi-owner-chain i.e., (game_chain)
         // we send a message from the game_chain to app_chain to update this count.

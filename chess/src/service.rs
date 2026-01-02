@@ -7,15 +7,16 @@ use std::sync::Arc;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use chess::{
     leaderboard::Leaderboard,
+    matches::TimedToken,
     notifications::Notification,
     player::{MatchHistory, PlayerInfo, PlayerProfile, PlayersTime},
     tournament::{utils::Match, Tournament},
-    GameChain, LastMove, Operation,
+    LastMove, Operation,
 };
 use linera_sdk::{
     abi::WithServiceAbi,
     graphql::GraphQLMutationRoot,
-    linera_base_types::{AccountOwner, ChainId, DataBlobHash, TimeDelta},
+    linera_base_types::{AccountOwner, ChainId, DataBlobHash},
     views::View,
     Service, ServiceRuntime,
 };
@@ -90,20 +91,8 @@ impl ChessService {
         }
     }
 
-    async fn game_chain(&self) -> Option<GameChain> {
-        if let Some(game_data) = self.state.game_chain.get() {
-            let now = self.runtime.system_time();
-            let expiry = game_data.timestamp.saturating_add(TimeDelta::from_secs(90)); // 1.30 secs MAX
-
-            // If expired → return None
-            if now < expiry {
-                Some(game_data.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+    async fn game_chain(&self) -> &Option<ChainId> {
+        self.state.game_chain.get()
     }
 
     async fn opponent_profile(&self, opponent: AccountOwner) -> Option<PlayerInfo> {
@@ -135,8 +124,19 @@ impl ChessService {
     }
 
     // we need to encode the profile here, with timedToken
-    async fn friend_id(&self) -> &str {
-        self.state.game_token.get()
+    async fn friend_id(&self) -> Option<String> {
+        if let Some(profile) = self.state.profile.get() {
+            let mut profile = profile.clone();
+            let now = self.runtime.system_time();
+            if let Some(hash) = profile.encode() {
+                let token = TimedToken::new(now, hash).encode_token();
+                return Some(token);
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 
     async fn leaderboard(&self) -> &Vec<Leaderboard> {

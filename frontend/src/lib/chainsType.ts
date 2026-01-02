@@ -65,7 +65,7 @@ export class Convert {
     )
 
     return {
-      default: wallet.default,
+      default: wallet.default as ChainId,
       chains,
     }
   }

@@ -84,7 +84,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       const res = await server.JsWallet()
       const wallet = Convert.chainsAsList(res)
       const defaultChain = wallet.default
-      const chains = Object.values(wallet.chains)
+      const chains = wallet.chains
       const id = chains[0].chainInfo.owner
       set({ chains, pubKey: id, defaultChain })
     } catch (e: any) {
@@ -149,11 +149,16 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   },
 
   getBalanceAsync: async (chain?: string): Promise<string> => {
-    const { chainClients, activeClient } = get()
+    const { chainClients, activeClient, server } = get()
     if (chain) {
       const chainClient = chainClients.get(chain as ChainId)
       if (chainClient) {
         return await chainClient.balance()
+      } else {
+        if (!server) throw new Error('Something is wrong..., Server is missing')
+        const chainClient = await server.initChainClient(chain as ChainId)
+        set({ chainClients: chainClients.set(chain as ChainId, chainClient) })
+        return chainClient.balance()
       }
     }
 
@@ -188,7 +193,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     if (!server || !ready)
       return { success: false, error: 'Server is not ready..' }
     try {
-      let res = await server.setDefault(chainId)
+      const res = await server.setDefault(chainId)
       return res
     } catch (e) {
       return { success: false, error: 'Failed to set Default chain..' }

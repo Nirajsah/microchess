@@ -209,25 +209,3 @@ impl ChessContract {
         }
     }
 }
-
-// Operation::FrGame => {
-//              let id = self.runtime.authenticated_signer().unwrap();
-//              let chain_id = self.runtime.chain_id();
-//              let now = self.runtime.system_time();
-
-//              let player: Option<PlayerHash> = if let Some(p) = self.state.profile.get() {
-//                  p.hash()
-//              } else {
-//                  let mut p = PlayerProfile::new(chain_id, id, None);
-//                  p.encode();
-//                  self.state.profile.set(Some(p.clone()));
-//                  p.hash()
-//              };
-
-//              if let Some(hash) = player {
-//                  let token = TimedToken::new(now, hash).encode_token();
-//                  self.state.game_token.set(token);
-//              }
-
-//              ChessResponse::Ok
-//          }

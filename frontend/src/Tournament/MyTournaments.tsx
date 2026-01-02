@@ -25,7 +25,7 @@ export default function MyTournaments() {
     const fetchMyTournaments = async () => {
       try {
         const response = await myTournaments()
-        const data = JSON.parse(response.result).data.myTournaments
+        const data = JSON.parse(response).data.myTournaments
         setTournamentsList(data)
       } catch (error) {
         console.error('Error fetching my tournaments:', error)
@@ -92,10 +92,11 @@ export default function MyTournaments() {
                     />
                     <div className="absolute top-3 right-3 z-10 flex gap-2">
                       <span
-                        className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wide backdrop-blur-md border border-white/10 ${t.status === 'Published'
-                          ? 'bg-green-500/80 text-white'
-                          : 'bg-gray-700/80 text-gray-300'
-                          }`}
+                        className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wide backdrop-blur-md border border-white/10 ${
+                          t.status === 'Published'
+                            ? 'bg-green-500/80 text-white'
+                            : 'bg-gray-700/80 text-gray-300'
+                        }`}
                       >
                         {t.status}
                       </span>
@@ -111,8 +112,7 @@ export default function MyTournaments() {
                         {t.maxPlayers}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Trophy className="w-4 h-4" />
-                        $ {t.prizePool}
+                        <Trophy className="w-4 h-4" />$ {t.prizePool}
                       </span>
                     </div>
                     <div className="mt-auto pt-4 flex items-center justify-between text-yellow-500 font-medium text-sm">

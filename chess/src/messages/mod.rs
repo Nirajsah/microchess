@@ -3,9 +3,8 @@ use chess::{
     notifications::Notification,
     player::{MatchHistory, PlayerHash, Players},
     tournament::{Tournament, TournamentInput, TournamentUpdate},
-    GameChain,
 };
-use linera_sdk::linera_base_types::{AccountOwner, TimeDelta};
+use linera_sdk::linera_base_types::{AccountOwner, ChainId, TimeDelta};
 use serde::{Deserialize, Serialize};
 
 pub mod tournament;
@@ -44,7 +43,7 @@ pub enum Message {
     },
     // receiving game_chain data from the app_chain
     GameChainData {
-        game_chain_data: GameChain,
+        game_chain: ChainId,
     },
     // app_chain receiving both players details to start a friendly match
     FriendlyGameReq {

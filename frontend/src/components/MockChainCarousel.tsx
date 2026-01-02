@@ -10,6 +10,7 @@ export function MockChainCarousel() {
   const getBalanceAsync = useWalletStore((s) => s.getBalanceAsync)
   const setRefetch = useWalletStore((s) => s.setRefetch)
   const setDefault = useWalletStore((s) => s.setDefaultAsync)
+  const setInUseAsync = useWalletStore((s) => s.setInUseAsync)
   const [balances, setBalances] = useState<Record<ChainId, string>>({})
 
   const handleCopy = (text: string) => {
@@ -31,7 +32,7 @@ export function MockChainCarousel() {
   }, [chains, getBalanceAsync])
 
   const handleSetDefault = async (chainId: string) => {
-    await setDefault(chainId).then(() => setRefetch())
+    await setInUseAsync(chainId as ChainId).then(() => console.log('done'))
   }
 
   const scroll = (direction: 'left' | 'right') => {

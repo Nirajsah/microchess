@@ -8,7 +8,7 @@ use chess::{
         utils::{Match, Participants, SingleElimParticipants, SwissParticipants},
         Tournament, TournamentFormat,
     },
-    GameChain, GameWrapper,
+    GameWrapper,
 };
 use linera_sdk::{
     linera_base_types::{AccountOwner, ChainId},
@@ -39,7 +39,7 @@ pub struct ChessState {
 
     /* Player Chain */
     /// Holds Newly created game chain, only for player_chain
-    pub game_chain: RegisterView<Option<GameChain>>,
+    pub game_chain: RegisterView<Option<ChainId>>,
     /// PlayerProfile only for player_chain
     pub profile: RegisterView<Option<PlayerProfile>>,
     /// Friendly game token stored only on user's chain
