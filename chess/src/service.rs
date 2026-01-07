@@ -210,6 +210,15 @@ impl ChessService {
         self.state.notifications.get()
     }
 
+    async fn notification_count(&self) -> usize {
+        self.state
+            .notifications
+            .get()
+            .iter()
+            .filter(|n| n.read == false)
+            .count()
+    }
+
     async fn tournament_chains(&self) -> &Vec<ChainId> {
         self.state.tournament_chains.get()
     }

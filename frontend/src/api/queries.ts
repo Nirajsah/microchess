@@ -46,6 +46,16 @@ function request(query: string): Promise<any> {
   //   query: query,
   // })
 }
+export function getNofitications() {
+  const query =
+    'query { notifications { title notificationType chainId data sender read createdAt } }'
+  return request(buildGraphQLQuery(query))
+}
+
+export function getNofiticationCount() {
+  const query = 'query { notificationCount }'
+  return request(buildGraphQLQuery(query))
+}
 
 export function myTournaments() {
   const query =
@@ -54,7 +64,7 @@ export function myTournaments() {
 }
 
 export function myTournament(tournamentId: string) {
-  const query = `query { myTournament(tournamentId: "${tournamentId}") { organiserChain organiserId organiserName tournamentId bannerImageUrl sponsorLogoUrl timeControl { baseMinutes incrementSeconds } tournamentName tournamentDescription tournamentFormat matchType gameMode maxPlayers minPlayers startingTime endTime status prizePool prizePoolDescription visibility } }`
+  const query = `query { myTournament(tournamentId: "${tournamentId}") { organiserChain organiserId organiserName tournamentId bannerImageUrl sponsorLogoUrl timeControl { baseMinutes incrementSeconds } tournamentName tournamentDescription tournamentFormat matchType gameMode maxPlayers minPlayers startingTime endTime status prizePool prizePoolDescription customTags visibility } }`
   return request(buildGraphQLQuery(query))
 }
 
@@ -194,8 +204,11 @@ export function hostTournament(input: TournamentInput) {
   return request(gqlQuery)
 }
 
-export function tournamentRegistration(tournamentId: string) {
-  const mutation = `mutation { tournamentRegistration(tournamentId: "${tournamentId}") }`
+export function tournamentRegistration(
+  tournamentId: string,
+  tournamentChain: string
+) {
+  const mutation = `mutation { tournamentRegistration(tournamentId: "${tournamentId}", tournamentChain: "${tournamentChain}" ) }`
   const query = buildGraphQLQuery(mutation)
   return request(query)
 }
@@ -218,6 +231,12 @@ export function updateTournament(
 
   const gqlQuery = JSON.stringify({ query: m })
   return request(gqlQuery)
+}
+
+export function markAllNotificationsRead() {
+  const mutation = `mutation { markAllRead }`
+  const query = buildGraphQLQuery(mutation)
+  return request(query)
 }
 
 // Start a new game

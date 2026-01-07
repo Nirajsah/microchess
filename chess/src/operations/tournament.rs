@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use chess::tournament::{Tournament, TournamentInput, TournamentStatus, TournamentUpdate};
 use linera_sdk::linera_base_types::ChainId;
 
@@ -9,7 +11,7 @@ impl ChessContract {
     pub fn on_op_tournament_participation(
         &mut self,
         tournament_id: String,
-        organiser_chain: ChainId,
+        tournament_chain: String,
     ) {
         let owner = self.runtime.authenticated_signer().unwrap();
         // returning early
@@ -25,7 +27,9 @@ impl ChessContract {
             player: player_hash,
         };
 
-        self.runtime.send_message(organiser_chain, message);
+        if let Ok(chain) = ChainId::from_str(&tournament_chain) {
+            self.runtime.send_message(chain, message);
+        }
     }
 
     pub fn on_op_tournament_withdraw(&mut self, tournament_id: String) {
@@ -97,6 +101,13 @@ impl ChessContract {
         if let Some(tournament) = self.state.tournament.get_mut() {
             if tournament_id == tournament.tournament_id {
                 tournament.update(&update, updated_at);
+            }
+
+            // registration close triggers tournament start
+            if tournament.status == TournamentStatus::RegistrationClosed {
+                let res = self.state.start_tournament_and_persist(&tournament_id);
+            } else {
+                return; // in any other case,
             }
         }
     }

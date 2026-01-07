@@ -39,6 +39,7 @@ import {
   TournamentStatus,
   Visibility,
 } from '@/graphql/graphql'
+import { datetimeLocalToMicros, microsToDatetimeLocal } from './utils'
 
 // Validation errors type
 type ValidationErrors = {
@@ -804,28 +805,22 @@ function StepSchedule({
           </p>
         </div>
       </div>
-
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField label="Start Date & Time" hint="Optional">
             <Input
               name="startingTime"
               type="datetime-local"
-              value={
-                formData.startingTime
-                  ? new Date(formData.startingTime).toISOString().slice(0, 16)
-                  : ''
-              }
+              step="60"
+              value={microsToDatetimeLocal(formData.startingTime)}
               onChange={(e) =>
                 setFormData((prev) => ({
                   ...prev,
-                  startingTime: new Date(e.target.value).getTime(),
+                  startingTime: datetimeLocalToMicros(e.target.value)!,
                 }))
               }
-              className="bg-[#262626] border-[#333] rounded-xl"
             />
           </FormField>
-
           <FormField
             label="End Date & Time"
             hint="Optional"
@@ -834,22 +829,18 @@ function StepSchedule({
             <Input
               name="endTime"
               type="datetime-local"
-              value={
-                formData.endTime
-                  ? new Date(formData.endTime).toISOString().slice(0, 16)
-                  : ''
-              }
+              step="60"
+              value={microsToDatetimeLocal(formData.endTime)}
               onChange={(e) =>
                 setFormData((prev) => ({
                   ...prev,
-                  endTime: new Date(e.target.value).getTime(),
+                  endTime: datetimeLocalToMicros(e.target.value)!,
                 }))
               }
               className={`bg-[#262626] border-[#333] rounded-xl ${errors.endTime ? 'border-red-500' : ''}`}
             />
           </FormField>
         </div>
-
         <div className="bg-[#262626] rounded-xl p-4 border border-[#333]">
           <div className="flex items-start gap-3">
             <Clock className="w-5 h-5 text-yellow-500 mt-0.5" />

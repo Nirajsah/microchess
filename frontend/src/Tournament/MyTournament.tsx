@@ -25,6 +25,7 @@ import {
   TournamentStatus,
   Visibility,
 } from '@/graphql/graphql'
+import { datetimeLocalToMicros, microsToDatetimeLocal } from './utils'
 
 // Fields that can be updated when tournament is in REGISTRATION_OPEN state
 const REGISTRATION_OPEN_EDITABLE_FIELDS = [
@@ -655,14 +656,21 @@ export default function ManageTournament() {
                     <Input
                       name="startingTime"
                       type="datetime-local"
-                      value={
-                        formData.startingTime
-                          ? new Date(formData.startingTime)
-                              .toISOString()
-                              .slice(0, 16)
-                          : ''
+                      // value={
+                      //   formData.startingTime
+                      //     ? new Date(formData.startingTime)
+                      //         .toISOString()
+                      //         .slice(0, 16)
+                      //     : ''
+                      // }
+                      // onChange={handleChange}
+                      value={microsToDatetimeLocal(formData.startingTime)}
+                      onChange={(e) =>
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          endTime: datetimeLocalToMicros(e.target.value)!,
+                        }))
                       }
-                      onChange={handleChange}
                       disabled={!isFieldEditable('startingTime')}
                       className={`bg-[#1f1f1f] border-[#333] text-sm rounded-xl ${!isFieldEditable('startingTime') ? 'opacity-50 cursor-not-allowed' : ''}`}
                     />
@@ -677,14 +685,21 @@ export default function ManageTournament() {
                     <Input
                       name="endTime"
                       type="datetime-local"
-                      value={
-                        formData.endTime
-                          ? new Date(formData.endTime)
-                              .toISOString()
-                              .slice(0, 16)
-                          : ''
+                      // value={
+                      //   formData.endTime
+                      //     ? new Date(formData.endTime)
+                      //         .toISOString()
+                      //         .slice(0, 16)
+                      //     : ''
+                      // }
+                      // onChange={handleChange}
+                      value={microsToDatetimeLocal(formData.endTime)}
+                      onChange={(e) =>
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          endTime: datetimeLocalToMicros(e.target.value)!,
+                        }))
                       }
-                      onChange={handleChange}
                       disabled={!isFieldEditable('endTime')}
                       className={`bg-[#1f1f1f] border-[#333] text-sm rounded-xl ${!isFieldEditable('endTime') ? 'opacity-50 cursor-not-allowed' : ''}`}
                     />

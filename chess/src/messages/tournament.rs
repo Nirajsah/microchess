@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use chess::{
+    notifications::Notification,
     player::PlayerHash,
     tournament::{
         utils::{Match, Participants, TParticipants},
@@ -13,6 +14,18 @@ use log::info;
 use crate::{event::Event, messages::Message, ChessContract, STREAM_NAME};
 
 impl ChessContract {
+    pub fn on_msg_handle_friendly_match_data(
+        &mut self,
+        chain_id: ChainId,
+        notification: Notification,
+    ) {
+        self.state.game_chain.set(Some(chain_id));
+        self.state.notifications.get_mut().push(notification);
+    }
+
+    pub fn on_msg_handle_notification(&mut self, notification: Notification) {
+        self.state.notifications.get_mut().push(notification);
+    }
     /// First message on tournament_chain to process the tournament
     pub async fn on_msg_process_tournament(&mut self, tournament: Tournament) {
         self.state.save_tournament(tournament).await;
@@ -21,11 +34,33 @@ impl ChessContract {
     /// Method used by app_chain to create a new chain send a cross-chain message with the tournament as payload
     pub async fn on_msg_host_tournament(&mut self, tournament: Tournament) {
         assert_eq!(self.runtime.chain_id(), self.app_chain());
+        let now = self.runtime.system_time();
+        let organiser_chain = tournament.organiser_chain;
 
         let chain = self.create_chain(tournament.organiser_id);
-        let message = Message::ProcessTournament {
-            value: Box::new(tournament),
+
+        let mut t = tournament.clone();
+        t.tournament_chain = Some(chain);
+
+        self.state.tournament_chains.get_mut().push(chain);
+
+        let message = Message::ProcessTournament { value: Box::new(t) };
+
+        let notification_message = Message::Notification {
+            notification: Notification::tournament_published(
+                "Tournament Was Published".to_string(),
+                chain,
+                tournament.tournament_name,
+                self.app_chain(),
+                now,
+            ),
         };
+
+        // send tournament organiser detailed notification about the published tournament
+        self.runtime
+            .send_message(organiser_chain, notification_message);
+
+        log::info!("tournament sent to sub {:?}", chain);
 
         // send tournament to newly create chain
         self.runtime.send_message(chain, message);
@@ -65,10 +100,7 @@ impl ChessContract {
             tournament.status = status;
             match status {
                 TournamentStatus::RegistrationClosed => {
-                    let matches = self
-                        .state
-                        .start_tournament_and_persist(&tournament_id)
-                        .await;
+                    let matches = self.state.start_tournament_and_persist(&tournament_id);
                     tournament.status = TournamentStatus::InProgress;
                     matches
                 } // we start the tournament and switch to inprogress
@@ -118,14 +150,11 @@ impl ChessContract {
         {
             return;
         }
+        log::info!("adding new player {owner}");
 
-        let Some(participants) = self.state.participants.get_mut() else {
-            return;
+        if let Some(participants) = self.state.participants.get_mut() {
+            participants.try_add_player(owner, player.clone());
         };
-
-        if participants.try_add_player(owner) {
-            let _ = self.state.players_data.insert(&owner, player.clone());
-        }
     }
 
     pub async fn on_msg_tournament_withdraw(
@@ -180,18 +209,4 @@ impl ChessContract {
         //     },
         // );
     }
-
-    // pub fn on_msg_publish_tournament(&mut self, tournament: Tournament) {
-    //     if self
-    //         .state
-    //         .tournaments
-    //         .insert(&tournament.tournament_id.clone(), tournament.clone())
-    //         .is_ok()
-    //     {
-    //         // let chain = self.create_chain(tournament.organiser_id);
-
-    //         self.runtime
-    //             .emit(STREAM_NAME.into(), &Event::Tournament { value: tournament });
-    //     }
-    // }
 }

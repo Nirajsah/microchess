@@ -137,6 +137,8 @@ export enum MatchType {
 
 export type Notification = {
   __typename?: 'Notification';
+  /** Optional payload depending on type */
+  chainId?: Maybe<Scalars['ChainId']['output']>;
   createdAt: Scalars['Timestamp']['output'];
   data: Scalars['String']['output'];
   notificationType: NotificationType;
@@ -146,12 +148,7 @@ export type Notification = {
 };
 
 export enum NotificationType {
-  MatchCreated = 'MATCH_CREATED',
-  MatchResult = 'MATCH_RESULT',
-  PlayerRegistered = 'PLAYER_REGISTERED',
-  RoundExpired = 'ROUND_EXPIRED',
-  RoundStarted = 'ROUND_STARTED',
-  TournamentCreated = 'TOURNAMENT_CREATED',
+  FriendlyMatch = 'FRIENDLY_MATCH',
   TournamentFinished = 'TOURNAMENT_FINISHED',
   TournamentPublished = 'TOURNAMENT_PUBLISHED'
 }
@@ -205,7 +202,7 @@ export type OperationMutationRootProfileArgs = {
 
 
 export type OperationMutationRootTournamentRegistrationArgs = {
-  organiserChain: Scalars['ChainId']['input'];
+  organiserChain: Scalars['String']['input'];
   tournamentId: Scalars['String']['input'];
 };
 

@@ -74,15 +74,25 @@ impl Contract for ChessContract {
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
         match operation {
+            Operation::MarkAllRead => {
+                self.state
+                    .notifications
+                    .get_mut()
+                    .iter_mut()
+                    .filter(|n| !n.read)
+                    .for_each(|n| n.read = true);
+
+                ChessResponse::Ok
+            }
             Operation::HostTournament { value } => {
                 self.on_op_host_tournament(*value);
                 ChessResponse::Ok
             }
             Operation::TournamentRegistration {
                 tournament_id,
-                organiser_chain,
+                tournament_chain,
             } => {
-                self.on_op_tournament_participation(tournament_id, organiser_chain);
+                self.on_op_tournament_participation(tournament_id, tournament_chain);
                 ChessResponse::Ok
             }
             Operation::TournamentWithDraw { tournament_id } => {
@@ -148,10 +158,7 @@ impl Contract for ChessContract {
                 match_type,
                 timer,
             } => self.start_new_game(players, match_id, timer, match_type),
-            Message::GameChainData { game_chain } => {
-                // create a new notification here and update the state
-                self.state.game_chain.set(Some(game_chain))
-            }
+            Message::GameChainData { game_chain } => self.state.game_chain.set(Some(game_chain)),
             Message::NewGameReq { player } => self.new_match(player),
             Message::FriendlyGameReq { players } => self.start_friendly_match(players).await,
             // handle updates after receiving the metadata
@@ -160,7 +167,6 @@ impl Contract for ChessContract {
                 player_hash,
                 match_history,
             } => {
-                // create a new notification here and update the state
                 if let Some(profile) = self.state.profile.get_mut() {
                     profile.update(player_hash);
                 }
@@ -192,11 +198,15 @@ impl Contract for ChessContract {
                     .await;
             }
             Message::Notification { notification } => {
-                self.state.notifications.get_mut().push(notification);
+                self.on_msg_handle_notification(notification);
             }
             Message::ProcessTournament { value } => {
                 self.on_msg_process_tournament(*value).await;
             }
+            Message::FriendlyGameChainData {
+                game_chain,
+                notification,
+            } => self.on_msg_handle_friendly_match_data(game_chain, notification),
         }
     }
 
@@ -292,7 +302,7 @@ impl ChessContract {
             if let Ok(game_chain_data) =
                 self.create_game_chain(fee, match_time, MatchType::Random, &players)
             {
-                self.send_game_chain_data_2players(game_chain_data, players);
+                self.send_game_chain_data_2players(game_chain_data, players, None);
             }
         } else {
             // we put the player in lobby.
@@ -346,17 +356,27 @@ impl ChessContract {
 
     // Method to send required chain data to players.
     // this is required, the web-client needs to assign player's wallet with new chain
-    pub fn send_game_chain_data_2players(&mut self, game_chain: ChainId, players: Players) {
+    pub fn send_game_chain_data_2players(
+        &mut self,
+        game_chain: ChainId,
+        players: Players,
+        notification: Option<Notification>,
+    ) {
         let (player_1, player_2) = players.get_players();
-        self.runtime.send_message(
-            player_1.chain_id,
-            Message::GameChainData {
-                game_chain: game_chain.clone(),
-            },
-        );
+
+        let message = if let Some(notification) = notification {
+            Message::FriendlyGameChainData {
+                game_chain,
+                notification,
+            }
+        } else {
+            Message::GameChainData { game_chain }
+        };
 
         self.runtime
-            .send_message(player_2.chain_id, Message::GameChainData { game_chain });
+            .send_message(player_1.chain_id, message.clone());
+
+        self.runtime.send_message(player_2.chain_id, message);
         // this means a game has started on a chain, we can increase the count,
         // in the future when a game starts on a multi-owner-chain i.e., (game_chain)
         // we send a message from the game_chain to app_chain to update this count.
@@ -380,13 +400,22 @@ impl ChessContract {
         let app_chain = self.app_chain();
         assert_eq!(self.runtime.chain_id(), app_chain);
 
+        let now = self.runtime.system_time();
+
         let fee = Amount::from_str("1.").unwrap();
         let match_time = TimeDelta::from_secs(900); // 15 mins
 
         if let Ok(game_chain_data) =
             self.create_game_chain(fee, match_time, MatchType::Friendly, &players)
         {
-            self.send_game_chain_data_2players(game_chain_data, players)
+            let notification = Notification::friendly_match(
+                "aoig".to_string(),
+                game_chain_data,
+                "gaeohag".to_string(),
+                app_chain,
+                now,
+            );
+            self.send_game_chain_data_2players(game_chain_data, players, Some(notification))
         }
     }
 

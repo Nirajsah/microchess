@@ -5,66 +5,65 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Users, Trophy, ArrowRight, Clock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/utils'
+import { microsToDatetimeLocal } from './utils'
 
-export type Tournaments = {
+export type Tournament = {
   tournament_id: string
-  tournamentName: string
-  tournamentDescription: string
-  tournamentFormat: string
-  maxPlayers: number
-  startingTime: number
-  endTime: number
-  prizePoolDescription: string
-  tournament_participants: { count: number }[]
+  tournament_name: string
+  tournament_description: string
+  tournament_format: string
+  max_players: number
+  starting_time: number
+  end_time: number
+  prize_pool_description: string
   visibility: string
-  bannerImageUrl: string
-  sponsorLogoUrl: string
-  prizeType: string
-  prizePool: number
-  createdAt: number
+  banner_image_url: string
+  sponsor_logo_url: string
+  prize_type: string
+  prize_pool: number
+  created_at: number
   status: string
+  participant_count: { count: number }[]
 }
 
 export default function TournamentList() {
   const navigate = useNavigate()
-  const [tournaments, setTournaments] = useState<Tournaments[]>([])
+  const [tournaments, setTournaments] = useState<Tournament[]>([])
   useEffect(() => {
     async function getTournaments() {
-      const { data: tournaments } = await supabase.from('tournaments').select(`
-                    tournament_id,
-                    tournamentName,
-                    tournamentDescription,
-                    tournamentFormat,
-                    maxPlayers,
-                    startingTime,
-                    endTime,
-                    prizePoolDescription,
-                    visibility,
-                    bannerImageUrl,
-                    sponsorLogoUrl,
-                    prizeType,
-                    prizePool,
-                    createdAt,
-                    status,
-                    tournament_participants(count)
-                `)
+      const { data: tournaments } = await supabase.from('tournaments_v2')
+        .select(`
+          tournament_id,
+          tournament_name,
+          tournament_description,
+          tournament_format,
+          max_players,
+          starting_time,
+          end_time,
+          prize_pool_description,
+          visibility,
+          banner_image_url,
+          sponsor_logo_url,
+          prize_type,
+          prize_pool,
+          created_at,
+          status,
+          participant_count:tournament_participants_v2(count)
+        `)
+
       if (!tournaments) return
-      setTournaments(
-        tournaments.map((t) => ({
-          ...t,
-          participantCount: t.tournament_participants?.[0]?.count ?? 0,
-        }))
-      )
+      setTournaments(tournaments)
     }
     getTournaments()
+
     const channel_tournaments = supabase
       .channel('tournaments-changes')
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
-          table: 'tournaments',
+          table: 'tournaments_v2',
         },
         () => {
           getTournaments()
@@ -147,7 +146,7 @@ function TournamentCard({
   index,
   onClick,
 }: {
-  tournament: Tournaments
+  tournament: Tournament
   index: number
   onClick: () => void
 }) {
@@ -164,18 +163,21 @@ function TournamentCard({
         <span
           className={`
                     px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide backdrop-blur-md border border-white/10
-                    ${tournament.status === 'IN_PROGRESS'
-              ? 'bg-red-500/80 text-white animate-pulse'
-              : ''
-            }
-                    ${tournament.status === 'REGISTRATION_OPEN'
-              ? 'bg-green-500/80 text-white'
-              : ''
-            }
-                    ${tournament.status === 'COMPLETED'
-              ? 'bg-gray-800/80 text-gray-400'
-              : ''
-            }
+                    ${
+                      tournament.status === 'IN_PROGRESS'
+                        ? 'bg-red-500/80 text-white animate-pulse'
+                        : ''
+                    }
+                    ${
+                      tournament.status === 'REGISTRATION_OPEN'
+                        ? 'bg-green-500/80 text-white'
+                        : ''
+                    }
+                    ${
+                      tournament.status === 'COMPLETED'
+                        ? 'bg-gray-800/80 text-gray-400'
+                        : ''
+                    }
                 `}
         >
           {tournament.status === 'IN_PROGRESS' && (
@@ -190,8 +192,8 @@ function TournamentCard({
         <div className="absolute inset-0 bg-gradient-to-t from-[#262626] via-transparent to-transparent z-[1]" />
         <img
           src={
-            tournament.bannerImageUrl
-              ? decodeURIComponent(tournament.bannerImageUrl)
+            tournament.banner_image_url
+              ? decodeURIComponent(tournament.banner_image_url)
               : 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?w=800&q=80'
           }
           alt="Tournament banner"
@@ -208,29 +210,29 @@ function TournamentCard({
       <div className="p-6 flex flex-col gap-4 flex-1">
         <div>
           <h3 className="text-xl font-bold text-gray-100 group-hover:text-yellow-400 transition-colors mb-2">
-            {tournament.tournamentName}
+            {tournament.tournament_name}
           </h3>
           <p className="text-sm text-gray-400 line-clamp-2">
-            {tournament.tournamentDescription}
+            {tournament.tournament_description}
           </p>
         </div>
 
         <div className="flex justify-between gap-4 mt-auto">
           <div className="flex items-center gap-2 text-sm text-gray-300">
             <Trophy className="w-4 h-4 text-yellow-500" />
-            <span>${tournament.prizePool}</span>
+            <span>${tournament.prize_pool}</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-300">
             <Users className="w-4 h-4 text-blue-500" />
-            <span>{tournament.tournament_participants[0].count}</span>/
-            <span>{tournament.maxPlayers}</span>
+            <span>{tournament.participant_count[0].count}</span>/
+            <span>{tournament.max_players}</span>
           </div>
         </div>
 
         <div className="pt-4 border-t border-[#333] flex justify-between items-center text-xs font-medium uppercase tracking-wider text-gray-500">
           <span className="flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5" />
-            {tournament.startingTime}
+            {microsToDatetimeLocal(tournament.starting_time)}
           </span>
           <span className="flex items-center gap-1 group-hover:translate-x-1 transition-transform text-white">
             Details <ArrowRight className="w-3 h-3" />

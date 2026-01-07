@@ -4,28 +4,76 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject, PartialEq)]
 pub struct Notification {
-    pub title: String,                       // Title of the notification
-    pub notification_type: NotificationType, // Notification type to match on the frontend
-    pub data: String,                        // data contained in the notification
-    pub sender: ChainId,                     // Chain which sends the notification(app_chain)
-    pub read: bool,                          // unread vs read
-    pub created_at: Timestamp,               // event time
+    pub title: String,
+    pub notification_type: NotificationType,
+
+    /// Optional payload depending on type
+    pub chain_id: Option<ChainId>,
+
+    pub data: String,
+    pub sender: ChainId,
+    pub read: bool,
+    pub created_at: Timestamp,
 }
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Enum, Eq)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Enum)]
 pub enum NotificationType {
-    TournamentCreated,
-    TournamentPublished,
-    PlayerRegistered,
-    MatchCreated,
-    MatchResult,
+    TournamentPublished, // has chain_id
     TournamentFinished,
-    RoundStarted,
-    RoundExpired,
+    FriendlyMatch, // has chain_id
 }
 
 impl Notification {
-    pub fn new() {
-        todo!()
+    pub fn tournament_published(
+        title: String,
+        chain_id: ChainId,
+        data: String,
+        sender: ChainId,
+        created_at: Timestamp,
+    ) -> Self {
+        Self {
+            title,
+            notification_type: NotificationType::TournamentPublished,
+            chain_id: Some(chain_id),
+            data,
+            sender,
+            read: false,
+            created_at,
+        }
+    }
+
+    pub fn tournament_finished(
+        title: String,
+        data: String,
+        sender: ChainId,
+        created_at: Timestamp,
+    ) -> Self {
+        Self {
+            title,
+            notification_type: NotificationType::TournamentFinished,
+            chain_id: None,
+            data,
+            sender,
+            read: false,
+            created_at,
+        }
+    }
+
+    pub fn friendly_match(
+        title: String,
+        chain_id: ChainId,
+        data: String,
+        sender: ChainId,
+        created_at: Timestamp,
+    ) -> Self {
+        Self {
+            title,
+            notification_type: NotificationType::FriendlyMatch,
+            chain_id: Some(chain_id),
+            data,
+            sender,
+            read: false,
+            created_at,
+        }
     }
 }

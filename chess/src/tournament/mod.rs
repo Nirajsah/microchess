@@ -1,6 +1,7 @@
 pub mod utils;
 
 use async_graphql::{Enum, InputObject, SimpleObject};
+use base64::{engine::general_purpose, Engine};
 use linera_sdk::linera_base_types::{AccountOwner, ChainId, Timestamp};
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +16,7 @@ pub struct Tournament {
     pub tournament_id: String,
     pub tournament_name: String,
     pub tournament_description: Option<String>,
+    pub tournament_chain: Option<ChainId>,
 
     // --- Format & Rules ---
     pub tournament_format: TournamentFormat,
@@ -169,6 +171,7 @@ impl From<TournamentInput> for Tournament {
             tournament_id: input.tournament_id.unwrap_or_default(), // Should be set before conversion if using new(), otherwise default
             tournament_name: input.tournament_name,
             tournament_description: input.tournament_description,
+            tournament_chain: None,
 
             // Format
             tournament_format: input.tournament_format,
@@ -207,9 +210,10 @@ impl From<TournamentInput> for Tournament {
 
 impl TournamentInput {
     pub fn new(value: Self, chain_id: ChainId, now: Timestamp, owner: AccountOwner) -> Self {
-        use base64::engine::{general_purpose::STANDARD_NO_PAD, Engine as _};
-        let unique = format!("{}{}{}", now, owner, value.tournament_name.clone()); // for how keeping it simple
-        let tournament_id = STANDARD_NO_PAD.encode(unique);
+        let unique = format!("{}{}{}", now, owner, value.tournament_name.clone()); // keeping it simple
+        let bytes = postcard::to_allocvec(&unique).expect("postcard serialization failed");
+        let tournament_id = general_purpose::STANDARD.encode(&bytes);
+
         let mut tournament = value;
 
         tournament.organiser_id = Some(owner);

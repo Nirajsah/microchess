@@ -3,7 +3,7 @@ import 'dotenv/config'
 
 const config: CodegenConfig = {
   schema:
-    'http://localhost:8080/chains/8d1fd1e297f7912a1b1630eebdde01808191db467ded408c77953a7868ebe843/applications/877f5db6037023f44f256aa730857e7b562ceaa17ac459c1321c683c46468db4',
+    'http://localhost:8080/chains/410f94a3b88bc789243fc81cc0e9cf635f01f9becd7e43ff0b95e0e520a21712/applications/fca2f56d1281d3f2fe6b8fbb904f77d35402f184f42e9852d1bf54f36cb5d957',
   generates: {
     './src/graphql/': {
       preset: 'client',

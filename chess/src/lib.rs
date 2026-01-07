@@ -21,7 +21,7 @@ use matches::{MatchId, MatchType};
 use linera_sdk::{
     abi::{ContractAbi, ServiceAbi},
     graphql::GraphQLMutationRoot,
-    linera_base_types::{AccountOwner, ChainId, TimeDelta},
+    linera_base_types::{AccountOwner, TimeDelta},
 };
 use tournament::{TournamentInput, TournamentUpdate};
 
@@ -57,13 +57,14 @@ pub enum ChessResponse {
 #[derive(Debug, Deserialize, Serialize, Clone, GraphQLMutationRoot)]
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
+    MarkAllRead, // mark all notification read
     // setup operations
     HostTournament {
         value: Box<TournamentInput>,
     },
     TournamentRegistration {
         tournament_id: String,
-        organiser_chain: ChainId,
+        tournament_chain: String,
     },
     TournamentWithDraw {
         tournament_id: String,
@@ -181,4 +182,12 @@ impl DerefMut for GameWrapper {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub enum ChainType {
+    #[default]
+    PersonalChain,
+    TournamentChain,
+    FriendlyMatchChain,
 }

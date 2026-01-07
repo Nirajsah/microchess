@@ -12,7 +12,7 @@ pub enum MatchType {
 }
 
 // match duration could be added
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct MatchMetaData {
     pub match_id: MatchId,
     pub winner: AccountOwner,

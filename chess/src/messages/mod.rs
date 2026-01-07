@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod tournament;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Message {
     ProcessTournament {
         value: Box<Tournament>,
@@ -44,6 +44,11 @@ pub enum Message {
     // receiving game_chain data from the app_chain
     GameChainData {
         game_chain: ChainId,
+    },
+
+    FriendlyGameChainData {
+        game_chain: ChainId,
+        notification: Notification,
     },
     // app_chain receiving both players details to start a friendly match
     FriendlyGameReq {
