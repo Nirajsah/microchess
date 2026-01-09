@@ -45,7 +45,8 @@ impl TournamentParticipant for SwissPlayer {
     }
 
     fn add_points(&mut self, score: f32) {
-        self.score += score;
+        // self.score += score;
+        todo!()
     }
 }
 
@@ -67,7 +68,8 @@ impl TournamentParticipant for SingleElimPlayer {
     }
 
     fn add_points(&mut self, score: f32) {
-        self.score += score;
+        // self.score += score;
+        todo!()
     }
 }
 
@@ -332,7 +334,7 @@ impl TParticipants for SwissParticipants {
                 tournament_id: self.tournament_id.clone(),
                 round: 1,
                 player_a: players[middle].player_id,
-                player_b: None,
+                player_b: players[middle].player_id,
                 result: None,
             });
         }
