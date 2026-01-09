@@ -108,16 +108,12 @@ impl ChessState {
     }
 
     /// Used on tournament_chain for starting a tournament
-    pub fn start_tournament_and_persist(&mut self, tournament_id: &str) -> Option<Vec<Match>> {
+    pub fn start_tournament_without_persist(&mut self, _tournament_id: &str) -> Option<Vec<Match>> {
         if let Some(participants) = self.participants.get() {
             let matches = match participants {
                 Participants::Swiss(p) => p.generate_pairings(1),
                 Participants::SingleElim(p) => p.generate_pairings(1),
             };
-
-            let _ = self
-                .tournament_matches
-                .insert(tournament_id, matches.clone());
 
             Some(matches)
         } else {

@@ -9,6 +9,7 @@ use crate::player::{PlayerHash, Players};
 pub enum MatchType {
     Random,
     Friendly,
+    Tournament,
 }
 
 // match duration could be added

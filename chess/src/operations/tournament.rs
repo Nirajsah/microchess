@@ -1,7 +1,11 @@
 use std::str::FromStr;
 
-use chess::tournament::{Tournament, TournamentInput, TournamentStatus, TournamentUpdate};
-use linera_sdk::linera_base_types::ChainId;
+use chess::{
+    matches::MatchType,
+    player::Players,
+    tournament::{utils::Match, Tournament, TournamentInput, TournamentStatus, TournamentUpdate},
+};
+use linera_sdk::linera_base_types::{Amount, ChainId, TimeDelta};
 
 use crate::{messages::Message, ChessContract};
 
@@ -94,21 +98,66 @@ impl ChessContract {
     }
 
     /// An organiser should add the touranment_chain in his/her wallet, he/she could directly update the state,
-    pub fn on_op_update_tournament(&mut self, tournament_id: String, update: TournamentUpdate) {
+    pub async fn on_op_update_tournament(
+        &mut self,
+        tournament_id: String,
+        update: TournamentUpdate,
+    ) {
         let updated_at = self.runtime.system_time();
 
-        // TODO: we need to take care of tournament update when the organiser want's to start the tournament
-        if let Some(tournament) = self.state.tournament.get_mut() {
-            if tournament_id == tournament.tournament_id {
-                tournament.update(&update, updated_at);
-            }
+        let tournament = match self.state.tournament.get_mut() {
+            Some(t) if t.tournament_id == tournament_id => t,
+            _ => return,
+        };
 
-            // registration close triggers tournament start
-            if tournament.status == TournamentStatus::RegistrationClosed {
-                let res = self.state.start_tournament_and_persist(&tournament_id);
-            } else {
-                return; // in any other case,
-            }
+        tournament.update(&update, updated_at);
+
+        if tournament.status != TournamentStatus::RegistrationClosed {
+            return;
         }
+
+        let matches = match self.state.start_tournament_without_persist(&tournament_id) {
+            Some(m) => m,
+            None => return,
+        };
+
+        let fee = Amount::from_str("1.").unwrap();
+        let time = TimeDelta::from_secs(900);
+
+        let mut matches_to = Vec::with_capacity(matches.len());
+
+        for m in matches {
+            let players = Players {
+                player_1: self
+                    .state
+                    .players_data
+                    .get(&m.player_a)
+                    .await
+                    .unwrap()
+                    .unwrap(),
+
+                player_2: self
+                    .state
+                    .players_data
+                    .get(&m.player_b)
+                    .await
+                    .unwrap()
+                    .unwrap(),
+            };
+
+            let chain = self
+                .create_game_chain(fee, time, MatchType::Tournament, &players)
+                .ok();
+
+            matches_to.push(Match {
+                game_chain: chain,
+                ..m
+            });
+        }
+
+        self.state
+            .tournament_matches
+            .insert(&tournament_id, matches_to)
+            .ok();
     }
 }

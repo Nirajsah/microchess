@@ -12,7 +12,7 @@ use chess::{
 };
 use linera_chain::types::ConfirmedBlockCertificate;
 use linera_sdk::{
-    linera_base_types::{ApplicationId, TimeDelta, Timestamp},
+    linera_base_types::{ApplicationId, BlobType, ChainDescription, TimeDelta, Timestamp},
     test::{ActiveChain, QueryOutcome, TestValidator},
 };
 
@@ -109,7 +109,7 @@ async fn test_tournament() {
 
     let tournament_query = "
         query {
-          myTournaments {
+          tournament {
             organiserChain
             organiserId
             organiserName
@@ -143,68 +143,43 @@ async fn test_tournament() {
           }
         }";
 
-    let QueryOutcome { response, .. } =
-        player_1_chain.graphql_query(app_id, tournament_query).await;
-
-    let res: Vec<Tournament> = serde_json::from_value(response["myTournaments"].clone())
-        .expect("Failed to deserialize response");
-
-    let id = res[0].tournament_id.clone();
-
-    app_chain
+    let certificate = app_chain
         .add_block(|block| {
             block.with_messages_from(&certificate);
         })
         .await;
 
-    let query = format!(
-        r#"
-            query {{
-                tournament(id: "{}") {{
-                    organiserChain
-                    organiserId
-                    organiserName
-                    tournamentId
-                    tournamentName
+    let key_pair1 = player_1_chain.key_pair();
 
-                    tournamentFormat
-                    matchType
-                    gameMode
-                    timeControl {{
-                        baseMinutes
-                        incrementSeconds
-                        modeLabel
-                    }}
-                    maxPlayers
-                    minPlayers
-                    startingTime
-                    endTime
-                    prizePool
-                    prizeType
+    let block = certificate.inner().block();
+    let description = block
+        .created_blobs()
+        .into_iter()
+        .filter_map(|(blob_id, blob)| {
+            (blob_id.blob_type == BlobType::ChainDescription)
+                .then(|| bcs::from_bytes::<ChainDescription>(blob.content().bytes()).unwrap())
+        })
+        .next()
+        .unwrap();
 
-                    visibility
-                    customTags
+    // valid key_pair is needed
+    let tournament_chain = ActiveChain::new(key_pair1.copy(), description, validator.clone());
 
-                    version
-                    createdAt
-                    updatedAt
-                    status
-                }}
-            }}
-            "#,
-        id
-    );
+    tournament_chain.handle_received_messages().await;
 
-    let QueryOutcome { response, .. } = app_chain.graphql_query(app_id, query).await;
+    let QueryOutcome { response, .. } = tournament_chain
+        .graphql_query(app_id, tournament_query)
+        .await;
 
-    let data: Tournament = serde_json::from_value(response["tournament"].clone())
+    let data: Option<Tournament> = serde_json::from_value(response["tournament"].clone())
         .expect("Failed to deserialize tournament data");
+
+    let data = data.unwrap();
 
     // Assert logic
     assert_eq!(data.organiser_chain, value.organiser_chain.unwrap());
     assert_eq!(data.organiser_id, value.organiser_id.unwrap());
     assert_eq!(data.organiser_name, value.organiser_name);
-    assert_eq!(data.tournament_id, id.to_owned());
     assert_eq!(data.tournament_name, value.tournament_name);
     assert_eq!(data.tournament_format, value.tournament_format);
     assert_eq!(data.match_type, value.match_type);

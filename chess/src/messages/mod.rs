@@ -23,10 +23,6 @@ pub enum Message {
         owner: AccountOwner,
         player: PlayerHash,
     },
-    UpdateTournament {
-        tournament_id: String,
-        update: TournamentUpdate,
-    },
     HostTournament {
         value: Box<Tournament>,
     },

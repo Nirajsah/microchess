@@ -111,7 +111,7 @@ impl Contract for ChessContract {
                 tournament_id,
                 update,
             } => {
-                self.on_op_update_tournament(tournament_id, *update);
+                self.on_op_update_tournament(tournament_id, *update).await;
                 ChessResponse::Ok
             }
 
@@ -175,14 +175,6 @@ impl Contract for ChessContract {
                 history.push(match_history);
             }
             Message::HostTournament { value } => self.on_msg_host_tournament(*value).await,
-            Message::UpdateTournament {
-                tournament_id,
-                update,
-            } => {
-                let sender = self.runtime.message_origin_chain_id().unwrap();
-                self.on_msg_update_tournament(sender, tournament_id, update)
-                    .await;
-            }
             Message::TournamentWithDraw {
                 tournament_id,
                 owner,
@@ -488,6 +480,7 @@ impl ChessContract {
         let mut leaderboard_changed = false;
 
         match metadata.match_type {
+            MatchType::Tournament => return, // Todo
             MatchType::Friendly => return, // we don't receive Friendly Match results from game_chain
             MatchType::Random => {
                 if let Ok(Some(players)) = self.state.matches.get(&metadata.match_id).await {
@@ -592,6 +585,7 @@ impl ChessContract {
         let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
 
         self.runtime
-            .open_chain(ownership, permissions, Amount::from_str("2.").unwrap())
+            .open_chain(ownership, permissions, Amount::from_str("20.").unwrap())
+        // Ammount 20. for tournament_chain, to process matches
     }
 }

@@ -60,78 +60,12 @@ impl ChessContract {
         self.runtime
             .send_message(organiser_chain, notification_message);
 
-        log::info!("tournament sent to sub {:?}", chain);
-
         // send tournament to newly create chain
         self.runtime.send_message(chain, message);
 
         // send chain detail to subscriber
         self.runtime
             .emit(STREAM_NAME.into(), &Event::TournamentChain { chain });
-    }
-
-    /// we don't really need this anymore as updates are handled by respective chains, needed in on_op_update_tournament to start a tournament, used on tournament_chain
-    pub async fn on_msg_update_tournament(
-        &mut self,
-        sender: ChainId,
-        tournament_id: String,
-        update: TournamentUpdate,
-    ) {
-        assert_eq!(self.runtime.chain_id(), self.app_chain());
-        let now = self.runtime.system_time();
-        let Some(mut tournament) = self
-            .state
-            .tournaments
-            .get(&tournament_id)
-            .await
-            .ok()
-            .flatten()
-        else {
-            return;
-        };
-
-        if tournament.organiser_chain != sender {
-            return;
-        }
-
-        tournament.update(&update, now);
-
-        let _data: Option<Vec<Match>> = if let Some(status) = update.status {
-            tournament.status = status;
-            match status {
-                TournamentStatus::RegistrationClosed => {
-                    let matches = self.state.start_tournament_and_persist(&tournament_id);
-                    tournament.status = TournamentStatus::InProgress;
-                    matches
-                } // we start the tournament and switch to inprogress
-                TournamentStatus::InProgress => todo!(), // we update to completed
-                TournamentStatus::Completed => todo!(),
-                TournamentStatus::Cancelled => todo!(), // we update to cancelled
-                _ => None,
-            }
-        } else {
-            None
-        };
-
-        // we need to create game_chain and send data to players, Vec<Match> has the required data, (player_a: AccountOwner, player_b: AccountOwner)
-
-        if self
-            .state
-            .tournaments
-            .insert(&tournament_id, tournament.clone())
-            .is_ok()
-        {
-            todo!()
-            // self.runtime.emit(
-            //     STREAM_NAME.into(),
-            //     &Event::Tournament {
-            //         value: Box::new(tournament),
-            //     },
-            // );
-        }
-        // update should be an enum with fields to update
-        // emit events
-        // app chain is responsible to emitting events to update supabase
     }
 
     /// Message received on tournament_chain to process the incoming participation request from a user
@@ -150,7 +84,6 @@ impl ChessContract {
         {
             return;
         }
-        log::info!("adding new player {owner}");
 
         if let Some(participants) = self.state.participants.get_mut() {
             participants.try_add_player(owner, player.clone());

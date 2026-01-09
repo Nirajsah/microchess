@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use async_graphql::SimpleObject;
 use base64::{engine::general_purpose, Engine};
-use linera_sdk::linera_base_types::AccountOwner;
+use linera_sdk::linera_base_types::{AccountOwner, ChainId};
 use serde::{Deserialize, Serialize};
 
 use crate::player::{PlayerHash, PlayerInfo};
@@ -44,7 +44,7 @@ impl TournamentParticipant for SwissPlayer {
         self.opponents.push(opponent_id);
     }
 
-    fn add_points(&mut self, score: f32) {
+    fn add_points(&mut self, _score: f32) {
         // self.score += score;
         todo!()
     }
@@ -67,7 +67,7 @@ impl TournamentParticipant for SingleElimPlayer {
         self.opponents.push(opponent_id);
     }
 
-    fn add_points(&mut self, score: f32) {
+    fn add_points(&mut self, _score: f32) {
         // self.score += score;
         todo!()
     }
@@ -157,152 +157,122 @@ impl TParticipants for SwissParticipants {
         if round == 1 {
             return self.generate_first_round_pairings();
         }
-
-        let mut swiss_players = self.players.clone();
-        swiss_players.sort_by(|a, b| a.player_id.cmp(&b.player_id));
+        // Sort by points (descending), then by player_id for tiebreaking
+        let mut sorted_players = self.players.clone();
+        sorted_players.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.player_id.cmp(&b.player_id))
+        });
 
         let mut matches = Vec::new();
+        let mut paired = HashSet::new();
         let mut match_count = 1;
 
-        //     // Handle odd number of players - assign bye to lowest rated unpaired player
-        //     let needs_bye = sorted_players.len() % 2 == 1;
-        //     let mut bye_player = None;
+        // Handle odd number of players - assign bye to lowest rated unpaired player
+        let needs_bye = sorted_players.len() % 2 == 1;
+        let mut bye_player = None;
 
-        for i in (0..swiss_players.len()).step_by(2) {
-            let p1 = &swiss_players[i];
-            let p2 = &swiss_players[i + 1];
+        if needs_bye {
+            // Find lowest ranked player who hasn't had a bye
+            for player in sorted_players.iter().rev() {
+                if !player.opponents.is_empty() {
+                    // 0 represents bye
+                    bye_player = Some(player.player_id);
+                    break;
+                }
+            }
+
+            // If all players had bye, give it to lowest ranked
+            if bye_player.is_none() {
+                bye_player = Some(sorted_players.last().unwrap().player_id);
+            }
+
+            paired.insert(bye_player.unwrap());
 
             matches.push(Match {
                 match_id: match_count,
                 tournament_id: self.tournament_id.clone(),
+                game_chain: None,
                 round,
-                player_a: p1.player_id,
-                player_b: p2.player_id,
-                result: None,
+                player_a: bye_player.unwrap(),
+                player_b: bye_player.unwrap(),
+                result: bye_player,
             });
 
             match_count += 1;
         }
 
+        // Swiss pairing with fold-down algorithm
+        let mut i = 0;
+        while i < sorted_players.len() {
+            let p1_id = sorted_players[i].player_id;
+
+            if paired.contains(&p1_id) {
+                i += 1;
+                continue;
+            }
+
+            let mut opponent_found = false;
+
+            // Try to find opponent in same score group first
+            for j in (i + 1)..sorted_players.len() {
+                let p2_id = sorted_players[j].player_id;
+
+                if paired.contains(&p2_id) {
+                    continue;
+                }
+
+                // Check if they haven't played before
+                if !sorted_players[i].has_played(p2_id) {
+                    matches.push(Match {
+                        match_id: match_count,
+                        tournament_id: self.tournament_id.clone(),
+                        round,
+                        game_chain: None,
+                        player_a: p1_id,
+                        player_b: p2_id,
+                        result: None,
+                    });
+
+                    paired.insert(p1_id);
+                    paired.insert(p2_id);
+                    match_count += 1;
+                    opponent_found = true;
+                    break;
+                }
+            }
+
+            // If no valid opponent in same bracket, allow repeat pairing (last resort)
+            if !opponent_found {
+                for j in (i + 1)..sorted_players.len() {
+                    let p2_id = sorted_players[j].player_id;
+
+                    if !paired.contains(&p2_id) {
+                        matches.push(Match {
+                            match_id: match_count,
+                            tournament_id: self.tournament_id.clone(),
+                            round,
+                            game_chain: None,
+                            player_a: p1_id,
+                            player_b: p2_id,
+                            result: None,
+                        });
+
+                        paired.insert(p1_id);
+                        paired.insert(p2_id);
+                        match_count += 1;
+                        break;
+                    }
+                }
+            }
+
+            i += 1;
+        }
+
         matches
     }
-
-    // fn generate_pairings(&mut self, round: u8) -> Vec<Match> {
-    //
-
-    //     // Sort by points (descending), then by player_id for tiebreaking
-    //     let mut sorted_players = self.players.clone();
-    //     sorted_players.sort_by(|a, b| {
-    //         b.points
-    //             .partial_cmp(&a.points)
-    //             .unwrap_or(std::cmp::Ordering::Equal)
-    //             .then_with(|| a.player_id.cmp(&b.player_id))
-    //     });
-
-    //     let mut matches = Vec::new();
-    //     let mut paired = HashSet::new();
-    //     let mut match_count = 1;
-
-    //     // Handle odd number of players - assign bye to lowest rated unpaired player
-    //     let needs_bye = sorted_players.len() % 2 == 1;
-    //     let mut bye_player = None;
-
-    //     if needs_bye {
-    //         // Find lowest ranked player who hasn't had a bye
-    //         for player in sorted_players.iter().rev() {
-    //             if !player.has_played(0) {
-    //                 // 0 represents bye
-    //                 bye_player = Some(player.player_id);
-    //                 break;
-    //             }
-    //         }
-
-    //         // If all players had bye, give it to lowest ranked
-    //         if bye_player.is_none() {
-    //             bye_player = Some(sorted_players.last().unwrap().player_id);
-    //         }
-
-    //         paired.insert(bye_player.unwrap());
-
-    //         matches.push(Match {
-    //             match_id: match_count,
-    //             tournament_id: self.tournament_id.clone(),
-    //             round,
-    //             player_a: bye_player.unwrap(),
-    //             player_b: None,
-    //             result: None,
-    //         });
-
-    //         match_count += 1;
-    //     }
-
-    //     // Swiss pairing with fold-down algorithm
-    //     let mut i = 0;
-    //     while i < sorted_players.len() {
-    //         let p1_id = sorted_players[i].player_id;
-
-    //         if paired.contains(&p1_id) {
-    //             i += 1;
-    //             continue;
-    //         }
-
-    //         let mut opponent_found = false;
-
-    //         // Try to find opponent in same score group first
-    //         for j in (i + 1)..sorted_players.len() {
-    //             let p2_id = sorted_players[j].player_id;
-
-    //             if paired.contains(&p2_id) {
-    //                 continue;
-    //             }
-
-    //             // Check if they haven't played before
-    //             if !sorted_players[i].has_played(p2_id) {
-    //                 matches.push(Match {
-    //                     match_id: match_count,
-    //                     tournament_id: self.tournament_id.clone(),
-    //                     round,
-    //                     player_a: p1_id,
-    //                     player_b: Some(p2_id),
-    //                     result: None,
-    //                 });
-
-    //                 paired.insert(p1_id);
-    //                 paired.insert(p2_id);
-    //                 match_count += 1;
-    //                 opponent_found = true;
-    //                 break;
-    //             }
-    //         }
-
-    //         // If no valid opponent in same bracket, allow repeat pairing (last resort)
-    //         if !opponent_found {
-    //             for j in (i + 1)..sorted_players.len() {
-    //                 let p2_id = sorted_players[j].player_id;
-
-    //                 if !paired.contains(&p2_id) {
-    //                     matches.push(Match {
-    //                         match_id: match_count,
-    //                         tournament_id: self.tournament_id.clone(),
-    //                         round,
-    //                         player_a: p1_id,
-    //                         player_b: Some(p2_id),
-    //                         result: None,
-    //                     });
-
-    //                     paired.insert(p1_id);
-    //                     paired.insert(p2_id);
-    //                     match_count += 1;
-    //                     break;
-    //                 }
-    //             }
-    //         }
-
-    //         i += 1;
-    //     }
-
-    //     matches
-    // }
 
     fn generate_first_round_pairings(&self) -> Vec<Match> {
         let mut players = self.players.clone();
@@ -319,6 +289,7 @@ impl TParticipants for SwissParticipants {
                 match_id: match_count,
                 tournament_id: self.tournament_id.clone(),
                 round: 1,
+                game_chain: None,
                 player_a: players[i].player_id,
                 player_b: players[players.len() - 1 - i].player_id,
                 result: None,
@@ -333,9 +304,10 @@ impl TParticipants for SwissParticipants {
                 match_id: match_count,
                 tournament_id: self.tournament_id.clone(),
                 round: 1,
+                game_chain: None,
                 player_a: players[middle].player_id,
                 player_b: players[middle].player_id,
-                result: None,
+                result: Some(players[middle].player_id),
             });
         }
 
@@ -413,12 +385,12 @@ impl TParticipants for SingleElimParticipants {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
-#[serde(rename_all = "camelCase")]
 pub struct Match {
-    match_id: u8,
-    tournament_id: String,
-    round: u8,
-    player_a: AccountOwner,
-    player_b: AccountOwner,
-    result: Option<AccountOwner>,
+    pub match_id: u8,
+    pub tournament_id: String,
+    pub round: u8,
+    pub game_chain: Option<ChainId>,
+    pub player_a: AccountOwner,
+    pub player_b: AccountOwner,
+    pub result: Option<AccountOwner>,
 }

@@ -79,7 +79,7 @@ async fn test_tournament() {
         organiser_id: Some(player_1_chain.public_key().into()),
         organiser_name: player_1_name.clone(),
         tournament_id: None,
-        tournament_name: "Teigjoeiagst".to_string(),
+        tournament_name: "Test".to_string(),
         tournament_description: None,
         tournament_format: TournamentFormat::Swiss,
         max_players: 16,
@@ -340,10 +340,11 @@ async fn test_participant_registration(
     chain: &ActiveChain,
     app_id: ApplicationId<ChessAbi>,
     tournament_id: &str,
+    tournament_chain: String,
 ) -> ConfirmedBlockCertificate {
     let operation = Operation::TournamentRegistration {
         tournament_id: tournament_id.to_string(),
-        tournament_chain: "gaieoga".to_string(),
+        tournament_chain,
     };
 
     chain
