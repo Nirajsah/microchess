@@ -6,16 +6,14 @@ import { useEffect, useRef, useState } from 'react'
 export function MockChainCarousel() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const chains = useWalletStore((s) => s.chains)
+  const activeChain = useWalletStore((s) => s.activeChain)
   const defaultChain = useWalletStore((s) => s.defaultChain)
   const getBalanceAsync = useWalletStore((s) => s.getBalanceAsync)
-  const setRefetch = useWalletStore((s) => s.setRefetch)
-  const setDefault = useWalletStore((s) => s.setDefaultAsync)
   const setInUseAsync = useWalletStore((s) => s.setInUseAsync)
   const [balances, setBalances] = useState<Record<ChainId, string>>({})
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text)
-    console.log('Copied:', text)
   }
 
   useEffect(() => {
@@ -34,6 +32,8 @@ export function MockChainCarousel() {
   const handleSetDefault = async (chainId: string) => {
     await setInUseAsync(chainId as ChainId).then(() => console.log('done'))
   }
+
+  const effectiveChain = activeChain ?? defaultChain
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -275,13 +275,13 @@ export function MockChainCarousel() {
                 </div>
               </div>
               <div className="absolute w-full h-10 flex justify-end items-center">
-                {defaultChain === chainId ? (
+                {effectiveChain === chainId ? (
                   <button
                     disabled
                     className="text-black text-xs border mr-4 mb-0.5 px-4 py-0.5 rounded-3xl flex gap-1 items-center bg-white/90"
                   >
                     <RefreshCw width={15} />
-                    Default
+                    InUse
                   </button>
                 ) : (
                   <button
@@ -289,7 +289,7 @@ export function MockChainCarousel() {
                     className="text-black text-xs border mr-1.5 mb-0.5 px-2 py-0.5 rounded-3xl flex gap-1 items-center bg-white/90"
                   >
                     <RefreshCw width={15} />
-                    Set Default
+                    Set InUse
                   </button>
                 )}
               </div>

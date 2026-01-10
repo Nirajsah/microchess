@@ -15,7 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { myTournament, updateTournament } from '@/api'
+import { myTournament, updateTournament, updateTournamentLocal } from '@/api'
 import { toast } from 'sonner'
 import {
   GameMode,
@@ -26,6 +26,7 @@ import {
   Visibility,
 } from '@/graphql/graphql'
 import { datetimeLocalToMicros, microsToDatetimeLocal } from './utils'
+import { useWalletStore } from '@/store/wallet'
 
 // Fields that can be updated when tournament is in REGISTRATION_OPEN state
 const REGISTRATION_OPEN_EDITABLE_FIELDS = [
@@ -46,6 +47,7 @@ export default function ManageTournament() {
   const [hasChanges, setHasChanges] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
+  const refetch = useWalletStore((s) => s.refetch)
 
   // Check if tournament is in a state where status can be changed to open registration
   const isTransitioningToOpen =
@@ -79,7 +81,7 @@ export default function ManageTournament() {
       }
     }
     fetchMyTournament()
-  }, [id])
+  }, [id, refetch])
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -123,14 +125,25 @@ export default function ManageTournament() {
       customTags: Array.isArray(formData.customTags) ? formData.customTags : [],
     }
 
-    updateTournament(tournament.tournamentId, submitData)
-      .then(() => {
-        toast.success('Tournament Update Saved')
-        setShowPublishConfirm(false)
-      })
-      .catch(() => {
-        toast.error('Failed to Update')
-      })
+    if (tournament.status === TournamentStatus.Draft) {
+      updateTournamentLocal(tournament.tournamentId, submitData)
+        .then(() => {
+          toast.success('Tournament Update Saved')
+          setShowPublishConfirm(false)
+        })
+        .catch(() => {
+          toast.error('Failed to Update')
+        })
+    } else {
+      updateTournament(tournament.tournamentId, submitData)
+        .then(() => {
+          toast.success('Tournament Update Saved')
+          setShowPublishConfirm(false)
+        })
+        .catch(() => {
+          toast.error('Failed to Update')
+        })
+    }
   }
 
   const deleteTournament = () => {

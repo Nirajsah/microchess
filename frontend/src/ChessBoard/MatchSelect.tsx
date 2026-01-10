@@ -107,7 +107,6 @@ const MatchSelect = () => {
   // fetch gameChainInfo(chainId, timestamp)
   const fetchGameChainInfo = async () => {
     const chain = await getGameChainInfo()
-    console.log('getting game chain', chain)
     const data = JSON.parse(chain).data.gameChain
     if (data) {
       dispatch({ type: 'RANDOM_ASSIGNED', chainId: data })

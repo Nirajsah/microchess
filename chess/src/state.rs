@@ -87,6 +87,7 @@ impl ChessState {
     /// Responsible for saving tournament in state as well as creating an empty participants list
     pub async fn save_tournament(&mut self, tournament: Tournament) {
         self.tournament.set(Some(tournament.clone()));
+        self.chain_type.set(ChainType::TournamentChain);
 
         let max_players = tournament.max_players as usize;
         let participants: Participants = match tournament.tournament_format {

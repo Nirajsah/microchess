@@ -11,7 +11,7 @@ use chess::{
     notifications::Notification,
     player::{MatchHistory, PlayerInfo, PlayerProfile, PlayersTime},
     tournament::{utils::Match, Tournament},
-    LastMove, Operation,
+    ChainType, LastMove, Operation,
 };
 use linera_sdk::{
     abi::WithServiceAbi,
@@ -170,16 +170,29 @@ impl ChessService {
         postcard::from_bytes::<Vec<String>>(&self.runtime.read_data_blob(hash)).unwrap_or_default()
     }
 
-    async fn my_tournaments(&self) -> &Vec<Tournament> {
-        self.state.my_tournaments.get()
+    async fn my_tournaments(&self) -> Vec<Tournament> {
+        if self.state.chain_type.get() == &ChainType::TournamentChain {
+            if let Some(tournament) = self.state.tournament.get() {
+                vec![tournament.clone()]
+            } else {
+                Vec::new()
+            }
+        } else {
+            self.state.my_tournaments.get().clone()
+        }
     }
 
     async fn my_tournament(&self, tournament_id: String) -> Option<&Tournament> {
-        self.state
-            .my_tournaments
-            .get()
-            .iter()
-            .find(|t| t.tournament_id.clone() == tournament_id)
+        if self.state.chain_type.get() == &ChainType::TournamentChain {
+            self.state.tournament.get().as_ref()
+        } else {
+            return self
+                .state
+                .my_tournaments
+                .get()
+                .iter()
+                .find(|t| t.tournament_id.clone() == tournament_id);
+        }
     }
 
     async fn tournament(&self) -> &Option<Tournament> {

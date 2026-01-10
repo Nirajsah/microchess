@@ -213,6 +213,27 @@ export function tournamentRegistration(
   return request(query)
 }
 
+
+export function updateTournamentLocal(
+  tournamentId: string,
+  updates: TournamentUpdate
+) {
+  const m = `mutation { updateTournamentLocal(tournamentId: "${tournamentId}" update: {
+      tournamentName: "${updates.tournamentName}",
+      tournamentDescription: "${updates.tournamentDescription}",
+      bannerImageUrl: "${updates.bannerImageUrl}",
+      sponsorLogoUrl: "${updates.sponsorLogoUrl}",
+      customTags: "${updates.customTags}",
+      status: "${updates.status}",
+      prizePool: ${updates.prizePool},
+      prizeType: "${updates.prizeType}",
+      visibility: "${updates.visibility}",
+    }) }`
+
+  const gqlQuery = JSON.stringify({ query: m })
+  return request(gqlQuery)
+}
+
 export function updateTournament(
   tournamentId: string,
   updates: TournamentUpdate

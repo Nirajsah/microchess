@@ -3,6 +3,7 @@ import { ChevronDown, Trophy, Swords, CheckCircle } from 'lucide-react'
 import { Notification, NotificationType } from '@/graphql/graphql'
 import { getNofitications, markAllNotificationsRead } from '@/api'
 import { microsToDatetimeLocal } from '@/Tournament/utils'
+import { useWalletStore } from '@/store/wallet'
 
 const NotificationIcon = ({ type }: { type: NotificationType }) => {
   switch (type) {
@@ -180,15 +181,18 @@ const NotificationItem = ({
 export const Notifications = ({ onReadAll }: { onReadAll?: () => void }) => {
   const [notifications, setNotifications] = React.useState<Notification[]>([])
   const [expandedId, setExpandedId] = React.useState<string | null>(null)
+  const assignChain = useWalletStore((s) => s.assignChainAsync)
 
   const handleToggle = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id))
   }
 
-  const handleAction = (chainId: string) => {
-    console.log('Action triggered for chainId:', chainId)
-    // Here you would call your actual API with the chainId
-    alert(`Action triggered for chainId: ${chainId}`)
+  const handleAction = async (chainId: string) => {
+    try {
+      await assignChain(chainId)
+    } catch (e) {
+      console.log(e)
+    }
   }
 
   React.useEffect(() => {

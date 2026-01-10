@@ -184,7 +184,7 @@ impl DerefMut for GameWrapper {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ChainType {
     #[default]
     PersonalChain,

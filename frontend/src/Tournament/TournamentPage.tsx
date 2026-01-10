@@ -24,6 +24,7 @@ import {
   Crown,
   Sparkles,
 } from 'lucide-react'
+import Round from './Round'
 
 type Participant = {
   id: string
@@ -272,7 +273,6 @@ export default function TournamentPage() {
   return (
     <div className="min-h-screen w-full bg-[#161616] text-white flex flex-col font-sansation">
       <Navbar />
-
       <div className="flex-1 flex flex-col">
         {/* Hero Section with Banner */}
         <div className="relative w-full h-[450px] md:h-[500px] overflow-hidden">
@@ -771,6 +771,7 @@ export default function TournamentPage() {
               </motion.div>
             </div>
           </div>
+          <Round tournamentId={tournament.tournament_id} />
         </div>
       </div>
     </div>
