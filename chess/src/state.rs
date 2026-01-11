@@ -7,7 +7,10 @@ use chess::{
     notifications::Notification,
     player::{MatchHistory, PlayerHash, PlayerProfile, Players},
     tournament::{
-        utils::{Match, Participants, SingleElimParticipants, SwissParticipants, TParticipants},
+        utils::{
+            Match, Participants, SingleElimParticipants, SwissParticipants, TParticipants,
+            TournamentRound,
+        },
         Tournament, TournamentFormat,
     },
     ChainType, GameWrapper,
@@ -58,6 +61,7 @@ pub struct ChessState {
     /// store player metadata for match making in tournaments
     pub players_data: MapView<AccountOwner, PlayerHash>,
     pub tournament_matches: MapView<String, Vec<Match>>,
+    pub tournament_rounds: RegisterView<Vec<TournamentRound>>,
 
     /* Game Chain */
     /// The current game state
@@ -108,15 +112,21 @@ impl ChessState {
         self.participants.set(Some(participants))
     }
 
-    /// Used on tournament_chain for starting a tournament
-    pub fn start_tournament_without_persist(&mut self, _tournament_id: &str) -> Option<Vec<Match>> {
+    pub fn start_tournament_without_persist(
+        &self,
+        _tournament_id: &str,
+    ) -> Option<(Vec<Match>, HashMap<String, PlayerHash>)> {
         if let Some(participants) = self.participants.get() {
-            let matches = match participants {
-                Participants::Swiss(p) => p.generate_pairings(1),
-                Participants::SingleElim(p) => p.generate_pairings(1),
-            };
-
-            Some(matches)
+            match participants {
+                Participants::Swiss(p) => {
+                    let matches = p.generate_pairings(1);
+                    Some((matches, p.participants.clone()))
+                }
+                Participants::SingleElim(p) => {
+                    let matches = p.generate_pairings(1);
+                    Some((matches, p.participants.clone()))
+                }
+            }
         } else {
             None
         }

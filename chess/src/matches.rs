@@ -1,15 +1,15 @@
-use async_graphql::{Enum, InputObject, SimpleObject};
+use async_graphql::{InputObject, SimpleObject};
 use base64::{engine::general_purpose, Engine};
-use linera_sdk::linera_base_types::{AccountOwner, DataBlobHash, TimeDelta, Timestamp};
+use linera_sdk::linera_base_types::{AccountOwner, ChainId, DataBlobHash, TimeDelta, Timestamp};
 use serde::{Deserialize, Serialize};
 
 use crate::player::{PlayerHash, Players};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Enum)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MatchType {
     Random,
     Friendly,
-    Tournament,
+    Tournament(ChainId),
 }
 
 // match duration could be added

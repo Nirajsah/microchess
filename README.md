@@ -37,25 +37,6 @@ pnpm dev
 **make sure to clone and build the croissant wallet and set it up as extension**
 https://github.com/Nirajsah/croissant
 
-## MicroChess Completed Features
-
-### Foundation and Initial Development
-
-- Implemented basic game logic.
-- Set up the chessboard and pieces.
-- Basic move handling.
-- FEN string generation and processing.
-
-### Move Validation of Each Piece
-
-- Implemented move validation for:
-  - Pawns
-  - Knights
-  - Bishops
-  - Rooks
-  - Queens
-  - Kings
-
 ### Tournament System Requirements
 
 **Core Tournament Management**

@@ -5,7 +5,7 @@
 use chess::{
     player::PlayerProfile,
     tournament::{
-        utils::{Match, Participants, TournamentParticipant},
+        utils::{Participants, TournamentParticipant, TournamentRound},
         GameMode, MatchType, PrizeType, TimeControlInput, Tournament, TournamentFormat,
         TournamentInput, TournamentStatus, TournamentUpdate, Visibility,
     },
@@ -40,7 +40,7 @@ async fn create_player_profile(
     let QueryOutcome { response, .. } = chain
         .graphql_query(
             app_id,
-            "query { profile { id name elo matches won lost ath chainId } }",
+            "query { profile { id name elo matches won lost ath chainId playerHash { value } } }",
         )
         .await;
 
@@ -163,7 +163,7 @@ async fn test_tournament() {
         .next()
         .unwrap();
 
-    let tournament_chain = ActiveChain::new(key_pair_1.copy(), description, validator);
+    let tournament_chain = ActiveChain::new(key_pair_1.copy(), description, validator.clone());
     tournament_chain.handle_received_messages().await;
 
     let QueryOutcome { response, .. } = tournament_chain
@@ -207,63 +207,58 @@ async fn test_tournament() {
 
     assert!(!data.version.is_empty());
 
-    // let participants_chains = create_participants(&validator, app_id).await;
-    //
-    // for chain in participants_chains {
-    //     let certificate = test_participant_registration(&chain, app_id, &id).await;
-    //     app_chain
-    //         .add_block(|block| {
-    //             block.with_messages_from(&certificate);
-    //         })
-    //         .await;
-    // }
-    //
-    // let query_participants = format!(
-    //     r#"
-    //         query {{ participants(id: "{}") }}
-    //     "#,
-    //     id
-    // );
-    //
-    // let QueryOutcome { response, .. } = app_chain.graphql_query(app_id, query_participants).await;
-    //
-    // let data: String = serde_json::from_value(response["participants"].clone())
-    //     .expect("Failed to deserialize participants data");
-    //
-    // let participants: Participants = Participants::decode(data);
-    //
-    // process_players(&participants);
-    //
-    // let certificate = test_update_tournament(&player_1_chain, app_id, id.clone()).await;
-    //
-    // app_chain
-    //     .add_block(|block| {
-    //         block.with_messages_from(&certificate);
-    //     })
-    //     .await;
-    //
-    // let query_tournament_matches = format!(
-    //     r#"
-    //         query {{ tournamentMatches(id: "{}") {{
-    //             matchId
-    //             tournamentId
-    //             playerA
-    //             playerB
-    //             round
-    //             result
-    //         }} }}
-    //     "#,
-    //     id
-    // );
-    //
-    // let QueryOutcome { response, .. } = app_chain
-    //     .graphql_query(app_id, query_tournament_matches)
-    //     .await;
-    //
-    // let data: Vec<Match> = serde_json::from_value(response["tournamentMatches"].clone())
-    //     .expect("Failed to deserialize participants data");
-    //
-    // assert_eq!(data.len(), 8);
+    let participants_chains = create_participants(&validator, app_id).await;
+
+    for chain in participants_chains {
+        let _certificate = test_participant_registration(
+            &chain,
+            app_id,
+            &data.tournament_id,
+            tournament_chain.id().to_string(),
+        )
+        .await;
+    }
+
+    tournament_chain.handle_received_messages().await;
+
+    let query_participants = "query { participants }";
+
+    let QueryOutcome { response, .. } = tournament_chain
+        .graphql_query(app_id, query_participants)
+        .await;
+
+    let p: String = serde_json::from_value(response["participants"].clone())
+        .expect("Failed to deserialize participants data");
+
+    let participants: Participants = Participants::decode(p);
+
+    process_players(&participants);
+
+    let _ = test_update_tournament(&tournament_chain, app_id, data.tournament_id.clone()).await;
+
+    let query_tournament_matches = "
+             query { tournamentRound {
+                 id
+                 round
+                 matches {
+                     matchId
+                     gameChain
+                     playerA
+                     playerB
+                     round
+                     status
+                     result
+                 }
+            } }";
+
+    let QueryOutcome { response, .. } = tournament_chain
+        .graphql_query(app_id, query_tournament_matches)
+        .await;
+
+    let data: Option<TournamentRound> = serde_json::from_value(response["tournamentRound"].clone())
+        .expect("Failed to deserialize match data");
+
+    println!("matches: {:?}", data);
 }
 
 pub fn process_players(participants: &Participants) {
@@ -274,7 +269,7 @@ pub fn process_players(participants: &Participants) {
 }
 
 fn process_player_list<T: TournamentParticipant>(players: &[T]) {
-    assert_eq!(players.len(), 16);
+    assert_eq!(players.len(), 4);
 }
 
 async fn test_host_tournament(
@@ -326,10 +321,10 @@ async fn create_participants(
 ) -> Vec<ActiveChain> {
     let mut participants_chains = Vec::with_capacity(16);
 
-    for number in 0..16 {
+    for number in 0..4 {
         let player_name = format!("{}{}", "John Done", number);
         let player_chain = validator.new_chain().await;
-        let _player = create_player_profile(&player_chain, app_id, player_name.clone()).await;
+        let _ = create_player_profile(&player_chain, app_id, player_name.clone()).await;
         participants_chains.push(player_chain);
     }
 

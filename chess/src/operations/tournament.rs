@@ -1,11 +1,13 @@
-use std::str::FromStr;
-
 use chess::{
     matches::MatchType,
     player::Players,
-    tournament::{utils::Match, Tournament, TournamentInput, TournamentStatus, TournamentUpdate},
+    tournament::{
+        utils::{Match, TournamentRound},
+        Tournament, TournamentInput, TournamentStatus, TournamentUpdate,
+    },
 };
 use linera_sdk::linera_base_types::{Amount, ChainId, TimeDelta};
+use std::str::FromStr;
 
 use crate::{messages::Message, ChessContract};
 
@@ -104,60 +106,51 @@ impl ChessContract {
         update: TournamentUpdate,
     ) {
         let updated_at = self.runtime.system_time();
+        let me = self.runtime.chain_id();
 
         let tournament = match self.state.tournament.get_mut() {
             Some(t) if t.tournament_id == tournament_id => t,
             _ => return,
         };
 
+        let timer = tournament.time_control.base_minutes;
+
         tournament.update(&update, updated_at);
-
-        if tournament.status != TournamentStatus::RegistrationClosed {
+        /* if tournament.status != TournamentStatus::RegistrationClosed {
             return;
-        }
+        } */
+        // Need to fix this
 
-        let matches = match self.state.start_tournament_without_persist(&tournament_id) {
-            Some(m) => m,
-            None => return,
+        let (matches, player_map) = {
+            match self.state.start_tournament_without_persist(&tournament_id) {
+                Some(m) => m,
+                None => return,
+            }
         };
 
         let fee = Amount::from_str("1.").unwrap();
-        let time = TimeDelta::from_secs(900);
+        let time = TimeDelta::from_secs(timer.into());
 
         let mut matches_to = Vec::with_capacity(matches.len());
 
         for m in matches {
             let players = Players {
-                player_1: self
-                    .state
-                    .players_data
-                    .get(&m.player_a)
-                    .await
-                    .unwrap()
-                    .unwrap(),
-
-                player_2: self
-                    .state
-                    .players_data
-                    .get(&m.player_b)
-                    .await
-                    .unwrap()
-                    .unwrap(),
+                player_1: player_map.get(&m.player_a.to_string()).unwrap().clone(),
+                player_2: player_map.get(&m.player_b.to_string()).unwrap().clone(),
             };
 
-            let chain = self
-                .create_game_chain(fee, time, MatchType::Tournament, &players)
-                .ok();
+            if let Some((chain, match_id)) =
+                self.create_game_chain(fee, time, MatchType::Tournament(me), &players)
+            {
+                self.state.matches.insert(&match_id, players).ok();
 
-            matches_to.push(Match {
-                game_chain: chain,
-                ..m
-            });
+                matches_to.push(Match {
+                    game_chain: Some(chain),
+                    ..m
+                });
+            }
         }
-
-        self.state
-            .tournament_matches
-            .insert(&tournament_id, matches_to)
-            .ok();
+        let t_round = TournamentRound::new(1, matches_to);
+        self.state.tournament_rounds.get_mut().push(t_round);
     }
 }

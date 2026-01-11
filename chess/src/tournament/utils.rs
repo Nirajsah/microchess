@@ -1,23 +1,38 @@
 use std::collections::{HashMap, HashSet};
 
-use async_graphql::SimpleObject;
+use async_graphql::{Enum, SimpleObject};
 use base64::{engine::general_purpose, Engine};
 use linera_sdk::linera_base_types::{AccountOwner, ChainId};
 use serde::{Deserialize, Serialize};
 
-use crate::player::{PlayerHash, PlayerInfo};
+use crate::{
+    matches::MatchMetaData,
+    player::{PlayerHash, Players},
+};
 
-#[derive(Clone, Debug, Serialize, Deserialize, SimpleObject, PartialEq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct HalfPoints(u16);
+
+impl HalfPoints {
+    pub fn won(self) -> Self {
+        Self(self.0 + 2)
+    }
+    pub fn draw(self) -> Self {
+        Self(self.0 + 1)
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SwissPlayer {
     player_id: AccountOwner,
-    score: u8, // starts at 0
+    score: HalfPoints, // starts at 0
     opponents: Vec<AccountOwner>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, SimpleObject, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SingleElimPlayer {
     player_id: AccountOwner,
-    score: u8, // starts at 0
+    score: HalfPoints, // starts at 0
     opponents: Vec<AccountOwner>,
 }
 
@@ -25,14 +40,15 @@ pub trait TournamentParticipant: std::fmt::Debug {
     fn new(player_id: AccountOwner) -> Self;
     fn has_played(&self, opponent_id: AccountOwner) -> bool;
     fn add_opponent(&mut self, opponent_id: AccountOwner);
-    fn add_points(&mut self, points: f32);
+    fn win(&mut self);
+    fn draw(&mut self);
 }
 
 impl TournamentParticipant for SwissPlayer {
     fn new(player_id: AccountOwner) -> Self {
         Self {
             player_id,
-            score: 0,
+            score: HalfPoints(0),
             opponents: vec![],
         }
     }
@@ -44,9 +60,12 @@ impl TournamentParticipant for SwissPlayer {
         self.opponents.push(opponent_id);
     }
 
-    fn add_points(&mut self, _score: f32) {
-        // self.score += score;
-        todo!()
+    fn win(&mut self) {
+        self.score.won();
+    }
+
+    fn draw(&mut self) {
+        self.score.draw();
     }
 }
 
@@ -54,7 +73,7 @@ impl TournamentParticipant for SingleElimPlayer {
     fn new(player_id: AccountOwner) -> Self {
         Self {
             player_id,
-            score: 0,
+            score: HalfPoints(0),
             opponents: vec![],
         }
     }
@@ -67,24 +86,26 @@ impl TournamentParticipant for SingleElimPlayer {
         self.opponents.push(opponent_id);
     }
 
-    fn add_points(&mut self, _score: f32) {
-        // self.score += score;
-        todo!()
+    fn win(&mut self) {
+        self.score.won();
+    }
+
+    fn draw(&mut self) {
+        self.score.draw();
     }
 }
-
-#[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SwissParticipants {
     pub players: Vec<SwissPlayer>,
-    pub participants: HashMap<String, PlayerInfo>,
+    pub participants: HashMap<String, PlayerHash>,
     pub tournament_id: String,
     pub max_players: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SingleElimParticipants {
     pub players: Vec<SingleElimPlayer>,
-    pub participants: HashMap<String, PlayerInfo>,
+    pub participants: HashMap<String, PlayerHash>,
     pub tournament_id: String,
     pub max_players: usize,
 }
@@ -128,9 +149,63 @@ pub trait TParticipants {
     fn remove_player(&mut self, id: AccountOwner);
     fn generate_pairings(&self, round: u8) -> Vec<Match>;
     fn generate_first_round_pairings(&self) -> Vec<Match>;
+
+    fn record_match_result(
+        &mut self,
+        match_result: &MatchMetaData,
+        players: Players,
+    ) -> Result<(), String>;
 }
 
 impl TParticipants for SwissParticipants {
+    fn record_match_result(
+        &mut self,
+        match_result: &MatchMetaData,
+        players: Players,
+    ) -> Result<(), String> {
+        let (p1, p2) = players.get_players();
+
+        let a = p1.id;
+        let b = p2.id;
+
+        // Locate players
+        let a_idx = self
+            .players
+            .iter()
+            .position(|p| p.player_id == a)
+            .ok_or("Player A not found")?;
+
+        let b_idx = self
+            .players
+            .iter()
+            .position(|p| p.player_id == b)
+            .ok_or("Player B not found")?;
+
+        // Prevent double application
+        /* if self.players[a_idx].has_played(b) {
+            return Err("Match result already applied".into());
+        } */
+
+        // Record opponents
+        self.players[a_idx].add_opponent(b);
+        self.players[b_idx].add_opponent(a);
+
+        // Determine outcome: 1.0 = player_1 wins, 0.5 = draw, 0.0 = player_2 wins
+        if a == match_result.winner {
+            // Player A wins
+            self.players[a_idx].win();
+        } else if b == match_result.winner {
+            // Player B wins
+            self.players[b_idx].win();
+        } else {
+            // Draw
+            self.players[a_idx].draw();
+            self.players[b_idx].draw();
+        };
+
+        Ok(())
+    }
+
     fn try_add_player(&mut self, id: AccountOwner, player_hash: PlayerHash) -> bool {
         // Check for duplicate player first
         if self.players.iter().any(|p| p.player_id == id) {
@@ -143,8 +218,9 @@ impl TParticipants for SwissParticipants {
 
         let player = SwissPlayer::new(id);
         self.players.push(player);
-        self.participants
-            .insert(id.to_string(), player_hash.decode().info());
+
+        self.participants.insert(id.to_string(), player_hash);
+
         true
     }
 
@@ -193,11 +269,11 @@ impl TParticipants for SwissParticipants {
 
             matches.push(Match {
                 match_id: match_count,
-                tournament_id: self.tournament_id.clone(),
                 game_chain: None,
                 round,
                 player_a: bye_player.unwrap(),
                 player_b: bye_player.unwrap(),
+                status: MatchStatus::Scheduled,
                 result: bye_player,
             });
 
@@ -228,11 +304,11 @@ impl TParticipants for SwissParticipants {
                 if !sorted_players[i].has_played(p2_id) {
                     matches.push(Match {
                         match_id: match_count,
-                        tournament_id: self.tournament_id.clone(),
                         round,
                         game_chain: None,
                         player_a: p1_id,
                         player_b: p2_id,
+                        status: MatchStatus::Scheduled,
                         result: None,
                     });
 
@@ -252,11 +328,11 @@ impl TParticipants for SwissParticipants {
                     if !paired.contains(&p2_id) {
                         matches.push(Match {
                             match_id: match_count,
-                            tournament_id: self.tournament_id.clone(),
                             round,
                             game_chain: None,
                             player_a: p1_id,
                             player_b: p2_id,
+                            status: MatchStatus::Scheduled,
                             result: None,
                         });
 
@@ -287,11 +363,11 @@ impl TParticipants for SwissParticipants {
         for i in 0..pair_count {
             matches.push(Match {
                 match_id: match_count,
-                tournament_id: self.tournament_id.clone(),
                 round: 1,
                 game_chain: None,
                 player_a: players[i].player_id,
                 player_b: players[players.len() - 1 - i].player_id,
+                status: MatchStatus::Scheduled,
                 result: None,
             });
             match_count += 1;
@@ -302,11 +378,11 @@ impl TParticipants for SwissParticipants {
             let middle = players.len() / 2;
             matches.push(Match {
                 match_id: match_count,
-                tournament_id: self.tournament_id.clone(),
                 round: 1,
                 game_chain: None,
                 player_a: players[middle].player_id,
                 player_b: players[middle].player_id,
+                status: MatchStatus::Scheduled,
                 result: Some(players[middle].player_id),
             });
         }
@@ -362,7 +438,7 @@ impl TParticipants for SingleElimParticipants {
     fn remove_player(&mut self, _id: AccountOwner) {
         todo!()
     }
-    fn try_add_player(&mut self, id: AccountOwner, player_hash: PlayerHash) -> bool {
+    fn try_add_player(&mut self, id: AccountOwner, _player_hash: PlayerHash) -> bool {
         // Check for duplicate player first
         if self.players.iter().any(|p| p.player_id == id) {
             return false;
@@ -374,23 +450,78 @@ impl TParticipants for SingleElimParticipants {
 
         let player = SingleElimPlayer::new(id);
         self.players.push(player);
-        self.participants
-            .insert(id.to_string(), player_hash.decode().info());
+        /* self.participants
+        .insert(id.to_string(), player_hash.decode().info()); */
         true
     }
 
     fn generate_first_round_pairings(&self) -> Vec<Match> {
         todo!()
     }
+
+    fn record_match_result(
+        &mut self,
+        _match_result: &MatchMetaData,
+        _players: Players,
+    ) -> Result<(), String> {
+        todo!()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
+#[serde(rename_all = "camelCase")]
 pub struct Match {
     pub match_id: u8,
-    pub tournament_id: String,
     pub round: u8,
     pub game_chain: Option<ChainId>,
     pub player_a: AccountOwner,
     pub player_b: AccountOwner,
+    pub status: MatchStatus,
     pub result: Option<AccountOwner>,
 }
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Enum)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MatchStatus {
+    Scheduled,
+    Completed,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
+pub struct TournamentRound {
+    pub id: String,
+    pub round: u8,
+    pub matches: Vec<Match>,
+}
+
+impl TournamentRound {
+    pub fn new(round: u8, matches: Vec<Match>) -> Self {
+        Self {
+            id: "dummy".to_string(),
+            round,
+            matches,
+        }
+    }
+}
+
+// supabase
+//   .from('tournament_rounds')
+//   .select(`
+//     round_number,
+//     tournament_matches (
+//       match_id,
+//       player_a,
+//       player_b,
+//       status,
+//       winner
+//     )
+//   `)
+//   .eq('tournament_id', tournamentId)
+//   .order('round_number');
+
+/* #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
+pub struct TournamentRounds {
+    pub tournament_id: String,
+    pub rounds: Vec<TournamentRound>,
+} */

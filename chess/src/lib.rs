@@ -109,10 +109,9 @@ pub struct LastMove {
     pub to: String,
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, SimpleObject)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct GameWrapper {
     pub initalized: bool,
-    #[graphql(skip)]
     inner: Game,
     pub players: [Option<AccountOwner>; 2],
     pub winner: Option<AccountOwner>,

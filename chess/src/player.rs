@@ -59,10 +59,15 @@ pub struct PlayerHash {
 }
 
 impl PlayerHash {
-    pub fn decode(&self) -> PlayerProfile {
-        let bytes = general_purpose::STANDARD.decode(&self.value).unwrap();
-        let player: PlayerProfile = bincode::deserialize(&bytes).unwrap();
+    pub fn try_decode(&self) -> Option<PlayerProfile> {
+        let bytes = general_purpose::STANDARD.decode(&self.value).ok()?;
+        let player = postcard::from_bytes::<PlayerProfile>(&bytes).ok()?;
+        Some(player)
+    }
 
+    pub fn decode(&self) -> PlayerProfile {
+        let bytes = general_purpose::STANDARD.decode(&self.value).ok().unwrap();
+        let player = postcard::from_bytes::<PlayerProfile>(&bytes).ok().unwrap();
         player
     }
 }
@@ -108,8 +113,8 @@ impl PlayerProfile {
     }
 
     pub fn encode(&mut self) -> Option<PlayerHash> {
-        let bytes = bincode::serialize(&self).unwrap();
-        let value = general_purpose::STANDARD.encode(bytes);
+        let bytes = postcard::to_allocvec(self).expect("postcard serialization failed");
+        let value = general_purpose::STANDARD.encode(&bytes);
 
         self.player_hash = Some(PlayerHash { value });
         self.player_hash.clone()
@@ -117,8 +122,12 @@ impl PlayerProfile {
 
     pub fn decode(&self) -> Option<Self> {
         if let Some(hash) = self.player_hash.clone() {
-            let bytes = general_purpose::STANDARD.decode(hash.value).unwrap();
-            let player: Self = bincode::deserialize(&bytes).unwrap();
+            let bytes = general_purpose::STANDARD
+                .decode(hash.value)
+                .expect("invalid base64 input");
+
+            let player = postcard::from_bytes::<PlayerProfile>(&bytes)
+                .expect("postcard deserialization failed");
 
             Some(player)
         } else {

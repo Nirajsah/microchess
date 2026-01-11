@@ -1,14 +1,17 @@
 use std::str::FromStr;
 
 use chess::{
+    clock::Clock,
+    matches::{MatchId, MatchType},
     notifications::Notification,
-    player::PlayerHash,
+    player::{PlayerHash, Players},
     tournament::{
         utils::{Match, Participants, TParticipants},
         Tournament, TournamentInput, TournamentStatus, TournamentUpdate,
     },
+    GameWrapper,
 };
-use linera_sdk::linera_base_types::{AccountOwner, ChainId};
+use linera_sdk::linera_base_types::{AccountOwner, ChainId, TimeDelta};
 use log::info;
 
 use crate::{event::Event, messages::Message, ChessContract, STREAM_NAME};
@@ -88,6 +91,8 @@ impl ChessContract {
         if let Some(participants) = self.state.participants.get_mut() {
             participants.try_add_player(owner, player.clone());
         };
+
+        self.state.players_data.insert(&owner, player).ok();
     }
 
     pub async fn on_msg_tournament_withdraw(

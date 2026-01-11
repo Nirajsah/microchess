@@ -10,7 +10,10 @@ use chess::{
     matches::TimedToken,
     notifications::Notification,
     player::{MatchHistory, PlayerInfo, PlayerProfile, PlayersTime},
-    tournament::{utils::Match, Tournament},
+    tournament::{
+        utils::{Match, TournamentRound},
+        Tournament,
+    },
     ChainType, LastMove, Operation,
 };
 use linera_sdk::{
@@ -207,6 +210,7 @@ impl ChessService {
         }
     }
 
+    // TO BE REMOVED
     async fn tournament_matches(&self, id: String) -> Option<Vec<Match>> {
         let matches = self
             .state
@@ -234,5 +238,13 @@ impl ChessService {
 
     async fn tournament_chains(&self) -> &Vec<ChainId> {
         self.state.tournament_chains.get()
+    }
+
+    async fn tournament_round(&self) -> Option<&TournamentRound> {
+        if let Some(last_round) = self.state.tournament_rounds.get().last() {
+            Some(last_round)
+        } else {
+            None
+        }
     }
 }

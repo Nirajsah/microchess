@@ -13,7 +13,10 @@ use chess::{
     matches::{MatchId, MatchMetaData, MatchType, TimedToken},
     notifications::Notification,
     player::{MatchHistory, Player, PlayerHash, PlayerProfile, Players},
-    tournament::TournamentInput,
+    tournament::{
+        utils::{Participants, TParticipants},
+        TournamentInput,
+    },
     ChessResponse, GameWrapper, InstantiationArgument, Operation,
 };
 use chess_lib::{game::game::GameState, ChessError, Result};
@@ -291,7 +294,7 @@ impl ChessContract {
             let fee = Amount::from_str("1.").unwrap();
             let match_time = TimeDelta::from_secs(900); // 15 mins
 
-            if let Ok(game_chain_data) =
+            if let Some((game_chain_data, _)) =
                 self.create_game_chain(fee, match_time, MatchType::Random, &players)
             {
                 self.send_game_chain_data_2players(game_chain_data, players, None);
@@ -312,10 +315,10 @@ impl ChessContract {
         match_time: TimeDelta,
         match_type: MatchType,
         players: &Players,
-    ) -> Result<ChainId> {
+    ) -> Option<(ChainId, MatchId)> {
         let (player_1, player_2) = players.get_players();
         if player_1.id == player_2.id {
-            return Err(ChessError::new("Found Players with same id, returning..."));
+            return None;
         }
 
         let ownership = ChainOwnership::multiple(
@@ -337,13 +340,13 @@ impl ChessContract {
             chain_id,
             Message::Start {
                 players: players.clone(),
-                match_id,
+                match_id: match_id.clone(),
                 timer: match_time,
                 match_type,
             },
         );
 
-        Ok(chain_id)
+        Some((chain_id, match_id))
     }
 
     // Method to send required chain data to players.
@@ -397,13 +400,13 @@ impl ChessContract {
         let fee = Amount::from_str("1.").unwrap();
         let match_time = TimeDelta::from_secs(900); // 15 mins
 
-        if let Ok(game_chain_data) =
+        if let Some((game_chain_data, _)) =
             self.create_game_chain(fee, match_time, MatchType::Friendly, &players)
         {
             let notification = Notification::friendly_match(
-                "aoig".to_string(),
+                "Friendly Match".to_string(),
                 game_chain_data,
-                "gaeohag".to_string(),
+                "Game chain is here".to_string(),
                 app_chain,
                 now,
             );
@@ -454,85 +457,46 @@ impl ChessContract {
             return;
         }
 
-        let bytes = postcard::to_allocvec(&game.moves_string).unwrap();
+        // we don't send result about friendly matches
+        if let Some(match_type) = game.match_type {
+            match match_type {
+                MatchType::Friendly => return,
+                MatchType::Random => {
+                    let bytes = postcard::to_allocvec(&game.moves_string).unwrap();
 
-        let blob_hash = self.runtime.create_data_blob(bytes);
+                    let blob_hash = self.runtime.create_data_blob(bytes);
 
-        if let Some(winner) = game.winner {
-            let metadata = MatchMetaData {
-                match_id: game.match_id.clone().unwrap(),
-                match_type: game.match_type.unwrap(),
-                winner,
-                blob_hash,
-            };
+                    if let Some(winner) = game.winner {
+                        let metadata = MatchMetaData {
+                            match_id: game.match_id.clone().unwrap(),
+                            match_type: game.match_type.unwrap(),
+                            winner,
+                            blob_hash,
+                        };
 
-            self.runtime
-                .send_message(app_chain, Message::MatchEnd { metadata });
-        }
-    }
-
-    /// Executed on the app_chain, sending final updates to players after a match
-    pub async fn handle_match_end(&mut self, metadata: MatchMetaData) {
-        assert_eq!(self.app_chain(), self.runtime.chain_id());
-        let elo_calculator = EloCalculator::new(30.0);
-
-        // Flag to track if we need to send the event
-        let mut leaderboard_changed = false;
-
-        match metadata.match_type {
-            MatchType::Tournament => return, // Todo
-            MatchType::Friendly => return, // we don't receive Friendly Match results from game_chain
-            MatchType::Random => {
-                if let Ok(Some(players)) = self.state.matches.get(&metadata.match_id).await {
-                    let (mut player_1, mut player_2) = players.get_players();
-
-                    let rating_1 = player_1.elo as f64;
-                    let rating_2 = player_2.elo as f64;
-
-                    // Determine outcome: 1.0 = player_1 wins, 0.5 = draw, 0.0 = player_2 wins
-                    let outcome = if player_1.id == metadata.winner {
-                        1.0
-                    } else if player_2.id == metadata.winner {
-                        0.0
-                    } else {
-                        0.5
-                    };
-
-                    let (new_rating_1, new_rating_2) =
-                        elo_calculator.calculate_new_ratings(rating_1, rating_2, outcome);
-
-                    // Calculate deltas
-                    let delta_1 = (new_rating_1.round() as i32) - (player_1.elo as i32);
-                    let delta_2 = (new_rating_2.round() as i32) - (player_2.elo as i32);
-
-                    // Update players
-                    player_1.update_rating(delta_1, outcome == 1.0, outcome == 0.0);
-                    player_2.update_rating(delta_2, outcome == 0.0, outcome == 1.0);
-
-                    if let Some(leaderboard) = self.state.leaderboard_manager.get_mut() {
-                        let p1 = leaderboard.try_add_player(player_1.to_leaderboard());
-                        let p2 = leaderboard.try_add_player(player_2.to_leaderboard());
-
-                        if p1 || p2 {
-                            leaderboard_changed = true;
-                        }
+                        self.runtime
+                            .send_message(app_chain, Message::MatchEnd { metadata });
                     }
+                }
+                MatchType::Tournament(tournament_chain) => {
+                    let bytes = postcard::to_allocvec(&game.moves_string).unwrap();
 
-                    if let Some(history) =
-                        self.send_match_update(&mut player_1, &player_2, metadata.blob_hash)
-                    {
-                        self.state.match_history.get_mut().push(history); // just push once
+                    let blob_hash = self.runtime.create_data_blob(bytes);
+
+                    if let Some(winner) = game.winner {
+                        let metadata = MatchMetaData {
+                            match_id: game.match_id.clone().unwrap(),
+                            match_type: game.match_type.unwrap(),
+                            winner,
+                            blob_hash,
+                        };
+
+                        self.runtime
+                            .send_message(tournament_chain, Message::MatchEnd { metadata });
                     }
-                    self.send_match_update(&mut player_2, &player_1, metadata.blob_hash);
                 }
             }
         }
-
-        let _ = self.state.matches.remove(&metadata.match_id);
-        if leaderboard_changed {
-            self.update_state_event(EventType::Leaderboard);
-        }
-        self.update_state_event(EventType::MatchHistory); // send matchhistory update to subscribers(only random matches)
     }
 
     fn send_match_update(
@@ -585,7 +549,91 @@ impl ChessContract {
         let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
 
         self.runtime
-            .open_chain(ownership, permissions, Amount::from_str("20.").unwrap())
+            .open_chain(ownership, permissions, Amount::from_str("10.").unwrap())
         // Ammount 20. for tournament_chain, to process matches
+    }
+
+    ///  Executed on the app_chain, sending final updates to players after a match
+    ///  Executed on tournament_chain, updating stats of players
+    pub async fn handle_match_end(&mut self, metadata: MatchMetaData) {
+        match metadata.match_type {
+            MatchType::Friendly => return, // we don't receive Friendly Match results from game_chain
+            MatchType::Tournament(t_chain) => {
+                assert_eq!(t_chain, self.runtime.chain_id());
+                if let Some(participants) = self.state.participants.get_mut() {
+                    let p = self
+                        .state
+                        .matches
+                        .get(&metadata.match_id)
+                        .await
+                        .expect("failed")
+                        .expect("failed");
+
+                    let _res = match participants {
+                        Participants::Swiss(a) => a.record_match_result(&metadata, p),
+                        Participants::SingleElim(_) => todo!(),
+                    };
+
+                    let _ = self.state.matches.remove(&metadata.match_id);
+                }
+            }
+            MatchType::Random => {
+                assert_eq!(self.app_chain(), self.runtime.chain_id());
+
+                let elo_calculator = EloCalculator::new(30.0);
+
+                // Flag to track if we need to send the event
+                let mut leaderboard_changed = false;
+
+                if let Ok(Some(players)) = self.state.matches.get(&metadata.match_id).await {
+                    let (mut player_1, mut player_2) = players.get_players();
+
+                    let rating_1 = player_1.elo as f64;
+                    let rating_2 = player_2.elo as f64;
+
+                    // Determine outcome: 1.0 = player_1 wins, 0.5 = draw, 0.0 = player_2 wins
+                    let outcome = if player_1.id == metadata.winner {
+                        1.0
+                    } else if player_2.id == metadata.winner {
+                        0.0
+                    } else {
+                        0.5
+                    };
+
+                    let (new_rating_1, new_rating_2) =
+                        elo_calculator.calculate_new_ratings(rating_1, rating_2, outcome);
+
+                    // Calculate deltas
+                    let delta_1 = (new_rating_1.round() as i32) - (player_1.elo as i32);
+                    let delta_2 = (new_rating_2.round() as i32) - (player_2.elo as i32);
+
+                    // Update players
+                    player_1.update_rating(delta_1, outcome == 1.0, outcome == 0.0);
+                    player_2.update_rating(delta_2, outcome == 0.0, outcome == 1.0);
+
+                    if let Some(leaderboard) = self.state.leaderboard_manager.get_mut() {
+                        let p1 = leaderboard.try_add_player(player_1.to_leaderboard());
+                        let p2 = leaderboard.try_add_player(player_2.to_leaderboard());
+
+                        if p1 || p2 {
+                            leaderboard_changed = true;
+                        }
+                    }
+
+                    if let Some(history) =
+                        self.send_match_update(&mut player_1, &player_2, metadata.blob_hash)
+                    {
+                        self.state.match_history.get_mut().push(history); // just push once
+                    }
+                    self.send_match_update(&mut player_2, &player_1, metadata.blob_hash);
+
+                    let _ = self.state.matches.remove(&metadata.match_id);
+                    if leaderboard_changed {
+                        self.update_state_event(EventType::Leaderboard);
+                    }
+                    self.update_state_event(EventType::MatchHistory); // send matchhistory update to subscribers(only random matches)                }
+                }
+            }
+        }
     }
 }

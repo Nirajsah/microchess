@@ -95,7 +95,7 @@ impl Tournament {
         if let Some(visibility) = update.visibility {
             self.visibility = visibility;
         }
-        self.updated_at = now
+        self.updated_at = now;
     }
 }
 
