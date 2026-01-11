@@ -107,15 +107,6 @@ function jsonToJSProps(typ: any): any {
   return typ.jsonToJS
 }
 
-function jsToJSONProps(typ: any): any {
-  if (typ.jsToJSON === undefined) {
-    const map: any = {}
-    typ.props.forEach((p: any) => (map[p.js] = { key: p.json, typ: p.typ }))
-    typ.jsToJSON = map
-  }
-  return typ.jsToJSON
-}
-
 function transform(
   val: any,
   typ: any,
@@ -135,7 +126,7 @@ function transform(
       const typ = typs[i]
       try {
         return transform(val, typ, getProps)
-      } catch (_) {}
+      } catch (_) { }
     }
     return invalidValue(typs, val, key, parent)
   }
@@ -223,16 +214,8 @@ function cast<T>(val: any, typ: any): T {
   return transform(val, typ, jsonToJSProps)
 }
 
-function uncast<T>(val: T, typ: any): any {
-  return transform(val, typ, jsToJSONProps)
-}
-
 function l(typ: any) {
   return { literal: typ }
-}
-
-function a(typ: any) {
-  return { arrayItems: typ }
 }
 
 function u(...typs: any[]) {

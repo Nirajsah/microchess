@@ -30,7 +30,7 @@ export default function MyTournaments() {
         const response = await myTournaments()
         const data = JSON.parse(response).data.myTournaments
         setTournamentsList(
-          data.map((t) => ({
+          data.map((t: MyTournaments) => ({
             ...t,
             __renderKey: crypto.randomUUID(), // the tournamentId might be same, the UI doesn't rerender in that case
           }))
@@ -104,11 +104,10 @@ export default function MyTournaments() {
                     />
                     <div className="absolute top-3 right-3 z-10 flex gap-2">
                       <span
-                        className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wide backdrop-blur-md border border-white/10 ${
-                          t.status === 'Published'
-                            ? 'bg-green-500/80 text-white'
-                            : 'bg-gray-700/80 text-gray-300'
-                        }`}
+                        className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wide backdrop-blur-md border border-white/10 ${t.status === 'Published'
+                          ? 'bg-green-500/80 text-white'
+                          : 'bg-gray-700/80 text-gray-300'
+                          }`}
                       >
                         {t.status}
                       </span>

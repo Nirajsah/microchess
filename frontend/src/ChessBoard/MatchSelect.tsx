@@ -331,15 +331,12 @@ function RandomLoading({ cancel }: any) {
   )
 }
 
-function RandomAssignScreen({ chainId, timestamp, back }: any) {
+function RandomAssignScreen({ chainId, back }: any) {
   const assignChain = useWalletStore((s) => s.assignChainAsync)
   const handleStart = async () => {
     try {
-      const res = await assignChain(chainId)
+      await assignChain(chainId)
       back() // just to reset the state
-      // if (res.success) {
-      //   window.location.reload()
-      // }
     } catch (e) {
       console.log(e)
     }

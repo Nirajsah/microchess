@@ -62,6 +62,7 @@ const rounds = [
 /* ---------------- MAIN COMPONENT ---------------- */
 
 export default function Round({ tournamentId }: { tournamentId: string }) {
+  console.log(tournamentId)
   // fetch matches here from supabase
   // if 0 matches return no matches yet
   return (
@@ -140,18 +141,16 @@ function MatchCard({ match, index }: { match: any; index: number }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
-      className={`rounded-lg border border-[#333] bg-[#262626] p-4 flex flex-col gap-3 ${
-        isCompleted ? 'opacity-70' : ''
-      }`}
+      className={`rounded-lg border border-[#333] bg-[#262626] p-4 flex flex-col gap-3 ${isCompleted ? 'opacity-70' : ''
+        }`}
     >
       <div className="flex justify-between items-center text-xs uppercase text-gray-500">
         <span>Match</span>
         <span
-          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-            match.status === 'completed'
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-blue-500/20 text-blue-400'
-          }`}
+          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${match.status === 'completed'
+            ? 'bg-green-500/20 text-green-400'
+            : 'bg-blue-500/20 text-blue-400'
+            }`}
         >
           {match.status}
         </span>
@@ -187,9 +186,8 @@ function PlayerRow({
 }) {
   return (
     <div
-      className={`flex items-center justify-between ${
-        isWinner ? 'text-yellow-400 font-bold' : 'text-gray-300'
-      }`}
+      className={`flex items-center justify-between ${isWinner ? 'text-yellow-400 font-bold' : 'text-gray-300'
+        }`}
     >
       <div className="flex flex-col">
         <span>{player.name}</span>

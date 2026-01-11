@@ -28,10 +28,14 @@ import {
 import { datetimeLocalToMicros, microsToDatetimeLocal } from './utils'
 import { useWalletStore } from '@/store/wallet'
 
-// Fields that can be updated when tournament is in REGISTRATION_OPEN state
-const REGISTRATION_OPEN_EDITABLE_FIELDS = [
+// Fields that can be updated when tournament is NOT in DRAFT state
+// These are cosmetic/descriptive fields that don't violate tournament creation rules
+// Fields NOT in this list (like prizePool, maxPlayers, timeControl, dates, format, gameMode, matchType)
+// are locked once the tournament leaves Draft state
+const NON_DRAFT_EDITABLE_FIELDS = [
   'tournamentName',
   'tournamentDescription',
+  'prizePoolDescription', // Just the description text, not the actual prize amount
   'bannerImageUrl',
   'sponsorLogoUrl',
   'customTags',
@@ -52,7 +56,7 @@ export default function ManageTournament() {
   // Check if tournament is in a state where status can be changed to open registration
   const isTransitioningToOpen =
     tournament?.status === TournamentStatus.Draft &&
-    formData?.status === TournamentStatus.RegistrationClosed
+    formData?.status === TournamentStatus.RegistrationOpen
 
   // Check if a field is editable based on tournament status
   const isFieldEditable = (fieldName: string): boolean => {
@@ -61,9 +65,16 @@ export default function ManageTournament() {
     if (tournament.status === TournamentStatus.Draft) return true
     // In REGISTRATION_OPEN state, only certain fields are editable
     if (tournament.status === TournamentStatus.RegistrationOpen) {
-      return REGISTRATION_OPEN_EDITABLE_FIELDS.includes(fieldName)
+      return NON_DRAFT_EDITABLE_FIELDS.includes(fieldName)
     }
-    // In other states, nothing is editable
+    // In REGISTRATION_CLOSED and IN_PROGRESS states, only status can be changed
+    if (
+      tournament.status === TournamentStatus.RegistrationClosed ||
+      tournament.status === TournamentStatus.InProgress
+    ) {
+      return fieldName === 'status'
+    }
+    // In other states (COMPLETED, CANCELLED), nothing is editable
     return false
   }
 
@@ -449,22 +460,21 @@ export default function ManageTournament() {
                   <Shield className="w-5 h-5 text-yellow-500" /> Configuration
                 </h3>
                 <span
-                  className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                    formData.status === 'DRAFT'
-                      ? 'bg-green-500/20 text-green-500'
-                      : formData.status === 'REGISTRATION_OPEN'
-                        ? 'bg-yellow-500/20 text-yellow-500'
-                        : formData.status === 'IN_PROGRESS'
-                          ? 'bg-blue-500/20 text-blue-500'
-                          : 'bg-gray-500/20 text-gray-500'
-                  }`}
+                  className={`px-2 py-1 rounded text-xs font-bold uppercase ${formData.status === 'DRAFT'
+                    ? 'bg-green-500/20 text-green-500'
+                    : formData.status === 'REGISTRATION_OPEN'
+                      ? 'bg-yellow-500/20 text-yellow-500'
+                      : formData.status === 'IN_PROGRESS'
+                        ? 'bg-blue-500/20 text-blue-500'
+                        : 'bg-gray-500/20 text-gray-500'
+                    }`}
                 >
                   {formData.status?.replace(/_/g, ' ')}
                 </span>
               </div>
 
               <div className="space-y-6">
-                {/* Status Selector - Only show in DRAFT */}
+                {/* Status Selector - Show based on current tournament status */}
                 {isDraft && (
                   <div className="space-y-2">
                     <Label>Status</Label>
@@ -479,16 +489,108 @@ export default function ManageTournament() {
                           label: 'Open Registration',
                           value: TournamentStatus.RegistrationOpen,
                         },
-                        // { label: 'In Progress', value: TournamentStatus.IN_PROGRESS },
-                        // {
-                        //   label: 'Completed',
-                        //   value: TournamentStatus.COMPLETED,
-                        // },
                       ]}
                     />
                     {isTransitioningToOpen && (
                       <p className="text-xs text-yellow-500 mt-1">
                         ⚠️ Saving will publish this tournament
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Status Selector for REGISTRATION_OPEN state */}
+                {tournament?.status === TournamentStatus.RegistrationOpen && (
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      disabled={!isFieldEditable('status')}
+                      options={[
+                        {
+                          label: 'Registration Open',
+                          value: TournamentStatus.RegistrationOpen,
+                        },
+                        {
+                          label: 'Close Registration',
+                          value: TournamentStatus.RegistrationClosed,
+                        },
+                      ]}
+                    />
+                    {formData?.status === TournamentStatus.RegistrationClosed && (
+                      <p className="text-xs text-yellow-500 mt-1">
+                        ⚠️ Saving will close registration for this tournament
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Status Selector for REGISTRATION_CLOSED state */}
+                {tournament?.status === TournamentStatus.RegistrationClosed && (
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      disabled={!isFieldEditable('status')}
+                      options={[
+                        {
+                          label: 'Registration Closed',
+                          value: TournamentStatus.RegistrationClosed,
+                        },
+                        {
+                          label: 'Start Tournament',
+                          value: TournamentStatus.InProgress,
+                        },
+                        {
+                          label: 'Re-open Registration',
+                          value: TournamentStatus.RegistrationOpen,
+                        },
+                      ]}
+                    />
+                    {formData?.status === TournamentStatus.InProgress && (
+                      <p className="text-xs text-yellow-500 mt-1">
+                        ⚠️ Saving will start the tournament
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Status Selector for IN_PROGRESS state */}
+                {tournament?.status === TournamentStatus.InProgress && (
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      disabled={!isFieldEditable('status')}
+                      options={[
+                        {
+                          label: 'In Progress',
+                          value: TournamentStatus.InProgress,
+                        },
+                        {
+                          label: 'Complete Tournament',
+                          value: TournamentStatus.Completed,
+                        },
+                        {
+                          label: 'Cancel Tournament',
+                          value: TournamentStatus.Cancelled,
+                        },
+                      ]}
+                    />
+                    {formData?.status === TournamentStatus.Completed && (
+                      <p className="text-xs text-green-500 mt-1">
+                        ✓ Saving will mark the tournament as completed
+                      </p>
+                    )}
+                    {formData?.status === TournamentStatus.Cancelled && (
+                      <p className="text-xs text-red-500 mt-1">
+                        ⚠️ Saving will cancel the tournament
                       </p>
                     )}
                   </div>
@@ -734,11 +836,10 @@ export default function ManageTournament() {
                           setHasChanges(true)
                         }}
                         disabled={!isFieldEditable('visibility')}
-                        className={`py-2 text-sm font-medium rounded-lg border transition-all ${
-                          formData.visibility === opt
-                            ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
-                            : 'bg-[#1f1f1f] border-[#333] text-gray-500 hover:border-[#444]'
-                        } ${!isFieldEditable('visibility') ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`py-2 text-sm font-medium rounded-lg border transition-all ${formData.visibility === opt
+                          ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500'
+                          : 'bg-[#1f1f1f] border-[#333] text-gray-500 hover:border-[#444]'
+                          } ${!isFieldEditable('visibility') ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {opt.toLowerCase() === 'public'
                           ? 'Public'
