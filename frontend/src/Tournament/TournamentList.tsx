@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Users, Trophy, ArrowRight, Clock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/utils'
-import { microsToDatetimeLocal } from './utils'
+import { formatDate } from './TournamentPage'
 
 export type Tournament = {
   tournament_id: string
@@ -163,21 +163,18 @@ function TournamentCard({
         <span
           className={`
                     px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide backdrop-blur-md border border-white/10
-                    ${
-                      tournament.status === 'IN_PROGRESS'
-                        ? 'bg-red-500/80 text-white animate-pulse'
-                        : ''
-                    }
-                    ${
-                      tournament.status === 'REGISTRATION_OPEN'
-                        ? 'bg-green-500/80 text-white'
-                        : ''
-                    }
-                    ${
-                      tournament.status === 'COMPLETED'
-                        ? 'bg-gray-800/80 text-gray-400'
-                        : ''
-                    }
+                    ${tournament.status === 'IN_PROGRESS'
+              ? 'bg-red-500/80 text-white animate-pulse'
+              : ''
+            }
+                    ${tournament.status === 'REGISTRATION_OPEN'
+              ? 'bg-green-500/80 text-white'
+              : ''
+            }
+                    ${tournament.status === 'COMPLETED'
+              ? 'bg-gray-800/80 text-gray-400'
+              : ''
+            }
                 `}
         >
           {tournament.status === 'IN_PROGRESS' && (
@@ -232,7 +229,7 @@ function TournamentCard({
         <div className="pt-4 border-t border-[#333] flex justify-between items-center text-xs font-medium uppercase tracking-wider text-gray-500">
           <span className="flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5" />
-            {microsToDatetimeLocal(tournament.starting_time)}
+            {formatDate(tournament.starting_time)}
           </span>
           <span className="flex items-center gap-1 group-hover:translate-x-1 transition-transform text-white">
             Details <ArrowRight className="w-3 h-3" />

@@ -67,11 +67,11 @@ type Tournament = {
   tournamentparticipants: Participant[]
 }
 
-function shortAddress(addr: string) {
+export function shortAddress(addr: string) {
   return addr.slice(0, 6) + '...' + addr.slice(-4)
 }
 
-function formatDate(timestamp: number): string {
+export function formatDate(timestamp: number): string {
   return new Date(timestamp / 1000).toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
@@ -80,7 +80,7 @@ function formatDate(timestamp: number): string {
   })
 }
 
-function formatTime(timestamp: number): string {
+export function formatTime(timestamp: number): string {
   return new Date(timestamp / 1000).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
