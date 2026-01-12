@@ -28,13 +28,13 @@ export const PlayerInfo = ({
       try {
         if (isOpponent && id) {
           const res = await opponentProfile(id)
-          const data = JSON.parse(res.result).data.opponentProfile
+          const data = JSON.parse(res).data.opponentProfile
           if (data) {
             setProfile({ name: data.name })
           }
         } else if (!isOpponent) {
           const res = await getProfile()
-          const data = JSON.parse(res.result).data.profile
+          const data = JSON.parse(res).data.profile
           if (data) {
             setProfile({ name: data.name })
           }

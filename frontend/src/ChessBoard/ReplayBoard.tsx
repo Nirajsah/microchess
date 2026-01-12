@@ -148,7 +148,7 @@ export default function ReplayBoard() {
     const fetchSanFromBlob = async () => {
       try {
         const response = await getSanFromBlob(id!)
-        const data = JSON.parse(response.result).data.readMoves
+        const data = JSON.parse(response).data.readMoves
         setSan(data)
       } catch (error) {
         console.error('Error fetching my tournaments:', error)

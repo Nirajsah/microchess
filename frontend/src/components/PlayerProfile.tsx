@@ -48,7 +48,7 @@ export const PlayerProfile = () => {
   React.useEffect(() => {
     const fetchMatches = async () => {
       const data = await getMatchHistory()
-      const matches = JSON.parse(data.result).data.matchHistoryAll
+      const matches = JSON.parse(data).data.matchHistoryAll
       setMatchHistory(matches)
     }
     if (!user) return

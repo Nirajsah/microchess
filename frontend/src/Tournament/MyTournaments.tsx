@@ -4,6 +4,7 @@ import Navbar from '../ChessBoard/Navbar'
 import { motion } from 'framer-motion'
 import { Users, Trophy, Settings, ChevronLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useWalletStore } from '@/store/wallet'
 
 type MyTournaments = {
   tournamentId: string
@@ -14,25 +15,33 @@ type MyTournaments = {
   prizePool: string
   bannerImageUrl: string
   status: string
+  __renderkey: any
 }
 
 export default function MyTournaments() {
   const navigate = useNavigate()
+  const refetch = useWalletStore((s) => s.refetch)
+  const [renderVersion, setRenderVersion] = useState(0)
 
   const [tournaments, setTournamentsList] = useState<MyTournaments[]>([])
-
   useEffect(() => {
     const fetchMyTournaments = async () => {
       try {
         const response = await myTournaments()
-        const data = JSON.parse(response.result).data.myTournaments
-        setTournamentsList(data)
+        const data = JSON.parse(response).data.myTournaments
+        setTournamentsList(
+          data.map((t: MyTournaments) => ({
+            ...t,
+            __renderKey: crypto.randomUUID(), // the tournamentId might be same, the UI doesn't rerender in that case
+          }))
+        )
+        setRenderVersion((prev) => prev + 1)
       } catch (error) {
         console.error('Error fetching my tournaments:', error)
       }
     }
     fetchMyTournaments()
-  }, [])
+  }, [refetch])
 
   return (
     <div className="min-h-screen w-full bg-[#161616] text-white flex flex-col font-sansation selection:bg-yellow-500/30">
@@ -73,10 +82,13 @@ export default function MyTournaments() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tournaments.map((t: MyTournaments) => (
+            <div
+              key={renderVersion}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              {tournaments.map((t: MyTournaments, index) => (
                 <div
-                  key={t.tournamentId}
+                  key={(t.__renderkey, index)}
                   onClick={() => navigate(`/tournaments/my/${t.tournamentId}`)}
                   className="group bg-[#262626] border border-[#333] rounded-[18px] overflow-hidden cursor-pointer hover:border-yellow-500/50 hover:shadow-xl hover:shadow-yellow-900/10 transition-all duration-300 relative flex flex-col h-full"
                 >
@@ -111,8 +123,7 @@ export default function MyTournaments() {
                         {t.maxPlayers}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Trophy className="w-4 h-4" />
-                        $ {t.prizePool}
+                        <Trophy className="w-4 h-4" />$ {t.prizePool}
                       </span>
                     </div>
                     <div className="mt-auto pt-4 flex items-center justify-between text-yellow-500 font-medium text-sm">

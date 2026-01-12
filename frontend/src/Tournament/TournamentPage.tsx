@@ -24,6 +24,7 @@ import {
   Crown,
   Sparkles,
 } from 'lucide-react'
+import Round from './Round'
 
 type Participant = {
   id: string
@@ -36,41 +37,42 @@ type Participant = {
 
 type Tournament = {
   tournament_id: string
-  organiserChain: string
-  organiserId: string
-  organiserName: string
-  tournamentName: string
-  tournamentDescription: string | null
-  tournamentFormat: string
-  matchType: string
-  gameMode: string
-  timeControlBaseMinutes: number
-  timeControlIncrementSeconds: number
-  timeControlModeLabel: string | null
-  maxPlayers: number | null
-  minPlayers: number | null
-  startingTime: number
-  endTime: number
-  prizePoolDescription: string | null
+  organiser_chain: string
+  organiser_id: string
+  organiser_name: string
+  tournament_name: string
+  tournament_description: string | null
+  tournament_format: string
+  tournament_chain: string
+  match_type: string
+  game_mode: string
+  time_control_base_minutes: number
+  time_control_increment_seconds: number
+  time_control_mode_label: string | null
+  max_players: number | null
+  min_players: number | null
+  starting_time: number
+  end_time: number
+  prize_pool_description: string | null
   visibility: string
-  bannerImageUrl: string | null
-  sponsorLogoUrl: string | null
-  prizeType: string
-  prizePool: number
-  customTags: string[]
+  banner_image_url: string | null
+  sponsor_logo_url: string | null
+  prize_type: string
+  prize_pool: number
+  custom_tags: string[]
   version: string
-  createdAt: number
-  updatedAt: number
+  created_at: number
+  updated_at: number
   status: string
   tournamentparticipants: Participant[]
 }
 
-function shortAddress(addr: string) {
+export function shortAddress(addr: string) {
   return addr.slice(0, 6) + '...' + addr.slice(-4)
 }
 
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString('en-US', {
+export function formatDate(timestamp: number): string {
+  return new Date(timestamp / 1000).toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -78,16 +80,18 @@ function formatDate(timestamp: number): string {
   })
 }
 
-function formatTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString('en-US', {
+export function formatTime(timestamp: number): string {
+  return new Date(timestamp / 1000).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   })
 }
 
 function getTimeUntil(timestamp: number): string {
-  const now = Date.now()
-  const diff = timestamp - now
+  const nowMillis = Date.now() // Current time in milliseconds
+  const targetMillis = timestamp / 1000 // Convert microseconds to milliseconds
+  const diff = targetMillis - nowMillis
+
   if (diff <= 0) return 'Started'
 
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
@@ -160,19 +164,18 @@ export default function TournamentPage() {
   useEffect(() => {
     async function getTournament() {
       const { data, error } = await supabase
-        .from('tournaments')
+        .from('tournaments_v2')
         .select(
-          `
-        *,
-        tournament_participants (
-          id,
-          tournament_id,
-          player_name,
-          player_elo,
-          player_ath,
-          player_matches
-        )
-      `
+          `*,
+          participants:tournament_participants_v2 (
+            id,
+            tournament_id,
+            player_name,
+            player_elo,
+            player_ath,
+            player_matches
+          )
+        `
         )
         .eq('tournament_id', tournamentId)
         .single()
@@ -184,39 +187,51 @@ export default function TournamentPage() {
       }
 
       setTournament(data)
-      setParticipants(data.tournament_participants ?? [])
+      setParticipants(data.participants ?? [])
     }
 
     getTournament()
 
-    const channel_tournament = supabase
-      .channel('tournament-changes')
+    const channel = supabase
+      .channel('tournament-live')
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
-          table: 'tournaments',
+          table: 'tournaments_v2',
+          filter: `tournament_id=eq.${tournamentId}`,
         },
-        () => {
-          getTournament()
-        }
+        getTournament
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tournament_participants_v2',
+          filter: `tournament_id=eq.${tournamentId}`,
+        },
+        getTournament
       )
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel_tournament)
+      supabase.removeChannel(channel)
     }
   }, [])
 
-  const handleRegister = async (tournamentId: string) => {
+  const handleRegister = async (
+    tournamentId: string,
+    tournamentChain: string
+  ) => {
     if (!name) {
       toast.error('Please update your profile first')
       return
     }
     setIsRegistering(true)
     try {
-      await tournamentRegistration(tournamentId)
+      await tournamentRegistration(tournamentId, tournamentChain)
       toast.success('Successfully registered for the tournament!')
     } catch {
       toast.error('Failed to register')
@@ -245,28 +260,26 @@ export default function TournamentPage() {
     )
   }
 
-
   const statusConfig = getStatusConfig(tournament.status)
   const StatusIcon = statusConfig.icon
-  const spotsLeft = tournament.maxPlayers
-    ? tournament.maxPlayers - participants.length
+  const spotsLeft = tournament.max_players
+    ? tournament.max_players - participants.length
     : null
   const isRegistrationOpen = tournament.status === 'REGISTRATION_OPEN'
-  const progress = tournament.maxPlayers
-    ? (participants.length / tournament.maxPlayers) * 100
+  const progress = tournament.max_players
+    ? (participants.length / tournament.max_players) * 100
     : 0
 
   return (
     <div className="min-h-screen w-full bg-[#161616] text-white flex flex-col font-sansation">
       <Navbar />
-
       <div className="flex-1 flex flex-col">
         {/* Hero Section with Banner */}
         <div className="relative w-full h-[450px] md:h-[500px] overflow-hidden">
           {/* Background Image */}
-          {tournament.bannerImageUrl ? (
+          {tournament.banner_image_url ? (
             <img
-              src={tournament.bannerImageUrl}
+              src={tournament.banner_image_url}
               alt="Tournament Banner"
               className="absolute inset-0 w-full h-full object-cover"
             />
@@ -298,7 +311,7 @@ export default function TournamentPage() {
                 )}
               </motion.div>
 
-              {tournament.customTags?.slice(0, 3).map((tag, i) => (
+              {tournament.custom_tags?.slice(0, 3).map((tag, i) => (
                 <span
                   key={i}
                   className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-gray-300 backdrop-blur-md"
@@ -314,7 +327,7 @@ export default function TournamentPage() {
               animate={{ opacity: 1, y: 0 }}
               className="text-4xl md:text-6xl lg:text-7xl font-black text-white tracking-tight mb-4 drop-shadow-2xl"
             >
-              {tournament.tournamentName}
+              {tournament.tournament_name}
             </motion.h1>
 
             {/* Quick Info Row */}
@@ -329,28 +342,29 @@ export default function TournamentPage() {
                 <span className="text-sm">
                   Hosted by{' '}
                   <span className="text-white font-medium">
-                    {tournament.organiserName}
+                    {tournament.organiser_name}
                   </span>
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-yellow-500" />
                 <span className="text-sm">
-                  {formatDate(tournament.startingTime)}
+                  {formatDate(tournament.starting_time)}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-yellow-500" />
                 <span className="text-sm">
                   {participants.length}
-                  {tournament.maxPlayers && ` / ${tournament.maxPlayers}`}{' '}
+                  {tournament.max_players &&
+                    ` / ${tournament.max_players}`}{' '}
                   Players
                 </span>
               </div>
             </motion.div>
 
             {/* Sponsor Badge */}
-            {tournament.sponsorLogoUrl && (
+            {tournament.sponsor_logo_url && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -362,7 +376,7 @@ export default function TournamentPage() {
                     Sponsored by
                   </span>
                   <img
-                    src={tournament.sponsorLogoUrl}
+                    src={tournament.sponsor_logo_url}
                     alt="Sponsor"
                     className="h-8 object-contain brightness-110"
                   />
@@ -412,7 +426,7 @@ export default function TournamentPage() {
                       </p>
 
                       {/* Progress Bar */}
-                      {tournament.maxPlayers && (
+                      {tournament.max_players && (
                         <div className="mt-4">
                           <div className="flex justify-between text-sm mb-1">
                             <span className="text-gray-500">
@@ -435,7 +449,12 @@ export default function TournamentPage() {
                     </div>
 
                     <button
-                      onClick={() => handleRegister(tournament.tournament_id)}
+                      onClick={() =>
+                        handleRegister(
+                          tournament.tournament_id,
+                          tournament.tournament_chain
+                        )
+                      }
                       disabled={isRegistering}
                       className="group relative px-8 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-bold text-lg rounded-xl shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40 transition-all duration-300 transform hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 whitespace-nowrap"
                     >
@@ -468,7 +487,7 @@ export default function TournamentPage() {
                   About This Tournament
                 </h2>
                 <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                  {tournament.tournamentDescription ||
+                  {tournament.tournament_description ||
                     'No description provided.'}
                 </p>
               </motion.div>
@@ -483,22 +502,22 @@ export default function TournamentPage() {
                 <InfoCard
                   icon={Gamepad2}
                   label="Format"
-                  value={tournament.tournamentFormat?.replace(/_/g, ' ')}
+                  value={tournament.tournament_format?.replace(/_/g, ' ')}
                 />
                 <InfoCard
                   icon={Shield}
                   label="Match Type"
-                  value={tournament.matchType?.replace(/_/g, ' ')}
+                  value={tournament.match_type?.replace(/_/g, ' ')}
                 />
                 <InfoCard
                   icon={Zap}
                   label="Game Mode"
-                  value={tournament.gameMode?.replace(/_/g, ' ')}
+                  value={tournament.game_mode?.replace(/_/g, ' ')}
                 />
                 <InfoCard
                   icon={Timer}
                   label="Time Control"
-                  value={`${tournament.timeControlBaseMinutes}+${tournament.timeControlIncrementSeconds}`}
+                  value={`${tournament.time_control_base_minutes}+${tournament.time_control_increment_seconds}`}
                 />
               </motion.div>
 
@@ -521,14 +540,14 @@ export default function TournamentPage() {
                     <div>
                       <p className="text-gray-500 text-sm mb-1">Starts</p>
                       <p className="text-white font-bold text-lg">
-                        {formatDate(tournament.startingTime)}
+                        {formatDate(tournament.starting_time)}
                       </p>
                       <p className="text-gray-400 text-sm">
-                        {formatTime(tournament.startingTime)}
+                        {formatTime(tournament.starting_time)}
                       </p>
-                      {tournament.startingTime > Date.now() && (
+                      {tournament.starting_time > Date.now() && (
                         <p className="text-emerald-400 text-sm mt-1 font-medium">
-                          in {getTimeUntil(tournament.startingTime)}
+                          in {getTimeUntil(tournament.starting_time)}
                         </p>
                       )}
                     </div>
@@ -540,10 +559,10 @@ export default function TournamentPage() {
                     <div>
                       <p className="text-gray-500 text-sm mb-1">Ends</p>
                       <p className="text-white font-bold text-lg">
-                        {formatDate(tournament.endTime)}
+                        {formatDate(tournament.end_time)}
                       </p>
                       <p className="text-gray-400 text-sm">
-                        {formatTime(tournament.endTime)}
+                        {formatTime(tournament.end_time)}
                       </p>
                     </div>
                   </div>
@@ -564,7 +583,7 @@ export default function TournamentPage() {
                   </h2>
                   <span className="px-3 py-1 rounded-full bg-[#333] text-gray-300 text-sm font-medium">
                     {participants.length}
-                    {tournament.maxPlayers && ` / ${tournament.maxPlayers}`}
+                    {tournament.max_players && ` / ${tournament.max_players}`}
                   </span>
                 </div>
 
@@ -663,19 +682,19 @@ export default function TournamentPage() {
                     </span>
                   </div>
                   <div className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2">
-                    ${tournament.prizePool?.toLocaleString() || '0'}
+                    ${tournament.prize_pool?.toLocaleString() || '0'}
                   </div>
                   <span className="inline-block px-2 py-1 rounded-md bg-yellow-500/10 text-yellow-500 text-xs font-bold">
-                    {tournament.prizeType}
+                    {tournament.prize_type}
                   </span>
 
-                  {tournament.prizePoolDescription && (
+                  {tournament.prize_pool_description && (
                     <div className="mt-4 pt-4 border-t border-[#333]">
                       <p className="text-gray-500 text-xs uppercase tracking-wide mb-2">
                         Distribution
                       </p>
                       <div className="space-y-2">
-                        {tournament.prizePoolDescription
+                        {tournament.prize_pool_description
                           .split('\n')
                           .map((line, i) => (
                             <div
@@ -707,11 +726,11 @@ export default function TournamentPage() {
                 <div className="space-y-4">
                   <StatRow
                     label="Min Players"
-                    value={tournament.minPlayers?.toString() || 'N/A'}
+                    value={tournament.min_players?.toString() || 'N/A'}
                   />
                   <StatRow
                     label="Max Players"
-                    value={tournament.maxPlayers?.toString() || 'Unlimited'}
+                    value={tournament.max_players?.toString() || 'Unlimited'}
                   />
                   <StatRow
                     label="Visibility"
@@ -720,7 +739,7 @@ export default function TournamentPage() {
                   />
                   <StatRow
                     label="Created"
-                    value={formatDate(tournament.createdAt)}
+                    value={formatDate(tournament.created_at)}
                   />
                 </div>
               </motion.div>
@@ -739,12 +758,12 @@ export default function TournamentPage() {
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center border-2 border-yellow-500/30">
                     <span className="font-bold text-yellow-500 text-xl">
-                      {tournament.organiserName?.[0]?.toUpperCase() || 'O'}
+                      {tournament.organiser_name?.[0]?.toUpperCase() || 'O'}
                     </span>
                   </div>
                   <div>
                     <p className="font-bold text-white">
-                      {tournament.organiserName}
+                      {tournament.organiser_name}
                     </p>
                     <p className="text-gray-500 text-sm">Tournament Host</p>
                   </div>
@@ -752,6 +771,7 @@ export default function TournamentPage() {
               </motion.div>
             </div>
           </div>
+          <Round tournamentId={tournament.tournament_id} />
         </div>
       </div>
     </div>

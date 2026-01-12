@@ -7,14 +7,19 @@ use std::sync::Arc;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use chess::{
     leaderboard::Leaderboard,
-    playerprofile::{PlayerInfo, PlayerProfile},
-    tournament::Tournament,
-    GameChain, LastMove, MatchHistory, Operation, PlayersTime,
+    matches::TimedToken,
+    notifications::Notification,
+    player::{MatchHistory, PlayerInfo, PlayerProfile, PlayersTime},
+    tournament::{
+        utils::{Match, TournamentRound},
+        Tournament,
+    },
+    ChainType, LastMove, Operation,
 };
 use linera_sdk::{
     abi::WithServiceAbi,
     graphql::GraphQLMutationRoot,
-    linera_base_types::{AccountOwner, DataBlobHash, TimeDelta},
+    linera_base_types::{AccountOwner, ChainId, DataBlobHash},
     views::View,
     Service, ServiceRuntime,
 };
@@ -68,12 +73,6 @@ struct GameData {
     last_move: Option<LastMove>,
 }
 
-#[derive(Deserialize, Serialize, SimpleObject)]
-struct TournamentParticipant {
-    id: AccountOwner,
-    player: PlayerInfo,
-}
-
 #[Object]
 impl ChessService {
     async fn game_data(&self, player: AccountOwner) -> GameData {
@@ -95,20 +94,8 @@ impl ChessService {
         }
     }
 
-    async fn game_chain(&self) -> Option<GameChain> {
-        if let Some(game_data) = self.state.game_chain.get() {
-            let now = self.runtime.system_time();
-            let expiry = game_data.timestamp.saturating_add(TimeDelta::from_secs(90)); // 1.30 secs MAX
-
-            // If expired → return None
-            if now < expiry {
-                Some(game_data.clone())
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+    async fn game_chain(&self) -> &Option<ChainId> {
+        self.state.game_chain.get()
     }
 
     async fn opponent_profile(&self, opponent: AccountOwner) -> Option<PlayerInfo> {
@@ -139,8 +126,20 @@ impl ChessService {
         self.state.game_count.get()
     }
 
-    async fn friend_id(&self) -> &str {
-        self.state.game_token.get()
+    // we need to encode the profile here, with timedToken
+    async fn friend_id(&self) -> Option<String> {
+        if let Some(profile) = self.state.profile.get() {
+            let mut profile = profile.clone();
+            let now = self.runtime.system_time();
+            if let Some(hash) = profile.encode() {
+                let token = TimedToken::new(now, hash).encode_token();
+                return Some(token);
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 
     async fn leaderboard(&self) -> &Vec<Leaderboard> {
@@ -171,71 +170,74 @@ impl ChessService {
 
     /// Read moves from datablob
     async fn read_moves(&self, hash: DataBlobHash) -> Vec<String> {
-        if let Ok(moves) = postcard::from_bytes::<Vec<String>>(&self.runtime.read_data_blob(hash)) {
-            moves
+        postcard::from_bytes::<Vec<String>>(&self.runtime.read_data_blob(hash)).unwrap_or_default()
+    }
+
+    async fn my_tournaments(&self) -> Vec<Tournament> {
+        if self.state.chain_type.get() == &ChainType::TournamentChain {
+            if let Some(tournament) = self.state.tournament.get() {
+                vec![tournament.clone()]
+            } else {
+                Vec::new()
+            }
         } else {
-            vec![]
+            self.state.my_tournaments.get().clone()
         }
-    }
-
-    async fn tournament(&self, id: String) -> Option<Tournament> {
-        let data = self
-            .state
-            .tournaments
-            .get(&id)
-            .await
-            .expect("failed to get data");
-
-        data
-    }
-
-    async fn my_tournaments(&self) -> &Vec<Tournament> {
-        self.state.my_tournaments.get()
     }
 
     async fn my_tournament(&self, tournament_id: String) -> Option<&Tournament> {
-        if let Some(tournament) = self
-            .state
-            .my_tournaments
-            .get()
-            .iter()
-            .find(|t| t.tournament_id == tournament_id)
-        {
-            Some(tournament)
+        if self.state.chain_type.get() == &ChainType::TournamentChain {
+            self.state.tournament.get().as_ref()
         } else {
-            None
+            return self
+                .state
+                .my_tournaments
+                .get()
+                .iter()
+                .find(|t| t.tournament_id.clone() == tournament_id);
         }
     }
 
-    async fn all_tournaments(&self) -> &Vec<Tournament> {
-        self.state.all_tournaments.get()
+    async fn tournament(&self) -> &Option<Tournament> {
+        self.state.tournament.get()
     }
 
-    async fn participants(&self, tournament_id: String) -> Vec<TournamentParticipant> {
-        let mut participants = Vec::new();
+    async fn participants(&self) -> Option<String> {
+        let p = self.state.participants.get();
+        p.as_ref().map(|p| p.encode())
+    }
 
-        let Some(player_ids) = self
+    // TO BE REMOVED
+    async fn tournament_matches(&self, id: String) -> Option<Vec<Match>> {
+        let matches = self
             .state
-            .participants
-            .get(&tournament_id)
+            .tournament_matches
+            .get(&id)
             .await
             .ok()
-            .flatten()
-        else {
-            return participants;
-        };
+            .flatten()?;
 
-        for id in player_ids {
-            let Some(p) = self.state.tournament_players.get(&id).await.ok().flatten() else {
-                continue; // skip missing player instead of panicking
-            };
+        Some(matches)
+    }
 
-            participants.push(TournamentParticipant {
-                id,
-                player: p.decode().info(),
-            });
-        }
+    async fn notifications(&self) -> &Vec<Notification> {
+        self.state.notifications.get()
+    }
 
-        participants
+    async fn notification_count(&self) -> usize {
+        self.state
+            .notifications
+            .get()
+            .iter()
+            .filter(|n| !n.read)
+            .count()
+    }
+
+    async fn tournament_chains(&self) -> &Vec<ChainId> {
+        self.state.tournament_chains.get()
+    }
+
+    async fn tournament_round(&self) -> Option<&TournamentRound> {
+        self.state.tournament_rounds.get().last()
     }
 }

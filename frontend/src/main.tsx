@@ -6,11 +6,13 @@ import NotFound from './NotFound.tsx'
 import ChessBoard from './ChessBoard/index.tsx'
 import WalletSheet from './components/WalletSheet.tsx'
 import ReplayBoard from './ChessBoard/ReplayBoard.tsx'
-import TournamentPage from './Tournament/TournamentPage.tsx'
-import TournamentList from './Tournament/TournamentList.tsx'
-import CreateTournament from './Tournament/CreateTournament.tsx'
-import MyTournaments from './Tournament/MyTournaments.tsx'
-import MyTournament from './Tournament/MyTournament.tsx'
+import {
+  CreateTournament,
+  MyTournament,
+  MyTournaments,
+  TournamentList,
+  TournamentPage,
+} from '@/Tournament'
 import { Toaster } from 'sonner'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

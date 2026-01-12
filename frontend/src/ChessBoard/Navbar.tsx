@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom'
 import React from 'react'
 import { storage } from '@/api'
 import { ThemeName } from '../components/theme'
+import { Notifications } from '@/components/Notifications'
+import { BellIcon } from 'lucide-react'
 
 export default function Navbar() {
   const handleGetStarted = useUserStore((s) => s.handleGetStarted)
@@ -14,17 +16,42 @@ export default function Navbar() {
   const ready = useWalletStore((s) => s.ready)
   const updateTheme = useUserStore((s) => s.updateTheme)
 
+  const [notificationCount, setNotificationCount] = React.useState(0)
+  const [showNotificationMenu, setShowNotificationMenu] = React.useState(false)
+
   React.useEffect(() => {
     checkWalletExistsAsync()
     const stroage_theme = storage.getTheme()
     updateTheme(stroage_theme as ThemeName)
-  }, [])
+  })
+
+  const notificationRef = React.useRef<HTMLDivElement | null>(null)
+
+  React.useEffect(() => {
+    if (!showNotificationMenu) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target as Node)
+      ) {
+        setShowNotificationMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showNotificationMenu])
+
+  React.useEffect(() => {
+    checkWalletExistsAsync()
+  })
 
   React.useEffect(() => {
     if (walletExists && !ready) {
       initAsync()
     }
-  }, [walletExists])
+  }, [walletExists, ready, initAsync])
 
   return (
     <div className="w-full h-14 p-3 flex justify-center">
@@ -32,12 +59,38 @@ export default function Navbar() {
         <Link to="/">
           <div className="text-xl">MicroChess</div>
         </Link>
-        <button
-          className="text-md max-w-[200px] truncate lg:w-full lg:max-w-full text-end"
-          onClick={handleGetStarted}
-        >
-          {pubKey ? pubKey : 'Get Started'}
-        </button>
+        <div className="flex">
+          {/* Notification Bell */}
+          <div ref={notificationRef} className="relative">
+            <button
+              onClick={() => setShowNotificationMenu((prev) => !prev)}
+              className="relative p-2"
+            >
+              <BellIcon />
+
+              {notificationCount > 0 && (
+                <span
+                  className="absolute top-1 right-1 min-w-[14px] h-[14px] px-1
+                       text-[10px] font-semibold text-white bg-red-600 rounded-full
+                       flex items-center justify-center"
+                >
+                  {notificationCount > 99 ? '99+' : notificationCount}
+                </span>
+              )}
+            </button>
+
+            {showNotificationMenu && (
+              <Notifications onReadAll={() => setNotificationCount(0)} />
+            )}
+          </div>
+
+          <button
+            onClick={handleGetStarted}
+            className="px-6 py-2 rounded-3xl truncate lg:w-full lg:max-w-fit cursor-pointer text-end hover:scale-105 duration-300 transition-all"
+          >
+            {pubKey ? pubKey : 'Get Started'}
+          </button>
+        </div>
       </div>
     </div>
   )

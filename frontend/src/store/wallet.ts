@@ -1,7 +1,8 @@
 import { create } from 'zustand'
-import { Result, Server } from '../../public/croissant/wallet'
+import { Result, Server } from '@/croissant/wallet'
 import { checkWalletExists } from '@/lib/checkWalletExist'
-import { ChainInfo, Convert } from '@/lib/chainsType'
+import { ChainEntry, ChainId, Convert } from '@/lib/chainsType'
+import { Application, Chain, NotificationHandle } from '@/croissant/wasm'
 
 type Request = {
   type: 'QUERY'
@@ -10,6 +11,18 @@ type Request = {
 }
 
 type WalletStore = {
+  /** Chain Manager */
+  chainClients: Map<ChainId, Chain>
+  // activeChainId: ChainId | null
+  activeClient: Chain | null
+  activeApplication: Application | null
+  activeChain: ChainId | null
+
+  setInUseAsync: (chain: ChainId) => Promise<void>
+  getBalanceAsync: (chain?: ChainId) => Promise<string>
+  abortNotificationHandler: () => void
+  notificationHandler: NotificationHandle | null
+
   /** Foundational Setup */
   server: Server | null
   ready: boolean
@@ -26,15 +39,12 @@ type WalletStore = {
   chainBalance: string
   pubKey: string | null
   defaultChain: string | null
-  chains: ChainInfo[] | null
+  chains: ChainEntry[] | null
   setRefetch: () => void
 
   /** User methods */
-  requestAsync: (req: Request) => Promise<void>
-  assignChainAsync: (data: {
-    chainId: string
-    timestamp: number
-  }) => Promise<Result<string>>
+  requestAsync: (req: Request) => Promise<string>
+  assignChainAsync: (chainId: string) => Promise<Result<string>>
   setDefaultAsync: (chainId: string) => Promise<Result<string>>
 }
 
@@ -43,8 +53,14 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   ready: false,
   notification: null,
   walletExists: false,
-  chainBalance: '',
+  chainBalance: '0',
   refetch: false,
+
+  activeChain: null,
+  activeApplication: null,
+  notificationHandler: null,
+  chainClients: new Map(),
+  activeClient: null,
 
   pubKey: null,
   defaultChain: null,
@@ -61,14 +77,14 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     const { walletExists, server } = get()
 
     if (!walletExists || !server) return
+
     try {
       const res = await server.JsWallet()
-      const wallet = Convert.toWallet(res)
-      const defaultChain = wallet.defaultChain
-      const chains = Object.values(wallet.chains)
-      const bal = (await server.getBalance()) || '0'
-      const id = chains[0].owner
-      set({ chains, pubKey: id, defaultChain, chainBalance: bal })
+      const wallet = Convert.chainsAsList(res)
+      const defaultChain = wallet.default
+      const chains = wallet.chains
+      const id = chains[0].chainInfo.owner
+      set({ chains, pubKey: id, defaultChain })
     } catch (e: any) {
       return e
     }
@@ -80,15 +96,23 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   },
 
   initAsync: async () => {
-    const { walletExists, ready } = get()
+    const { walletExists, ready, defaultChain } = get()
+
     if (!walletExists || ready) return
 
     try {
       const server = await Server.init() // returns existing instance, else creates new
-      await server.initClient((data) => {
+      const activeClient = await server.initClient()
+      activeClient.onNotification((data: any) => {
         set((state) => (state.notification = data))
       })
-      set({ server, ready: true })
+
+      set({
+        server,
+        ready: true,
+        activeClient,
+        activeChain: defaultChain as ChainId,
+      })
     } catch {
       return
     }
@@ -99,30 +123,73 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     const server = await Server.init() // returns existing instance, else creates new (here it will create a new instance)
     if (!server || walletExists) return // this means the wasm instance is ready, but we don't have a wallet yet.
     try {
-      await server.create((data) => {
-        set((state) => (state.notification = data))
-      }) // this creates a new wallet and starts the client
-
-      set({ server, ready: true, walletExists: true })
+      const res = await server.create() // this creates a new wallet and starts the client
+      if (res.success) {
+        const chain = res.result
+        chain.onNotification((data: any) => {
+          set((state) => (state.notification = data))
+        })
+        set({ server, ready: true, walletExists: true, activeClient: chain })
+      } else {
+        console.error(res.error)
+      }
     } catch (error) {
       console.error(error)
     }
   },
 
-  requestAsync: async (req: Request): Promise<any> => {
-    const server = get().server
-    if (!server) throw new Error('failed server does not exist')
-    return await server.request(req)
+  requestAsync: async (req: Request): Promise<string> => {
+    const { activeClient, activeApplication } = get()
+    if (!activeClient) throw new Error('failed server does not exist')
+    if (!activeApplication) {
+      const app = await activeClient.application(req.applicationId)
+      const res = await app.query(req.query)
+      set({ activeApplication: app })
+      return res
+    } else {
+      return await activeApplication.query(req.query)
+    }
   },
 
-  assignChainAsync: async (data: {
-    chainId: string
-    timestamp: number
-  }): Promise<Result<string>> => {
-    const { server, ready } = get()
+  getBalanceAsync: async (chain?: string): Promise<string> => {
+    const { chainClients, activeClient, server } = get()
+    if (chain) {
+      const chainClient = chainClients.get(chain as ChainId)
+      if (chainClient) {
+        return await chainClient.balance()
+      } else {
+        if (!server) throw new Error('Something is wrong..., Server is missing')
+        const chainClient = await server.initChainClient(chain as ChainId)
+        set({ chainClients: chainClients.set(chain as ChainId, chainClient) })
+        return chainClient.balance()
+      }
+    }
+
+    if (!activeClient) throw new Error('ActiveClient does not exist')
+    return await activeClient.balance()
+  },
+
+  assignChainAsync: async (chainId: string): Promise<Result<string>> => {
+    const { server, ready, refetch, abortNotificationHandler, chainClients } =
+      get()
+
     if (!server || !ready)
       return { success: false, error: 'Server is not ready..' }
-    return await server.assign(data)
+    const chain = await server.assign(chainId)
+    abortNotificationHandler()
+    const aborter = chain.onNotification((data: any) => {
+      set((state) => (state.notification = data))
+    })
+    set({
+      activeClient: chain,
+      refetch: !refetch,
+      notificationHandler: aborter,
+      activeApplication: null,
+      chainClients: chainClients.set(chainId as ChainId, chain),
+      activeChain: chainId as ChainId,
+    })
+
+    return { success: true, result: 'Chain Assigned' }
   },
 
   setDefaultAsync: async (chainId: string): Promise<Result<string>> => {
@@ -130,10 +197,52 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     if (!server || !ready)
       return { success: false, error: 'Server is not ready..' }
     try {
-      let res = await server.setDefault(chainId)
+      const res = await server.setDefault(chainId)
       return res
     } catch (e) {
       return { success: false, error: 'Failed to set Default chain..' }
     }
+  },
+
+  setInUseAsync: async (chainId: string) => {
+    const { server, chainClients, refetch, abortNotificationHandler } = get()
+
+    const chainClient = chainClients.get(chainId as ChainId)
+    if (!chainClient) {
+      if (!server) throw new Error('Something is wrong..., Server is missing')
+      abortNotificationHandler()
+      const chainClient = await server.initChainClient(chainId as ChainId)
+      const aborter = chainClient.onNotification((data: any) => {
+        set((state) => (state.notification = data))
+      })
+      set({
+        activeClient: chainClient,
+        chainClients: chainClients.set(chainId as ChainId, chainClient),
+        refetch: !refetch,
+        notificationHandler: aborter,
+        activeApplication: null,
+        activeChain: chainId as ChainId,
+      })
+    } else {
+      abortNotificationHandler()
+      const aborter = chainClient.onNotification((data: any) => {
+        set((state) => (state.notification = data))
+      })
+      set({
+        activeClient: chainClient,
+        refetch: !refetch,
+        notificationHandler: aborter,
+        activeApplication: null,
+        activeChain: chainId as ChainId,
+      })
+    }
+  },
+
+  abortNotificationHandler: () => {
+    const { notificationHandler } = get()
+    if (notificationHandler) {
+      notificationHandler.unsubscribe()
+    }
+    set({ notificationHandler: null })
   },
 }))

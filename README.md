@@ -37,31 +37,44 @@ pnpm dev
 **make sure to clone and build the croissant wallet and set it up as extension**
 https://github.com/Nirajsah/croissant
 
-## MicroChess Completed Features
+### Tournament System Requirements
 
-### Foundation and Initial Development
+**Core Tournament Management**
 
-- Implemented basic game logic.
-- Set up the chessboard and pieces.
-- Basic move handling.
-- FEN string generation and processing.
+- [x] Enable users to create and host tournaments
+- [x] Allow users to register for tournaments
+- [ ] Allow participants to withdraw from tournaments
+- [ ] Maintain and progress tournament state through defined phases (registration, active rounds, completed)
 
-### Move Validation of Each Piece
+**Pairings and Structure**
 
-- Implemented move validation for:
-  - Pawns
-  - Knights
-  - Bishops
-  - Rooks
-  - Queens
-  - Kings
+- [x] Automatically generate participant pairings
+- [x] Automatically generate round brackets
+- [ ] Support multiple tournament formats:
+  - [x] Swiss System
+  - [ ] Round Robin
+
+**Match and Round Execution**
+
+- [x] Create on-chain game instances for all matches and rounds
+- [x] Track match results and advance rounds accordingly
+
+**Participant Experience**
+
+- [ ] Send notifications to participants for:
+  - [ ] Registration status
+  - [ ] Round start
+  - [ ] Match assignments
+  - [ ] Tournament completion
+
+**Persistence and Archival**
+
+- [ ] Persist completed tournaments to blob storage for long-term retention
+- [ ] Ensure historical tournament data remains accessible and verifiable
 
 ### Future Features
 
-- [ ] Develop a tournament feature.
 - [ ] Implement AI opponent for single-player mode.
-
-To be added...
 
 ## License
 

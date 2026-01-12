@@ -15,33 +15,27 @@ import {
   X,
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { myTournament, updateTournament } from '@/api'
+import { myTournament, updateTournament, updateTournamentLocal } from '@/api'
+import { toast } from 'sonner'
 import {
+  GameMode,
+  MatchType,
   PrizeType,
+  TournamentFormat,
   TournamentStatus,
   Visibility,
-  TournamentFormat,
-  MatchType,
-  GameMode,
-} from './CreateTournament'
-import { toast } from 'sonner'
+} from '@/graphql/graphql'
+import { datetimeLocalToMicros, microsToDatetimeLocal } from './utils'
+import { useWalletStore } from '@/store/wallet'
 
-export type TournamentUpdate = {
-  tournamentName?: string
-  tournamentDescription?: string
-  bannerImageUrl?: string
-  sponsorLogoUrl?: string
-  customTags?: string[]
-  status: TournamentStatus
-  prizePool: number
-  prizeType?: PrizeType
-  visibility: Visibility
-}
-
-// Fields that can be updated when tournament is in REGISTRATION_OPEN state
-const REGISTRATION_OPEN_EDITABLE_FIELDS = [
+// Fields that can be updated when tournament is NOT in DRAFT state
+// These are cosmetic/descriptive fields that don't violate tournament creation rules
+// Fields NOT in this list (like prizePool, maxPlayers, timeControl, dates, format, gameMode, matchType)
+// are locked once the tournament leaves Draft state
+const NON_DRAFT_EDITABLE_FIELDS = [
   'tournamentName',
   'tournamentDescription',
+  'prizePoolDescription', // Just the description text, not the actual prize amount
   'bannerImageUrl',
   'sponsorLogoUrl',
   'customTags',
@@ -57,22 +51,30 @@ export default function ManageTournament() {
   const [hasChanges, setHasChanges] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
+  const refetch = useWalletStore((s) => s.refetch)
 
   // Check if tournament is in a state where status can be changed to open registration
   const isTransitioningToOpen =
-    tournament?.status === TournamentStatus.DRAFT &&
-    formData?.status === TournamentStatus.REGISTRATION_OPEN
+    tournament?.status === TournamentStatus.Draft &&
+    formData?.status === TournamentStatus.RegistrationOpen
 
   // Check if a field is editable based on tournament status
   const isFieldEditable = (fieldName: string): boolean => {
     if (!tournament) return false
     // In DRAFT state, all fields are editable
-    if (tournament.status === TournamentStatus.DRAFT) return true
+    if (tournament.status === TournamentStatus.Draft) return true
     // In REGISTRATION_OPEN state, only certain fields are editable
-    if (tournament.status === TournamentStatus.REGISTRATION_OPEN) {
-      return REGISTRATION_OPEN_EDITABLE_FIELDS.includes(fieldName)
+    if (tournament.status === TournamentStatus.RegistrationOpen) {
+      return NON_DRAFT_EDITABLE_FIELDS.includes(fieldName)
     }
-    // In other states, nothing is editable
+    // In REGISTRATION_CLOSED and IN_PROGRESS states, only status can be changed
+    if (
+      tournament.status === TournamentStatus.RegistrationClosed ||
+      tournament.status === TournamentStatus.InProgress
+    ) {
+      return fieldName === 'status'
+    }
+    // In other states (COMPLETED, CANCELLED), nothing is editable
     return false
   }
 
@@ -80,21 +82,17 @@ export default function ManageTournament() {
     const fetchMyTournament = async () => {
       try {
         const response = await myTournament(id!)
-        const data = JSON.parse(response.result).data.myTournament
-        console.log(data)
+        const data = JSON.parse(response).data.myTournament
         setTournament(data)
         setFormData(data)
         setLoading(false)
       } catch (error) {
         console.error('Error fetching my tournaments:', error)
-        // Fallback to mock data on error
-        // setTournament(MOCK_TOURNAMENT)
-        // setFormData(MOCK_TOURNAMENT)
         setLoading(false)
       }
     }
     fetchMyTournament()
-  }, [id])
+  }, [id, refetch])
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -133,24 +131,35 @@ export default function ManageTournament() {
     setHasChanges(false)
     const submitData = {
       ...formData,
-      prizeType: formData.prizeType || PrizeType.TOKENS,
+      prizeType: formData.prizeType || PrizeType.Tokens,
       prizePool: Number(formData.prizePool),
       customTags: Array.isArray(formData.customTags) ? formData.customTags : [],
     }
 
-    updateTournament(tournament.tournamentId, submitData)
-      .then(() => {
-        toast.success('Tournament Update Saved')
-        setShowPublishConfirm(false)
-      })
-      .catch(() => {
-        toast.error('Failed to Update')
-      })
+    if (tournament.status === TournamentStatus.Draft) {
+      updateTournamentLocal(tournament.tournamentId, submitData)
+        .then(() => {
+          toast.success('Tournament Update Saved')
+          setShowPublishConfirm(false)
+        })
+        .catch(() => {
+          toast.error('Failed to Update')
+        })
+    } else {
+      updateTournament(tournament.tournamentId, submitData)
+        .then(() => {
+          toast.success('Tournament Update Saved')
+          setShowPublishConfirm(false)
+        })
+        .catch(() => {
+          toast.error('Failed to Update')
+        })
+    }
   }
 
   const deleteTournament = () => {
     // TODO: Implement delete functionality
-    alert("not yet implemented")
+    alert('not yet implemented')
   }
 
   if (loading)
@@ -166,7 +175,7 @@ export default function ManageTournament() {
       </div>
     )
 
-  const isDraft = tournament.status === TournamentStatus.DRAFT
+  const isDraft = tournament.status === TournamentStatus.Draft
 
   return (
     <div className="min-h-screen w-full bg-[#161616] text-white flex flex-col font-sansation selection:bg-yellow-500/30 p-6 md:p-8">
@@ -346,12 +355,12 @@ export default function ManageTournament() {
                   )}
                   <Select
                     name="prizeType"
-                    value={formData.prizeType || PrizeType.TOKENS}
+                    value={formData.prizeType || PrizeType.Tokens}
                     onChange={handleChange}
                     disabled={!isFieldEditable('prizeType')}
                     options={[
-                      { label: 'Tokens', value: PrizeType.TOKENS },
-                      { label: 'NFT', value: PrizeType.NFT },
+                      { label: 'Tokens', value: PrizeType.Tokens },
+                      { label: 'NFT', value: PrizeType.Nft },
                     ]}
                   />
                 </div>
@@ -376,7 +385,6 @@ export default function ManageTournament() {
                   <span className="text-gray-500 text-xs">(Locked)</span>
                 )}
                 <textarea
-
                   name="prizePoolDescription"
                   value={formData.prizePoolDescription || ''}
                   onChange={handleChange}
@@ -466,7 +474,7 @@ export default function ManageTournament() {
               </div>
 
               <div className="space-y-6">
-                {/* Status Selector - Only show in DRAFT */}
+                {/* Status Selector - Show based on current tournament status */}
                 {isDraft && (
                   <div className="space-y-2">
                     <Label>Status</Label>
@@ -476,21 +484,113 @@ export default function ManageTournament() {
                       onChange={handleChange}
                       disabled={!isFieldEditable('status')}
                       options={[
-                        { label: 'Draft', value: TournamentStatus.DRAFT },
+                        { label: 'Draft', value: TournamentStatus.Draft },
                         {
                           label: 'Open Registration',
-                          value: TournamentStatus.REGISTRATION_OPEN,
+                          value: TournamentStatus.RegistrationOpen,
                         },
-                        // { label: 'In Progress', value: TournamentStatus.IN_PROGRESS },
-                        // {
-                        //   label: 'Completed',
-                        //   value: TournamentStatus.COMPLETED,
-                        // },
                       ]}
                     />
                     {isTransitioningToOpen && (
                       <p className="text-xs text-yellow-500 mt-1">
                         ⚠️ Saving will publish this tournament
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Status Selector for REGISTRATION_OPEN state */}
+                {tournament?.status === TournamentStatus.RegistrationOpen && (
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      disabled={!isFieldEditable('status')}
+                      options={[
+                        {
+                          label: 'Registration Open',
+                          value: TournamentStatus.RegistrationOpen,
+                        },
+                        {
+                          label: 'Close Registration',
+                          value: TournamentStatus.RegistrationClosed,
+                        },
+                      ]}
+                    />
+                    {formData?.status === TournamentStatus.RegistrationClosed && (
+                      <p className="text-xs text-yellow-500 mt-1">
+                        ⚠️ Saving will close registration for this tournament
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Status Selector for REGISTRATION_CLOSED state */}
+                {tournament?.status === TournamentStatus.RegistrationClosed && (
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      disabled={!isFieldEditable('status')}
+                      options={[
+                        {
+                          label: 'Registration Closed',
+                          value: TournamentStatus.RegistrationClosed,
+                        },
+                        {
+                          label: 'Start Tournament',
+                          value: TournamentStatus.InProgress,
+                        },
+                        {
+                          label: 'Re-open Registration',
+                          value: TournamentStatus.RegistrationOpen,
+                        },
+                      ]}
+                    />
+                    {formData?.status === TournamentStatus.InProgress && (
+                      <p className="text-xs text-yellow-500 mt-1">
+                        ⚠️ Saving will start the tournament
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Status Selector for IN_PROGRESS state */}
+                {tournament?.status === TournamentStatus.InProgress && (
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      disabled={!isFieldEditable('status')}
+                      options={[
+                        {
+                          label: 'In Progress',
+                          value: TournamentStatus.InProgress,
+                        },
+                        {
+                          label: 'Complete Tournament',
+                          value: TournamentStatus.Completed,
+                        },
+                        {
+                          label: 'Cancel Tournament',
+                          value: TournamentStatus.Cancelled,
+                        },
+                      ]}
+                    />
+                    {formData?.status === TournamentStatus.Completed && (
+                      <p className="text-xs text-green-500 mt-1">
+                        ✓ Saving will mark the tournament as completed
+                      </p>
+                    )}
+                    {formData?.status === TournamentStatus.Cancelled && (
+                      <p className="text-xs text-red-500 mt-1">
+                        ⚠️ Saving will cancel the tournament
                       </p>
                     )}
                   </div>
@@ -509,20 +609,20 @@ export default function ManageTournament() {
                     onChange={handleChange}
                     disabled={!isFieldEditable('tournamentFormat')}
                     options={[
-                      { label: 'Swiss', value: TournamentFormat.SWISS },
+                      { label: 'Swiss', value: TournamentFormat.Swiss },
                       {
                         label: 'Round Robin',
-                        value: TournamentFormat.ROUND_ROBIN,
+                        value: TournamentFormat.RoundRobin,
                       },
                       {
                         label: 'Single Elimination',
-                        value: TournamentFormat.SINGLE_ELIM,
+                        value: TournamentFormat.SingleElim,
                       },
                       {
                         label: 'Double Elimination',
-                        value: TournamentFormat.DOUBLE_ELIM,
+                        value: TournamentFormat.DoubleElim,
                       },
-                      { label: 'Arena', value: TournamentFormat.ARENA },
+                      { label: 'Arena', value: TournamentFormat.Arena },
                     ]}
                   />
                 </div>
@@ -541,9 +641,9 @@ export default function ManageTournament() {
                       onChange={handleChange}
                       disabled={!isFieldEditable('gameMode')}
                       options={[
-                        { label: 'Standard', value: GameMode.STANDARD },
-                        { label: 'Microchess', value: GameMode.MICROCHESS },
-                        { label: 'CrazyHouse', value: GameMode.CRAZYHOUSE },
+                        { label: 'Standard', value: GameMode.Standard },
+                        { label: 'Microchess', value: GameMode.Microchess },
+                        { label: 'CrazyHouse', value: GameMode.Crazyhouse },
                       ]}
                     />
                   </div>
@@ -560,9 +660,9 @@ export default function ManageTournament() {
                       onChange={handleChange}
                       disabled={!isFieldEditable('matchType')}
                       options={[
-                        { label: 'Bo1', value: MatchType.BO_1 },
-                        { label: 'Bo3', value: MatchType.BO_3 },
-                        { label: 'Bo5', value: MatchType.BO_5 },
+                        { label: 'Bo1', value: MatchType.Bo_1 },
+                        { label: 'Bo3', value: MatchType.Bo_3 },
+                        { label: 'Bo5', value: MatchType.Bo_5 },
                       ]}
                     />
                   </div>
@@ -671,14 +771,21 @@ export default function ManageTournament() {
                     <Input
                       name="startingTime"
                       type="datetime-local"
-                      value={
-                        formData.startingTime
-                          ? new Date(formData.startingTime)
-                            .toISOString()
-                            .slice(0, 16)
-                          : ''
+                      // value={
+                      //   formData.startingTime
+                      //     ? new Date(formData.startingTime)
+                      //         .toISOString()
+                      //         .slice(0, 16)
+                      //     : ''
+                      // }
+                      // onChange={handleChange}
+                      value={microsToDatetimeLocal(formData.startingTime)}
+                      onChange={(e) =>
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          endTime: datetimeLocalToMicros(e.target.value)!,
+                        }))
                       }
-                      onChange={handleChange}
                       disabled={!isFieldEditable('startingTime')}
                       className={`bg-[#1f1f1f] border-[#333] text-sm rounded-xl ${!isFieldEditable('startingTime') ? 'opacity-50 cursor-not-allowed' : ''}`}
                     />
@@ -693,12 +800,21 @@ export default function ManageTournament() {
                     <Input
                       name="endTime"
                       type="datetime-local"
-                      value={
-                        formData.endTime
-                          ? new Date(formData.endTime).toISOString().slice(0, 16)
-                          : ''
+                      // value={
+                      //   formData.endTime
+                      //     ? new Date(formData.endTime)
+                      //         .toISOString()
+                      //         .slice(0, 16)
+                      //     : ''
+                      // }
+                      // onChange={handleChange}
+                      value={microsToDatetimeLocal(formData.endTime)}
+                      onChange={(e) =>
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          endTime: datetimeLocalToMicros(e.target.value)!,
+                        }))
                       }
-                      onChange={handleChange}
                       disabled={!isFieldEditable('endTime')}
                       className={`bg-[#1f1f1f] border-[#333] text-sm rounded-xl ${!isFieldEditable('endTime') ? 'opacity-50 cursor-not-allowed' : ''}`}
                     />
@@ -743,8 +859,7 @@ export default function ManageTournament() {
                 <p className="text-sm text-gray-400">
                   <span className="text-yellow-500 font-medium">Note:</span>{' '}
                   Some fields are locked because this tournament is no longer in
-                  draft mode. Only cosmetic settings can be
-                  modified.
+                  draft mode. Only cosmetic settings can be modified.
                 </p>
               </div>
             )}

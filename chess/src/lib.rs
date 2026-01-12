@@ -1,30 +1,29 @@
 #![allow(non_snake_case)]
 
-use std::ops::{Deref, DerefMut};
-
-use async_graphql::{Enum, InputObject, Request, Response, SimpleObject};
-use base64::{engine::general_purpose, Engine};
+use async_graphql::{Request, Response, SimpleObject};
 use chess_lib::{
     game::game::{Game, GameState},
     pieces::Color,
     ChessError,
 };
-use leaderboard::Leaderboard;
-use playerprofile::{PlayerHash, PlayerInfo, PlayerProfile};
+use player::{PlayerInfo, PlayerProfile};
 use serde::{Deserialize, Serialize};
+use std::ops::{Deref, DerefMut};
 pub struct ChessAbi;
+pub mod clock;
 pub mod leaderboard;
-pub mod playerprofile;
+pub mod matches;
+pub mod notifications;
+pub mod player;
 pub mod tournament;
+use matches::{MatchId, MatchType};
 
 use linera_sdk::{
     abi::{ContractAbi, ServiceAbi},
     graphql::GraphQLMutationRoot,
-    linera_base_types::{AccountOwner, ChainId, DataBlobHash, TimeDelta, Timestamp},
+    linera_base_types::{AccountOwner, TimeDelta},
 };
-use tournament::{Tournament, TournamentInput, TournamentUpdate};
-
-use crate::playerprofile::Players;
+use tournament::{TournamentInput, TournamentUpdate};
 
 impl ContractAbi for ChessAbi {
     type Operation = Operation;
@@ -49,12 +48,6 @@ pub struct InstantiationArgument {
     pub block_delay: TimeDelta,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Enum)]
-pub enum MatchType {
-    Random,
-    Friendly,
-}
-
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChessResponse {
     Ok,
@@ -64,22 +57,27 @@ pub enum ChessResponse {
 #[derive(Debug, Deserialize, Serialize, Clone, GraphQLMutationRoot)]
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
+    MarkAllRead, // mark all notification read
     // setup operations
     HostTournament {
-        value: TournamentInput,
+        value: Box<TournamentInput>,
     },
     TournamentRegistration {
         tournament_id: String,
+        tournament_chain: String,
     },
     TournamentWithDraw {
         tournament_id: String,
     },
     UpdateTournament {
         tournament_id: String,
-        update: TournamentUpdate,
+        update: Box<TournamentUpdate>,
+    },
+    UpdateTournamentLocal {
+        tournament_id: String,
+        update: Box<TournamentUpdate>,
     },
     NewGame,
-    FrGame,
     FrGameHash {
         token: String,
     },
@@ -105,162 +103,15 @@ pub enum Operation {
     },
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub enum Message {
-    TournamentWithDraw {
-        tournament_id: String,
-        owner: AccountOwner,
-    },
-    TournamentRegister {
-        tournament_id: String,
-        owner: AccountOwner,
-        player: PlayerHash,
-    },
-    UpdateTournament {
-        tournament_id: String,
-        update: TournamentUpdate,
-    },
-    HostTournament {
-        value: TournamentInput,
-    },
-    // game_chain receiving data to start a new game
-    Start {
-        match_id: MatchId,
-        players: Players,
-        timer: TimeDelta,
-        match_type: MatchType,
-    },
-    // app_chain receiving player to put in lobby or start a game.
-    NewGameReq {
-        player: PlayerHash,
-    },
-    // receiving game_chain data from the app_chain
-    GameChainData {
-        game_chain_data: GameChain,
-    },
-    // app_chain receiving both players details to start a friendly match
-    FriendlyGameReq {
-        players: Players,
-    },
-    // MatchMetadata from the game_chain to the app_chain
-    MatchEnd {
-        metadata: MatchMetaData,
-    },
-    // app_chain sends points update to the players
-    MatchUpdate {
-        player_hash: PlayerHash,
-        match_history: MatchHistory,
-    },
-}
-
-// match duration could be added
-#[derive(Serialize, Deserialize, Debug)]
-pub struct MatchMetaData {
-    pub match_id: MatchId,
-    pub winner: AccountOwner,
-    pub match_type: MatchType,
-    pub blob_hash: DataBlobHash, // we only store moves in this, so we can replay the entire game
-}
-
-#[derive(Clone, Serialize, Deserialize, PartialEq, Debug, SimpleObject, InputObject)]
-pub struct MatchId {
-    value: String,
-}
-
-impl MatchId {
-    pub fn encode_players(players: &Players) -> Self {
-        let bytes = bincode::serialize(players).unwrap();
-        let value = general_purpose::STANDARD.encode(bytes);
-
-        MatchId { value }
-    }
-
-    pub fn decode_players(&self) -> Option<Players> {
-        let bytes = general_purpose::STANDARD.decode(&self.value).unwrap();
-        let players: Players = bincode::deserialize(&bytes).unwrap();
-
-        Some(players)
-    }
-}
-
-const TOKEN_TIME: u64 = 300; // 300 seconds = 5 minutes
-
-// Friendly hash active for 5 minutes since creation
-#[derive(Serialize, Deserialize, Debug, SimpleObject)]
-pub struct TimedToken {
-    player: PlayerHash,
-    expires_at: Timestamp,
-}
-
-impl TimedToken {
-    pub fn new(now: Timestamp, player: PlayerHash) -> Self {
-        Self {
-            player,
-            expires_at: now.saturating_add(TimeDelta::from_secs(TOKEN_TIME)),
-        }
-    }
-
-    // Encode the token into a base64 string
-    pub fn encode_token(&self) -> String {
-        let bytes = bincode::serialize(self).unwrap();
-        general_purpose::STANDARD.encode(bytes)
-    }
-
-    // Decode the base64 string back into a token
-    pub fn decode_token(encoded: &str, now: Timestamp) -> Option<PlayerHash> {
-        let bytes = general_purpose::STANDARD.decode(encoded).ok()?;
-        let timed_token: TimedToken = bincode::deserialize(&bytes).ok()?;
-
-        if now <= timed_token.expires_at {
-            Some(timed_token.player)
-        } else {
-            None
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub enum Event {
-    GameCount {
-        value: u64,
-    },
-    Leaderboard {
-        leaderboard: Vec<Leaderboard>,
-    },
-    MatchHistory {
-        history: MatchHistory,
-    },
-    Tournament {
-        value: Tournament,
-    },
-    TournamentRegistration {
-        tournament_id: String,
-        owner: AccountOwner,
-        player: PlayerHash,
-    },
-    TournamentWithDraw {
-        tournament_id: String,
-        owner: AccountOwner,
-    },
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub enum EventType {
-    GameCount,
-    Leaderboard,
-    MatchHistory,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
 pub struct LastMove {
     pub from: String,
     pub to: String,
 }
 
-#[derive(Clone, Default, Serialize, Deserialize, SimpleObject)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct GameWrapper {
     pub initalized: bool,
-    #[graphql(skip)]
     inner: Game,
     pub players: [Option<AccountOwner>; 2],
     pub winner: Option<AccountOwner>,
@@ -332,112 +183,10 @@ impl DerefMut for GameWrapper {
     }
 }
 
-/// The ID and timestamp of a temporary chain for a single game.
-///
-/// Register View needs this struct to impl Default trait. but ChainId does not, we use Option<ChainId<ChainId>
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, SimpleObject)]
-#[serde(rename_all = "camelCase")]
-pub struct GameChain {
-    /// The Timestamp of the `OpenChain` message that created the chain.
-    pub timestamp: Timestamp,
-    /// The ID of the temporary game chain itself.
-    pub chain_id: ChainId,
-}
-
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
-pub struct PlayersTime {
-    pub white: TimeDelta,
-    pub black: TimeDelta,
-}
-
-/// A struct to represent a Clock
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
-pub struct Clock {
-    pub time_left: [TimeDelta; 2],
-    pub current_turn_start: Option<Timestamp>,
-    pub block_delay: TimeDelta,
-}
-
-impl Clock {
-    /// Initializes the clock.
-    pub fn new(timer: TimeDelta) -> Self {
-        Self {
-            time_left: [timer, timer],
-            // increment: arg.increment, // todo!(increment is not required at the moment)
-            current_turn_start: None, // clock starts after a player make a move
-            block_delay: TimeDelta::from_secs(5),
-        }
-    }
-
-    /// Records a player making a move in the current block.
-    pub fn make_move(&mut self, block_time: Timestamp, player: Color) {
-        if self.current_turn_start.is_none() {
-            self.current_turn_start = Some(block_time);
-            return;
-        }
-
-        let duration = block_time.delta_since(
-            self.current_turn_start
-                .expect("failed to get timestamp at make move(clock)"),
-        );
-        let i = player.index();
-        self.time_left[i] = self.time_left[i].saturating_sub(duration);
-
-        self.current_turn_start = Some(block_time); // need to reset the current_turn_start for the next player
-    }
-
-    /// Returns the time left for a given player.
-    pub fn time_left_for_players(
-        &self,
-        block_time: Timestamp,
-        active_player: Color,
-    ) -> PlayersTime {
-        let mut white_time = self.time_left[Color::White.index()];
-        let mut black_time = self.time_left[Color::Black.index()];
-
-        // Deduct elapsed time from active player only
-        if let Some(turn_start) = self.current_turn_start {
-            let elapsed = block_time.delta_since(turn_start);
-
-            match active_player {
-                Color::White => {
-                    white_time = white_time.saturating_sub(elapsed);
-                }
-                Color::Black => {
-                    black_time = black_time.saturating_sub(elapsed);
-                }
-            }
-        }
-
-        PlayersTime {
-            white: white_time,
-            black: black_time,
-        }
-    }
-
-    /// Returns whether the given player has timed out.
-    #[inline]
-    pub fn timed_out(&self, block_time: Timestamp, player: Color) -> bool {
-        let Some(start) = self.current_turn_start else {
-            return false;
-        };
-
-        let elapsed = block_time.delta_since(start);
-        let t = self.time_left[player.index()].saturating_sub(elapsed);
-        t.eq(&TimeDelta::ZERO)
-    }
-}
-
-// Struct to hold the entire match metadata
-#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
-pub struct MatchHistory {
-    pub you: Player,
-    pub opponent: Player,
-    pub blob_hash: DataBlobHash, // we only store moves here
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
-pub struct Player {
-    pub id: AccountOwner,
-    pub name: Option<String>,
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ChainType {
+    #[default]
+    PersonalChain,
+    TournamentChain,
+    FriendlyMatchChain,
 }

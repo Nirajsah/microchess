@@ -8,13 +8,19 @@ use std::str::FromStr;
 use crate::state::ChessState;
 
 use chess::{
+    clock::Clock,
     leaderboard::{EloCalculator, LeaderboardManager},
-    playerprofile::{PlayerHash, PlayerProfile, Players},
-    tournament::TournamentInput,
-    ChessResponse, Clock, Event, EventType, GameChain, GameWrapper, InstantiationArgument,
-    MatchHistory, MatchId, MatchMetaData, MatchType, Message, Operation, Player, TimedToken,
+    matches::{MatchId, MatchMetaData, MatchType, TimedToken},
+    notifications::Notification,
+    player::{MatchHistory, Player, PlayerHash, PlayerProfile, Players},
+    tournament::{
+        utils::{Participants, TParticipants},
+        TournamentInput,
+    },
+    ChessResponse, GameWrapper, InstantiationArgument, Operation,
 };
 use chess_lib::{game::game::GameState, ChessError, Result};
+use event::{Event, EventType};
 use linera_sdk::{
     abi::WithContractAbi,
     linera_base_types::{
@@ -25,7 +31,10 @@ use linera_sdk::{
     views::{RootView, View},
     Contract, ContractRuntime,
 };
+use log::info;
+use messages::Message;
 use tracing::Instrument;
+pub mod event;
 pub mod messages;
 pub mod operations;
 
@@ -68,26 +77,47 @@ impl Contract for ChessContract {
 
     async fn execute_operation(&mut self, operation: Self::Operation) -> ChessResponse {
         match operation {
-            Operation::HostTournament { value } => {
-                self.on_op_host_tournament(value);
+            Operation::MarkAllRead => {
+                self.state
+                    .notifications
+                    .get_mut()
+                    .iter_mut()
+                    .filter(|n| !n.read)
+                    .for_each(|n| n.read = true);
+
                 ChessResponse::Ok
             }
-            Operation::TournamentRegistration { tournament_id } => {
-                self.on_op_tournament_registration(tournament_id);
+            Operation::HostTournament { value } => {
+                self.on_op_host_tournament(*value);
+                ChessResponse::Ok
+            }
+            Operation::TournamentRegistration {
+                tournament_id,
+                tournament_chain,
+            } => {
+                self.on_op_tournament_participation(tournament_id, tournament_chain);
                 ChessResponse::Ok
             }
             Operation::TournamentWithDraw { tournament_id } => {
                 self.on_op_tournament_withdraw(tournament_id);
                 ChessResponse::Ok
             }
+            Operation::UpdateTournamentLocal {
+                tournament_id,
+                update,
+            } => {
+                self.on_op_update_tournament_local(tournament_id, *update);
+                ChessResponse::Ok
+            }
+
             Operation::UpdateTournament {
                 tournament_id,
                 update,
             } => {
-                tracing::debug!("called to update tournament");
-                self.on_op_update_tournament(tournament_id, update);
+                self.on_op_update_tournament(tournament_id, *update).await;
                 ChessResponse::Ok
             }
+
             Operation::DeleteChainMetadata => {
                 assert_ne!(self.runtime.chain_id(), self.app_chain());
                 self.state.game_chain.set(None);
@@ -107,224 +137,19 @@ impl Contract for ChessContract {
                 }
                 ChessResponse::Ok
             }
-            Operation::Resign => {
-                assert_ne!(self.runtime.chain_id(), self.app_chain());
-                let active_player = self.state.board.get().active_player;
-
-                assert_eq!(
-                    self.runtime.authenticated_signer(),
-                    Some(self.state.board.get().players[active_player.index()].unwrap()),
-                    "Only active player can make a move"
-                );
-                self.state
-                    .board
-                    .get_mut()
-                    .handle_resign(active_player.opposite());
-                // handle match_end
-                self.send_result();
-
-                ChessResponse::Ok
-            }
+            Operation::Resign => self.on_op_resign(),
             // we take the hash, decode it and send a req to app_chain
-            Operation::FrGameHash { token } => {
-                let id = self.runtime.authenticated_signer().unwrap();
-                let chain_id = self.runtime.chain_id();
-                let now = self.runtime.system_time();
-
-                let player: Option<PlayerHash> = if let Some(p) = self.state.profile.get() {
-                    p.hash()
-                } else {
-                    let mut p = PlayerProfile::new(chain_id, id, None);
-                    p.encode();
-                    self.state.profile.set(Some(p.clone()));
-                    p.hash()
-                };
-
-                if let Some(hash) = player {
-                    let decoded: PlayerHash = TimedToken::decode_token(&token, now).unwrap();
-                    let players = Players {
-                        player_1: decoded,
-                        player_2: hash,
-                    };
-                    self.request_friendly_match(players);
-                }
-
-                ChessResponse::Ok
-            }
+            Operation::FrGameHash { token } => self.on_op_request_friendly_match(token),
             // Create a new hash for a friendly match
-            Operation::FrGame => {
-                let id = self.runtime.authenticated_signer().unwrap();
-                let chain_id = self.runtime.chain_id();
-                let now = self.runtime.system_time();
-
-                let player: Option<PlayerHash> = if let Some(p) = self.state.profile.get() {
-                    p.hash()
-                } else {
-                    let mut p = PlayerProfile::new(chain_id, id, None);
-                    p.encode();
-                    self.state.profile.set(Some(p.clone()));
-                    p.hash()
-                };
-
-                if let Some(hash) = player {
-                    let token = TimedToken::new(now, hash).encode_token();
-                    self.state.game_token.set(token);
-                }
-
-                ChessResponse::Ok
-            }
-
-            Operation::Subscribe => {
-                let app_id = self.runtime.application_id().forget_abi();
-                let chain_id = self.app_chain();
-                self.runtime
-                    .subscribe_to_events(chain_id, app_id, STREAM_NAME.into());
-
-                ChessResponse::Ok
-            }
-            // A player makes a new game request to its own chain, requires player profile to be present
-            Operation::NewGame => {
-                let app_chain = self.app_chain();
-                let chain_id = self.runtime.chain_id();
-                let id = self.runtime.authenticated_signer().unwrap();
-
-                let player: Option<PlayerHash> = if let Some(p) = self.state.profile.get() {
-                    p.hash()
-                } else {
-                    let mut p = PlayerProfile::new(chain_id, id, None);
-                    p.encode();
-                    self.state.profile.set(Some(p.clone()));
-                    p.hash()
-                };
-
-                if let Some(hash) = player {
-                    self.runtime
-                        .send_message(app_chain, Message::NewGameReq { player: hash });
-                }
-
-                ChessResponse::Ok
-            }
-
-            Operation::MakeMove { from, to, piece } => {
-                assert_ne!(self.runtime.chain_id(), self.app_chain());
-                let active_player = self.state.board.get().active_player;
-                let clock = self.state.clock.get_mut();
-                let block_time = self.runtime.system_time();
-
-                assert_eq!(
-                    self.runtime.authenticated_signer(),
-                    Some(self.state.board.get().players[active_player.index()].unwrap()),
-                    "Only active player can make a move"
-                );
-
-                if clock.timed_out(block_time, active_player) {
-                    // Mark game as over with opponent as winner
-                    let board = self.state.board.get_mut();
-                    let opponent = active_player.opposite();
-                    board.winner = Some(board.players[opponent.index()].unwrap());
-                    board.state = GameState::Ended;
-
-                    self.send_result();
-
-                    return ChessResponse::Err(ChessError::new("Timed Out"));
-                }
-
-                match self
-                    .state
-                    .board
-                    .get_mut()
-                    .commit_move(from.clone(), to.clone(), piece, None)
-                {
-                    Ok(mv) => {
-                        clock.make_move(block_time, active_player);
-                        self.runtime
-                            .assert_before(block_time.saturating_add(clock.block_delay));
-                        if let Some(san) = mv.san {
-                            let board = self.state.board.get_mut();
-                            board.moves_string.push(san);
-                            board.add_move(from, to);
-                        }
-
-                        // CHECK GAME STATE AFTER MOVE
-                        let game_state = self.state.board.get().state;
-                        if game_state == GameState::Checkmate || game_state == GameState::Stalemate
-                        {
-                            self.send_result();
-                        }
-                        ChessResponse::Ok
-                    }
-                    Err(e) => match e {
-                        ChessError::GameOver => {
-                            self.send_result();
-                            ChessResponse::Err(e)
-                        }
-                        _ => ChessResponse::Err(e),
-                    },
-                }
-            }
+            Operation::Subscribe => self.on_op_subscribe(),
+            Operation::NewGame => self.on_op_request_new_game(),
+            Operation::MakeMove { from, to, piece } => self.on_op_make_move(from, to, piece),
             Operation::PawnPromotion {
                 from,
                 to,
                 piece,
                 promoted_piece,
-            } => {
-                assert_ne!(self.runtime.chain_id(), self.app_chain());
-                let active_player = self.state.board.get().active_player;
-                let block_time = self.runtime.system_time();
-                let clock = self.state.clock.get_mut();
-
-                assert_eq!(
-                    self.runtime.authenticated_signer(),
-                    Some(self.state.board.get().players[active_player.index()].unwrap()),
-                    "Only active player can make a move"
-                );
-
-                if clock.timed_out(block_time, active_player) {
-                    // Mark game as over with opponent as winner
-                    let board = self.state.board.get_mut();
-                    let opponent = active_player.opposite();
-                    board.winner = Some(board.players[opponent.index()].unwrap());
-                    board.state = GameState::Ended;
-
-                    self.send_result();
-
-                    return ChessResponse::Err(ChessError::new("Timed Out"));
-                }
-
-                match self.state.board.get_mut().commit_move(
-                    from.clone(),
-                    to.clone(),
-                    piece,
-                    Some(promoted_piece),
-                ) {
-                    Ok(mv) => {
-                        clock.make_move(block_time, active_player);
-                        self.runtime
-                            .assert_before(block_time.saturating_add(clock.block_delay));
-
-                        if let Some(san) = mv.san {
-                            let board = self.state.board.get_mut();
-                            board.moves_string.push(san);
-                            board.add_move(from, to);
-                        }
-
-                        let game_state = self.state.board.get().state;
-                        if game_state == GameState::Checkmate || game_state == GameState::Stalemate
-                        {
-                            self.send_result();
-                        }
-                        ChessResponse::Ok
-                    }
-
-                    Err(e) => match e {
-                        ChessError::GameOver => {
-                            self.send_result();
-                            ChessResponse::Err(e)
-                        }
-                        _ => ChessResponse::Err(e),
-                    },
-                }
-            }
+            } => self.on_op_pawn_promotion(from, to, piece, promoted_piece),
         }
     }
 
@@ -336,9 +161,7 @@ impl Contract for ChessContract {
                 match_type,
                 timer,
             } => self.start_new_game(players, match_id, timer, match_type),
-            Message::GameChainData { game_chain_data } => {
-                self.state.game_chain.set(Some(game_chain_data))
-            }
+            Message::GameChainData { game_chain } => self.state.game_chain.set(Some(game_chain)),
             Message::NewGameReq { player } => self.new_match(player),
             Message::FriendlyGameReq { players } => self.start_friendly_match(players).await,
             // handle updates after receiving the metadata
@@ -354,15 +177,7 @@ impl Contract for ChessContract {
                 let history = self.state.match_history.get_mut();
                 history.push(match_history);
             }
-            Message::HostTournament { value } => self.on_msg_host_tournament(value),
-            Message::UpdateTournament {
-                tournament_id,
-                update,
-            } => {
-                let sender = self.runtime.message_origin_chain_id().unwrap();
-                self.on_msg_update_tournament(sender, tournament_id, update)
-                    .await;
-            }
+            Message::HostTournament { value } => self.on_msg_host_tournament(*value).await,
             Message::TournamentWithDraw {
                 tournament_id,
                 owner,
@@ -374,9 +189,19 @@ impl Contract for ChessContract {
                 owner,
                 player,
             } => {
-                self.on_msg_tournament_registration(tournament_id, owner, player)
+                self.on_msg_tournament_participation(tournament_id, owner, player)
                     .await;
             }
+            Message::Notification { notification } => {
+                self.on_msg_handle_notification(notification);
+            }
+            Message::ProcessTournament { value } => {
+                self.on_msg_process_tournament(*value).await;
+            }
+            Message::FriendlyGameChainData {
+                game_chain,
+                notification,
+            } => self.on_msg_handle_friendly_match_data(game_chain, notification),
         }
     }
 
@@ -401,50 +226,25 @@ impl Contract for ChessContract {
                     Event::MatchHistory { history } => {
                         self.state.match_history.get_mut().push(history);
                     }
-                    Event::Tournament { value } => self.state.all_tournaments.get_mut().push(value),
+                    Event::Tournament { value } => {
+                        self.on_event_host_tournament(*value);
+                    }
                     Event::TournamentRegistration {
                         tournament_id,
                         owner,
                         player,
                     } => {
-                        let mut participants = self
-                            .state
-                            .participants
-                            .get(&tournament_id)
-                            .await
-                            .ok()
-                            .flatten()
-                            .unwrap_or_default();
-
-                        participants.push(owner);
-                        self.state
-                            .participants
-                            .insert(&tournament_id, participants)
-                            .ok();
-                        self.state.tournament_players.insert(&owner, player).ok();
+                        self.on_event_tournament_registration(tournament_id, owner, player)
+                            .await;
                     }
                     Event::TournamentWithDraw {
                         tournament_id,
                         owner,
                     } => {
-                        let mut participants = self
-                            .state
-                            .participants
-                            .get(&tournament_id)
-                            .await
-                            .ok()
-                            .flatten()
-                            .unwrap_or_default();
-
-                        participants.retain(|v| v != &owner);
-
-                        self.state
-                            .participants
-                            .insert(&tournament_id, participants)
-                            .ok();
-
-                        self.state.tournament_players.remove(&owner).ok();
+                        self.on_event_tournament_withdraw(tournament_id, owner)
+                            .await;
                     }
+                    Event::TournamentChain { chain } => self.on_event_tournament_chain(chain),
                 }
             }
         }
@@ -458,6 +258,12 @@ impl Contract for ChessContract {
 impl ChessContract {
     pub fn app_chain(&mut self) -> ChainId {
         self.runtime.application_creator_chain_id()
+    }
+
+    pub fn send_notification_to_user(&mut self, chain_id: ChainId, notification: Notification) {
+        let message = Message::Notification { notification };
+
+        self.runtime.send_message(chain_id, message);
     }
 
     /// Starting a match on game_chain
@@ -488,10 +294,10 @@ impl ChessContract {
             let fee = Amount::from_str("1.").unwrap();
             let match_time = TimeDelta::from_secs(900); // 15 mins
 
-            if let Ok(game_chain_data) =
+            if let Some((game_chain_data, _)) =
                 self.create_game_chain(fee, match_time, MatchType::Random, &players)
             {
-                self.send_game_chain_data_2players(game_chain_data, players);
+                self.send_game_chain_data_2players(game_chain_data, players, None);
             }
         } else {
             // we put the player in lobby.
@@ -509,12 +315,10 @@ impl ChessContract {
         match_time: TimeDelta,
         match_type: MatchType,
         players: &Players,
-    ) -> Result<GameChain> {
-        let timestamp: Timestamp = self.runtime.system_time();
-
+    ) -> Option<(ChainId, MatchId)> {
         let (player_1, player_2) = players.get_players();
         if player_1.id == player_2.id {
-            return Err(ChessError::new("Found Players with same id, returning..."));
+            return None;
         }
 
         let ownership = ChainOwnership::multiple(
@@ -536,35 +340,38 @@ impl ChessContract {
             chain_id,
             Message::Start {
                 players: players.clone(),
-                match_id,
+                match_id: match_id.clone(),
                 timer: match_time,
                 match_type,
             },
         );
 
-        let game_chain = GameChain {
-            chain_id,
-            timestamp,
-        };
-
-        Ok(game_chain)
+        Some((chain_id, match_id))
     }
 
     // Method to send required chain data to players.
     // this is required, the web-client needs to assign player's wallet with new chain
-    pub fn send_game_chain_data_2players(&mut self, game_chain_data: GameChain, players: Players) {
+    pub fn send_game_chain_data_2players(
+        &mut self,
+        game_chain: ChainId,
+        players: Players,
+        notification: Option<Notification>,
+    ) {
         let (player_1, player_2) = players.get_players();
-        self.runtime.send_message(
-            player_1.chain_id,
-            Message::GameChainData {
-                game_chain_data: game_chain_data.clone(),
-            },
-        );
 
-        self.runtime.send_message(
-            player_2.chain_id,
-            Message::GameChainData { game_chain_data },
-        );
+        let message = if let Some(notification) = notification {
+            Message::FriendlyGameChainData {
+                game_chain,
+                notification,
+            }
+        } else {
+            Message::GameChainData { game_chain }
+        };
+
+        self.runtime
+            .send_message(player_1.chain_id, message.clone());
+
+        self.runtime.send_message(player_2.chain_id, message);
         // this means a game has started on a chain, we can increase the count,
         // in the future when a game starts on a multi-owner-chain i.e., (game_chain)
         // we send a message from the game_chain to app_chain to update this count.
@@ -588,13 +395,22 @@ impl ChessContract {
         let app_chain = self.app_chain();
         assert_eq!(self.runtime.chain_id(), app_chain);
 
+        let now = self.runtime.system_time();
+
         let fee = Amount::from_str("1.").unwrap();
         let match_time = TimeDelta::from_secs(900); // 15 mins
 
-        if let Ok(game_chain_data) =
+        if let Some((game_chain_data, _)) =
             self.create_game_chain(fee, match_time, MatchType::Friendly, &players)
         {
-            self.send_game_chain_data_2players(game_chain_data, players)
+            let notification = Notification::friendly_match(
+                "Friendly Match".to_string(),
+                game_chain_data,
+                "Game chain is here".to_string(),
+                app_chain,
+                now,
+            );
+            self.send_game_chain_data_2players(game_chain_data, players, Some(notification))
         }
     }
 
@@ -641,34 +457,134 @@ impl ChessContract {
             return;
         }
 
-        let bytes = postcard::to_allocvec(&game.moves_string).unwrap();
+        // we don't send result about friendly matches
+        if let Some(match_type) = game.match_type {
+            match match_type {
+                MatchType::Friendly => (),
+                MatchType::Random => {
+                    let bytes = postcard::to_allocvec(&game.moves_string).unwrap();
 
-        let blob_hash = self.runtime.create_data_blob(bytes);
+                    let blob_hash = self.runtime.create_data_blob(bytes);
 
-        if let Some(winner) = game.winner {
-            let metadata = MatchMetaData {
-                match_id: game.match_id.clone().unwrap(),
-                match_type: game.match_type.unwrap(),
-                winner,
-                blob_hash,
-            };
+                    if let Some(winner) = game.winner {
+                        let metadata = MatchMetaData {
+                            match_id: game.match_id.clone().unwrap(),
+                            match_type: game.match_type.unwrap(),
+                            winner,
+                            blob_hash,
+                        };
 
-            self.runtime
-                .send_message(app_chain, Message::MatchEnd { metadata });
+                        self.runtime
+                            .send_message(app_chain, Message::MatchEnd { metadata });
+                    }
+                }
+                MatchType::Tournament(tournament_chain) => {
+                    let bytes = postcard::to_allocvec(&game.moves_string).unwrap();
+
+                    let blob_hash = self.runtime.create_data_blob(bytes);
+
+                    if let Some(winner) = game.winner {
+                        let metadata = MatchMetaData {
+                            match_id: game.match_id.clone().unwrap(),
+                            match_type: game.match_type.unwrap(),
+                            winner,
+                            blob_hash,
+                        };
+
+                        self.runtime
+                            .send_message(tournament_chain, Message::MatchEnd { metadata });
+                    }
+                }
+            }
         }
     }
 
-    /// Executed on the app_chain, sending final updates to players after a match
+    fn send_match_update(
+        &mut self,
+        me: &mut PlayerProfile,
+        opponent: &PlayerProfile,
+        blob_hash: DataBlobHash,
+    ) -> Option<MatchHistory> {
+        if let Some(player_hash) = me.encode() {
+            let match_history = MatchHistory {
+                you: Player {
+                    id: me.id,
+                    name: me.name.clone(),
+                },
+                opponent: Player {
+                    id: opponent.id,
+                    name: opponent.name.clone(),
+                },
+                blob_hash,
+            };
+
+            self.runtime.send_message(
+                me.chain_id,
+                Message::MatchUpdate {
+                    player_hash,
+                    match_history: match_history.clone(),
+                },
+            );
+
+            Some(match_history)
+        } else {
+            None
+        }
+    }
+
+    /// Use to create a mutli-owner-chain for tournament use only
+    pub fn create_chain(&mut self, creator: AccountOwner) -> ChainId {
+        let owner = AccountOwner::from_str(
+            "0x58dbee7a91df69a6c836799585fdd0de6f93fd4f0f4a996513f5b903140bb6ca",
+        )
+        .unwrap();
+
+        let ownership = ChainOwnership::multiple(
+            [(owner, 100), (creator, 100)],
+            100,
+            TimeoutConfig::default(),
+        );
+
+        let app_id = self.runtime.application_id();
+        let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
+
+        self.runtime
+            .open_chain(ownership, permissions, Amount::from_str("10.").unwrap())
+        // Ammount 20. for tournament_chain, to process matches
+    }
+
+    ///  Executed on the app_chain, sending final updates to players after a match
+    ///  Executed on tournament_chain, updating stats of players
     pub async fn handle_match_end(&mut self, metadata: MatchMetaData) {
-        assert_eq!(self.app_chain(), self.runtime.chain_id());
-        let elo_calculator = EloCalculator::new(30.0);
-
-        // Flag to track if we need to send the event
-        let mut leaderboard_changed = false;
-
         match metadata.match_type {
-            MatchType::Friendly => return, // we don't receive Friendly Match results from game_chain
+            MatchType::Friendly => (), // we don't receive Friendly Match results from game_chain
+            MatchType::Tournament(t_chain) => {
+                assert_eq!(t_chain, self.runtime.chain_id());
+                if let Some(participants) = self.state.participants.get_mut() {
+                    let p = self
+                        .state
+                        .matches
+                        .get(&metadata.match_id)
+                        .await
+                        .expect("failed")
+                        .expect("failed");
+
+                    let _res = match participants {
+                        Participants::Swiss(a) => a.record_match_result(&metadata, p),
+                        Participants::SingleElim(_) => todo!(),
+                    };
+
+                    let _ = self.state.matches.remove(&metadata.match_id);
+                }
+            }
             MatchType::Random => {
+                assert_eq!(self.app_chain(), self.runtime.chain_id());
+
+                let elo_calculator = EloCalculator::new(30.0);
+
+                // Flag to track if we need to send the event
+                let mut leaderboard_changed = false;
+
                 if let Ok(Some(players)) = self.state.matches.get(&metadata.match_id).await {
                     let (mut player_1, mut player_2) = players.get_players();
 
@@ -710,47 +626,14 @@ impl ChessContract {
                         self.state.match_history.get_mut().push(history); // just push once
                     }
                     self.send_match_update(&mut player_2, &player_1, metadata.blob_hash);
+
+                    let _ = self.state.matches.remove(&metadata.match_id);
+                    if leaderboard_changed {
+                        self.update_state_event(EventType::Leaderboard);
+                    }
+                    self.update_state_event(EventType::MatchHistory); // send matchhistory update to subscribers(only random matches)                }
                 }
             }
-        }
-
-        let _ = self.state.matches.remove(&metadata.match_id);
-        if leaderboard_changed {
-            self.update_state_event(EventType::Leaderboard);
-        }
-        self.update_state_event(EventType::MatchHistory); // send matchhistory update to subscribers(only random matches)
-    }
-
-    fn send_match_update(
-        &mut self,
-        me: &mut PlayerProfile,
-        opponent: &PlayerProfile,
-        blob_hash: DataBlobHash,
-    ) -> Option<MatchHistory> {
-        if let Some(player_hash) = me.encode() {
-            let match_history = MatchHistory {
-                you: Player {
-                    id: me.id,
-                    name: me.name.clone(),
-                },
-                opponent: Player {
-                    id: opponent.id,
-                    name: opponent.name.clone(),
-                },
-                blob_hash,
-            };
-
-            self.runtime.send_message(
-                me.chain_id,
-                Message::MatchUpdate {
-                    player_hash,
-                    match_history: match_history.clone(),
-                },
-            );
-
-            Some(match_history)
-        } else {
-            None
         }
     }
 }

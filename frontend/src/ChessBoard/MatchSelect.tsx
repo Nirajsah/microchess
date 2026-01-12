@@ -15,7 +15,6 @@ import {
   friendId,
   gameWithToken,
   getGameChainInfo,
-  reqFriendlyGame,
   startGame,
   storage,
 } from '@/api'
@@ -26,14 +25,14 @@ const MatchSelect = () => {
   type MatchState =
     | { status: 'idle' }
     | { status: 'random.loading' }
-    | { status: 'random.ready'; chainId: string; timestamp: number }
+    | { status: 'random.ready'; chainId: string }
     | { status: 'friendly.loading' }
     | { status: 'friendly.share'; gameHash: string }
     | { status: 'friendly.join' }
 
   type Event =
     | { type: 'START_RANDOM' }
-    | { type: 'RANDOM_ASSIGNED'; chainId: string; timestamp: number }
+    | { type: 'RANDOM_ASSIGNED'; chainId: string }
     | { type: 'START_FRIENDLY' }
     | { type: 'FRIENDLY_READY'; gameHash: string }
     | { type: 'JOIN_FRIENDLY' }
@@ -48,7 +47,6 @@ const MatchSelect = () => {
         return {
           status: 'random.ready',
           chainId: event.chainId,
-          timestamp: event.timestamp,
         }
 
       case 'START_FRIENDLY':
@@ -73,6 +71,7 @@ const MatchSelect = () => {
 
   const notification = useWalletStore((s) => s.notification)
   const ready = useWalletStore((s) => s.ready)
+  const refetch = useWalletStore((s) => s.refetch)
 
   let saved = storage.getGameState()
   if (saved === 'friendly.share' || saved === 'random.ready') {
@@ -108,25 +107,20 @@ const MatchSelect = () => {
   // fetch gameChainInfo(chainId, timestamp)
   const fetchGameChainInfo = async () => {
     const chain = await getGameChainInfo()
-    const data = JSON.parse(chain.result).data.gameChain
-    if (data && data.chainId) {
-      dispatch({ type: 'RANDOM_ASSIGNED', ...data })
-    }
-  }
-
-  // creates a new personalId to share with friend for friendly match
-  const requestFriendly = async () => {
-    if (ready) {
-      dispatch({ type: 'START_FRIENDLY' })
-      await reqFriendlyGame()
+    const data = JSON.parse(chain).data.gameChain
+    if (data) {
+      dispatch({ type: 'RANDOM_ASSIGNED', chainId: data })
     }
   }
 
   // this is FriendId passed to friend to start a friendly match
   const getPersonalId = async () => {
+    if (ready) {
+      dispatch({ type: 'START_FRIENDLY' })
+    }
     await friendId()
       .then((chain) => {
-        const data = JSON.parse(chain.result).data.friendId
+        const data = JSON.parse(chain).data.friendId
         if (data) {
           dispatch({ type: 'FRIENDLY_READY', gameHash: data })
         }
@@ -152,7 +146,7 @@ const MatchSelect = () => {
     if (state.status === 'friendly.loading') {
       getPersonalId()
     }
-  }, [state.status, notification])
+  }, [state.status, notification, refetch])
 
   React.useEffect(() => {
     if (state.status === 'friendly.share' || state.status === 'friendly.join') {
@@ -161,14 +155,14 @@ const MatchSelect = () => {
     if (state.status === 'friendly.loading') {
       getPersonalId()
     }
-  }, [notification])
+  }, [notification, refetch, state.status])
 
   return (
     <div className="h-full w-full mx-auto">
       {state.status === 'idle' && (
         <MatchTypeSelection
           requestRandom={startRandom}
-          requestFriendly={requestFriendly}
+          requestFriendly={getPersonalId}
           JoinWithHash={JoinWithHash}
         />
       )}
@@ -177,11 +171,7 @@ const MatchSelect = () => {
         <RandomLoading cancel={handleCancel} />
       )}
       {state.status === 'random.ready' && (
-        <RandomAssignScreen
-          chainId={state.chainId}
-          timestamp={state.timestamp}
-          back={back}
-        />
+        <RandomAssignScreen chainId={state.chainId} back={back} />
       )}
       {state.status === 'friendly.loading' && (
         <FriendlyLoading cancel={handleCancel} />
@@ -341,15 +331,12 @@ function RandomLoading({ cancel }: any) {
   )
 }
 
-function RandomAssignScreen({ chainId, timestamp, back }: any) {
+function RandomAssignScreen({ chainId, back }: any) {
   const assignChain = useWalletStore((s) => s.assignChainAsync)
   const handleStart = async () => {
     try {
-      const res = await assignChain({ chainId, timestamp })
+      await assignChain(chainId)
       back() // just to reset the state
-      if (res.success) {
-        window.location.reload()
-      }
     } catch (e) {
       console.log(e)
     }
@@ -382,10 +369,6 @@ function RandomAssignScreen({ chainId, timestamp, back }: any) {
               <span className="text-zinc-400 text-sm">ChainId: </span>
               {chainId}
             </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-zinc-400 text-sm">Timestamp:</span>
-            <span className="text-white font-mono">{timestamp}</span>
           </div>
         </div>
 
@@ -420,7 +403,9 @@ function FriendlyLoading({ cancel }: any) {
         <h3 className="text-2xl font-bold text-white mb-2">
           Creating Private Room...
         </h3>
-        <p className="text-zinc-400">Setting up your friendly match</p>
+        <p className="text-zinc-400">
+          If you're seeing this, Update Your Name..
+        </p>
       </div>
 
       <button onClick={cancel} className="text-orange-400 hover:scale-105">
