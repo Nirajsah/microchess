@@ -180,30 +180,9 @@ const NotificationItem = ({
   )
 }
 
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    title: 'Friendly Match Invitation',
-    notificationType: NotificationType.FriendlyMatch,
-    createdAt: Date.now() / 1000 - 3600,
-    read: false,
-    data: 'Player123',
-    sender: 'Deathmatch',
-    chainId: 'chain-001',
-  },
-  {
-    title: 'New Tournament Published!',
-    notificationType: NotificationType.TournamentPublished,
-    createdAt: Date.now() / 1000 - 7200,
-    read: true,
-    chainId: 'chain-002',
-    data: 'Spring Championship',
-    sender: '',
-  },
-]
-
 export const Notifications = ({ onReadAll }: { onReadAll?: () => void }) => {
   const [notifications, setNotifications] =
-    React.useState<Notification[]>(MOCK_NOTIFICATIONS)
+    React.useState<Notification[]>([])
   const [expandedId, setExpandedId] = React.useState<string | null>(null)
   const assignChain = useWalletStore((s) => s.assignChainAsync)
 
