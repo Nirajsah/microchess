@@ -20,7 +20,7 @@ pub enum Event {
         history: MatchHistory,
     },
     Tournament {
-        value: Tournament,
+        value: Box<Tournament>,
     },
     TournamentRegistration {
         tournament_id: String,

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use async_graphql::{Enum, SimpleObject};
 use base64::{engine::general_purpose, Engine};
-use linera_sdk::linera_base_types::{AccountOwner, ChainId};
+use linera_sdk::linera_base_types::{AccountOwner, ChainId, DataBlobHash};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -275,6 +275,7 @@ impl TParticipants for SwissParticipants {
                 player_b: bye_player.unwrap(),
                 status: MatchStatus::Scheduled,
                 result: bye_player,
+                blob_hash: None,
             });
 
             match_count += 1;
@@ -310,6 +311,7 @@ impl TParticipants for SwissParticipants {
                         player_b: p2_id,
                         status: MatchStatus::Scheduled,
                         result: None,
+                        blob_hash: None,
                     });
 
                     paired.insert(p1_id);
@@ -322,8 +324,8 @@ impl TParticipants for SwissParticipants {
 
             // If no valid opponent in same bracket, allow repeat pairing (last resort)
             if !opponent_found {
-                for j in (i + 1)..sorted_players.len() {
-                    let p2_id = sorted_players[j].player_id;
+                for p2 in sorted_players.iter().skip(i + 1) {
+                    let p2_id = p2.player_id;
 
                     if !paired.contains(&p2_id) {
                         matches.push(Match {
@@ -334,6 +336,7 @@ impl TParticipants for SwissParticipants {
                             player_b: p2_id,
                             status: MatchStatus::Scheduled,
                             result: None,
+                            blob_hash: None,
                         });
 
                         paired.insert(p1_id);
@@ -369,6 +372,7 @@ impl TParticipants for SwissParticipants {
                 player_b: players[players.len() - 1 - i].player_id,
                 status: MatchStatus::Scheduled,
                 result: None,
+                blob_hash: None,
             });
             match_count += 1;
         }
@@ -384,6 +388,7 @@ impl TParticipants for SwissParticipants {
                 player_b: players[middle].player_id,
                 status: MatchStatus::Scheduled,
                 result: Some(players[middle].player_id),
+                blob_hash: None,
             });
         }
 
@@ -478,6 +483,7 @@ pub struct Match {
     pub player_b: AccountOwner,
     pub status: MatchStatus,
     pub result: Option<AccountOwner>,
+    pub blob_hash: Option<DataBlobHash>,
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Enum)]
@@ -490,38 +496,12 @@ pub enum MatchStatus {
 
 #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
 pub struct TournamentRound {
-    pub id: String,
     pub round: u8,
     pub matches: Vec<Match>,
 }
 
 impl TournamentRound {
     pub fn new(round: u8, matches: Vec<Match>) -> Self {
-        Self {
-            id: "dummy".to_string(),
-            round,
-            matches,
-        }
+        Self { round, matches }
     }
 }
-
-// supabase
-//   .from('tournament_rounds')
-//   .select(`
-//     round_number,
-//     tournament_matches (
-//       match_id,
-//       player_a,
-//       player_b,
-//       status,
-//       winner
-//     )
-//   `)
-//   .eq('tournament_id', tournamentId)
-//   .order('round_number');
-
-/* #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
-pub struct TournamentRounds {
-    pub tournament_id: String,
-    pub rounds: Vec<TournamentRound>,
-} */

@@ -49,15 +49,15 @@ https://github.com/Nirajsah/croissant
 **Pairings and Structure**
 
 - [x] Automatically generate participant pairings
-- [ ] Automatically generate round brackets
+- [x] Automatically generate round brackets
 - [ ] Support multiple tournament formats:
   - [x] Swiss System
   - [ ] Round Robin
 
 **Match and Round Execution**
 
-- [ ] Create on-chain game instances for all matches and rounds
-- [ ] Track match results and advance rounds accordingly
+- [x] Create on-chain game instances for all matches and rounds
+- [x] Track match results and advance rounds accordingly
 
 **Participant Experience**
 

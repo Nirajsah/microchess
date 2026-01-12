@@ -228,11 +228,11 @@ export function __web_thread_worker_entry_point(code, context) {
 }
 
 function __wbg_adapter_72(arg0, arg1, arg2) {
-    wasm.closure1098_externref_shim(arg0, arg1, arg2);
+    wasm.closure1073_externref_shim(arg0, arg1, arg2);
 }
 
 function __wbg_adapter_75(arg0, arg1, arg2) {
-    wasm.closure1327_externref_shim(arg0, arg1, arg2);
+    wasm.closure1337_externref_shim(arg0, arg1, arg2);
 }
 
 function __wbg_adapter_78(arg0, arg1) {
@@ -247,11 +247,11 @@ function __wbg_adapter_81(arg0, arg1) {
 }
 
 function __wbg_adapter_84(arg0, arg1, arg2) {
-    wasm.closure3467_externref_shim(arg0, arg1, arg2);
+    wasm.closure3477_externref_shim(arg0, arg1, arg2);
 }
 
 function __wbg_adapter_487(arg0, arg1, arg2, arg3) {
-    wasm.closure3992_externref_shim(arg0, arg1, arg2, arg3);
+    wasm.closure4002_externref_shim(arg0, arg1, arg2, arg3);
 }
 
 /**
@@ -365,12 +365,14 @@ export class Chain {
      * # Panics
      * If the handler function fails.
      * @param {Function} handler
+     * @returns {NotificationHandle}
      */
     onNotification(handler) {
         const ret = wasm.chain_onNotification(this.__wbg_ptr, handler);
-        if (ret[1]) {
-            throw takeFromExternrefTable0(ret[0]);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
         }
+        return NotificationHandle.__wrap(ret[0]);
     }
     /**
      * Transfers funds from one account to another.
@@ -494,15 +496,6 @@ export class Client {
     constructor(w, signer, options) {
         _assertClass(w, Wallet);
         const ret = wasm.client_new(w.__wbg_ptr, signer, isLikeNone(options) ? 0 : addToExternrefTable0(options));
-        return ret;
-    }
-    /**
-     * @param {ChainId} chain_id
-     * @param {AccountOwner} owner
-     * @returns {Promise<Chain>}
-     */
-    assignAndSetDefault(chain_id, owner) {
-        const ret = wasm.client_assignAndSetDefault(this.__wbg_ptr, chain_id, owner);
         return ret;
     }
     /**
@@ -713,6 +706,36 @@ export class IntoUnderlyingSource {
     cancel() {
         const ptr = this.__destroy_into_raw();
         wasm.intounderlyingsource_cancel(ptr);
+    }
+}
+
+const NotificationHandleFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_notificationhandle_free(ptr >>> 0, 1));
+
+export class NotificationHandle {
+
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(NotificationHandle.prototype);
+        obj.__wbg_ptr = ptr;
+        NotificationHandleFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        NotificationHandleFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_notificationhandle_free(ptr, 0);
+    }
+    unsubscribe() {
+        wasm.notificationhandle_unsubscribe(this.__wbg_ptr);
     }
 }
 
@@ -1873,28 +1896,28 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper13385 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 3445, __wbg_adapter_81);
+    imports.wbg.__wbindgen_closure_wrapper13368 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 3455, __wbg_adapter_81);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper13426 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 3468, __wbg_adapter_84);
+    imports.wbg.__wbindgen_closure_wrapper13409 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 3478, __wbg_adapter_84);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper13427 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 3468, __wbg_adapter_84);
+    imports.wbg.__wbindgen_closure_wrapper13410 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 3478, __wbg_adapter_84);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper6761 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 1099, __wbg_adapter_72);
+    imports.wbg.__wbindgen_closure_wrapper6385 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 1074, __wbg_adapter_72);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper7653 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 1328, __wbg_adapter_75);
+    imports.wbg.__wbindgen_closure_wrapper7634 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 1338, __wbg_adapter_75);
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper8855 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 1784, __wbg_adapter_78);
+    imports.wbg.__wbindgen_closure_wrapper8836 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 1794, __wbg_adapter_78);
         return ret;
     };
     imports.wbg.__wbindgen_debug_string = function(arg0, arg1) {

@@ -204,10 +204,7 @@ impl ChessService {
 
     async fn participants(&self) -> Option<String> {
         let p = self.state.participants.get();
-        match p {
-            Some(p) => Some(p.encode()),
-            None => None,
-        }
+        p.as_ref().map(|p| p.encode())
     }
 
     // TO BE REMOVED
@@ -232,7 +229,7 @@ impl ChessService {
             .notifications
             .get()
             .iter()
-            .filter(|n| n.read == false)
+            .filter(|n| !n.read)
             .count()
     }
 
@@ -241,10 +238,6 @@ impl ChessService {
     }
 
     async fn tournament_round(&self) -> Option<&TournamentRound> {
-        if let Some(last_round) = self.state.tournament_rounds.get().last() {
-            Some(last_round)
-        } else {
-            None
-        }
+        self.state.tournament_rounds.get().last()
     }
 }

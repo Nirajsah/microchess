@@ -1,6 +1,5 @@
 /* eslint-disable */
 import { ResultOf, DocumentTypeDecoration, TypedDocumentNode } from '@graphql-typed-document-node/core';
-import { FragmentDefinitionNode } from 'graphql';
 import { Incremental } from './graphql';
 
 
@@ -9,10 +8,10 @@ export type FragmentType<TDocumentType extends DocumentTypeDecoration<any, any>>
   any
 >
   ? [TType] extends [{ ' $fragmentName'?: infer TKey }]
-    ? TKey extends string
-      ? { ' $fragmentRefs'?: { [key in TKey]: TType } }
-      : never
-    : never
+  ? TKey extends string
+  ? { ' $fragmentRefs'?: { [key in TKey]: TType } }
+  : never
+  : never
   : never;
 
 // return non-nullable if `fragmentType` is non-nullable
@@ -79,9 +78,9 @@ export function isFragmentReady<TQuery, TFrag>(
 
   if (!deferredFields) return true;
 
-  const fragDef = fragmentNode.definitions[0] as FragmentDefinitionNode | undefined;
+  const fragDef = fragmentNode.definitions[0] as any | undefined;
   const fragName = fragDef?.name?.value;
 
   const fields = (fragName && deferredFields[fragName]) || [];
-  return fields.length > 0 && fields.every(field => data && field in data);
+  return fields.length > 0 && fields.every((field: any) => data && field in data);
 }

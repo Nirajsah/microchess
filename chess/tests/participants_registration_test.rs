@@ -238,7 +238,6 @@ async fn test_tournament() {
 
     let query_tournament_matches = "
              query { tournamentRound {
-                 id
                  round
                  matches {
                      matchId
@@ -248,6 +247,7 @@ async fn test_tournament() {
                      round
                      status
                      result
+                     blobHash
                  }
             } }";
 

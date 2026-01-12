@@ -17,7 +17,10 @@ export enum SignerError {
  * *This API requires the following crate features to be activated: `ReadableStreamType`*
  */
 type ReadableStreamType = "bytes";
-import type { Signer } from '../signer/index.js';
+export interface QueryOptions {
+    blockHash?: string | undefined;
+    owner?: AccountOwner | undefined;
+}
 
 export interface TransferParams {
     donor?: AccountOwner | undefined;
@@ -29,10 +32,7 @@ export interface AddOwnerOptions {
     weight?: number;
 }
 
-export interface QueryOptions {
-    blockHash?: string | undefined;
-    owner?: AccountOwner | undefined;
-}
+import type { Signer } from '../signer/index.js';
 
 export interface Options extends ChainListenerConfig {
     /**
@@ -238,7 +238,7 @@ export class Chain {
    * # Panics
    * If the handler function fails.
    */
-  onNotification(handler: Function): void;
+  onNotification(handler: Function): NotificationHandle;
   /**
    * Transfers funds from one account to another.
    *
@@ -303,7 +303,6 @@ export class Client {
    * unavailable, or if `options` is incorrectly structured.
    */
   constructor(w: Wallet, signer: Signer, options?: Options | null);
-  assignAndSetDefault(chain_id: ChainId, owner: AccountOwner): Promise<Chain>;
   /**
    * Assigns a new chain and returns the ChainClient for use
    */
@@ -362,6 +361,11 @@ export class IntoUnderlyingSource {
   pull(controller: ReadableStreamDefaultController): Promise<any>;
   cancel(): void;
 }
+export class NotificationHandle {
+  private constructor();
+  free(): void;
+  unsubscribe(): void;
+}
 export class Secret {
   free(): void;
   /**
@@ -399,34 +403,35 @@ export class Wallet {
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
-  readonly __wbg_secret_free: (a: number, b: number) => void;
-  readonly secret_set: (a: number, b: number, c: number, d: any) => any;
-  readonly secret_get: (a: number, b: number, c: number) => any;
-  readonly secret_new: () => number;
+  readonly __wbg_application_free: (a: number, b: number) => void;
+  readonly application_query: (a: number, b: number, c: number, d: number) => any;
   readonly __wbg_chain_free: (a: number, b: number) => void;
-  readonly chain_onNotification: (a: number, b: any) => [number, number];
+  readonly __wbg_notificationhandle_free: (a: number, b: number) => void;
+  readonly notificationhandle_unsubscribe: (a: number) => void;
+  readonly chain_onNotification: (a: number, b: any) => [number, number, number];
   readonly chain_transfer: (a: number, b: any) => any;
   readonly chain_balance: (a: number) => any;
   readonly chain_identity: (a: number) => any;
   readonly chain_addOwner: (a: number, b: any, c: number) => any;
   readonly chain_validatorVersionInfo: (a: number) => any;
   readonly chain_application: (a: number, b: number, c: number) => any;
+  readonly __wbg_secret_free: (a: number, b: number) => void;
+  readonly secret_set: (a: number, b: number, c: number, d: any) => any;
+  readonly secret_get: (a: number, b: number, c: number) => any;
+  readonly secret_new: () => number;
+  readonly __wbg_wallet_free: (a: number, b: number) => void;
+  readonly wallet_get: () => any;
+  readonly wallet_readJsWallet: () => any;
+  readonly wallet_save_to_storage: (a: number, b: number) => any;
   readonly __wbg_faucet_free: (a: number, b: number) => void;
   readonly faucet_new: (a: number, b: number) => number;
   readonly faucet_createWallet: (a: number) => any;
   readonly faucet_claimChain: (a: number, b: number, c: any) => any;
   readonly __wbg_client_free: (a: number, b: number) => void;
   readonly client_new: (a: number, b: any, c: number) => any;
-  readonly client_assignAndSetDefault: (a: number, b: any, c: any) => any;
   readonly client_assignChain: (a: number, b: any, c: any) => any;
   readonly client_chain: (a: number, b: number) => any;
   readonly main: () => void;
-  readonly __wbg_application_free: (a: number, b: number) => void;
-  readonly application_query: (a: number, b: number, c: number, d: number) => any;
-  readonly __wbg_wallet_free: (a: number, b: number) => void;
-  readonly wallet_get: () => any;
-  readonly wallet_readJsWallet: () => any;
-  readonly wallet_save_to_storage: (a: number, b: number) => any;
   readonly __web_thread_worker_entry_point: (a: any, b: any) => any;
   readonly __wbg_intounderlyingbytesource_free: (a: number, b: number) => void;
   readonly intounderlyingbytesource_type: (a: number) => number;
@@ -452,12 +457,12 @@ export interface InitOutput {
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_export_7: WebAssembly.Table;
   readonly __externref_table_dealloc: (a: number) => void;
-  readonly closure1098_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure1327_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure1073_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure1337_externref_shim: (a: number, b: number, c: any) => void;
   readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__haf1205b389f3f51f: (a: number, b: number) => void;
   readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h18ca806deb6aeb38_multivalue_shim: (a: number, b: number) => [number, number];
-  readonly closure3467_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure3992_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly closure3477_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure4002_externref_shim: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_thread_destroy: (a?: number, b?: number, c?: number) => void;
   readonly __wbindgen_start: (a: number) => void;
 }

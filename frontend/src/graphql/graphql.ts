@@ -41,6 +41,7 @@ export type ChessService = {
   mvString: Array<Scalars['String']['output']>;
   myTournament?: Maybe<Tournament>;
   myTournaments: Array<Tournament>;
+  notificationCount: Scalars['Int']['output'];
   notifications: Array<Notification>;
   opponentProfile?: Maybe<PlayerInfo>;
   participants?: Maybe<Scalars['String']['output']>;
@@ -51,6 +52,7 @@ export type ChessService = {
   tournament?: Maybe<Tournament>;
   tournamentChains: Array<Scalars['ChainId']['output']>;
   tournamentMatches?: Maybe<Array<Match>>;
+  tournamentRound?: Maybe<TournamentRound>;
 };
 
 
@@ -113,12 +115,14 @@ export type Leaderboard = {
 
 export type Match = {
   __typename?: 'Match';
+  blobHash?: Maybe<Scalars['DataBlobHash']['output']>;
+  gameChain?: Maybe<Scalars['ChainId']['output']>;
   matchId: Scalars['Int']['output'];
   playerA: Scalars['AccountOwner']['output'];
   playerB: Scalars['AccountOwner']['output'];
   result?: Maybe<Scalars['AccountOwner']['output']>;
   round: Scalars['Int']['output'];
-  tournamentId: Scalars['String']['output'];
+  status: MatchStatus;
 };
 
 export type MatchHistory = {
@@ -127,6 +131,12 @@ export type MatchHistory = {
   opponent: Player;
   you: Player;
 };
+
+export enum MatchStatus {
+  Cancelled = 'CANCELLED',
+  Completed = 'COMPLETED',
+  Scheduled = 'SCHEDULED'
+}
 
 /** Match type / series */
 export enum MatchType {
@@ -159,6 +169,7 @@ export type OperationMutationRoot = {
   frGameHash: Array<Scalars['Int']['output']>;
   hostTournament: Array<Scalars['Int']['output']>;
   makeMove: Array<Scalars['Int']['output']>;
+  markAllRead: Array<Scalars['Int']['output']>;
   newGame: Array<Scalars['Int']['output']>;
   pawnPromotion: Array<Scalars['Int']['output']>;
   profile: Array<Scalars['Int']['output']>;
@@ -202,7 +213,7 @@ export type OperationMutationRootProfileArgs = {
 
 
 export type OperationMutationRootTournamentRegistrationArgs = {
-  organiserChain: Scalars['String']['input'];
+  tournamentChain: Scalars['String']['input'];
   tournamentId: Scalars['String']['input'];
 };
 
@@ -305,6 +316,7 @@ export type Tournament = {
   startingTime: Scalars['Timestamp']['output'];
   status: TournamentStatus;
   timeControl: TimeControl;
+  tournamentChain?: Maybe<Scalars['ChainId']['output']>;
   tournamentDescription?: Maybe<Scalars['String']['output']>;
   tournamentFormat: TournamentFormat;
   tournamentId: Scalars['String']['output'];
@@ -351,6 +363,12 @@ export type TournamentInput = {
   updatedAt?: InputMaybe<Scalars['Timestamp']['input']>;
   version?: InputMaybe<Scalars['String']['input']>;
   visibility: Visibility;
+};
+
+export type TournamentRound = {
+  __typename?: 'TournamentRound';
+  matches: Array<Match>;
+  round: Scalars['Int']['output'];
 };
 
 /** Tournament status lifecycle */

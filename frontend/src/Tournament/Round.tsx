@@ -7,8 +7,6 @@ import { useNavigate } from 'react-router-dom'
 
 /* ---------------- MOCK DATA (SWISS STYLE) ---------------- */
 
-
-
 /* ---------------- MAIN COMPONENT ---------------- */
 
 type Round = {
@@ -21,7 +19,8 @@ export default function Round({ tournamentId }: { tournamentId: string }) {
 
   useEffect(() => {
     async function getRounds() {
-      const { data: rounds } = await supabase.from('tournament_round_v2')
+      const { data: rounds } = await supabase
+        .from('tournament_round_v2')
         .select('id, round')
         .eq('tournament_id', tournamentId)
 
@@ -73,7 +72,6 @@ export default function Round({ tournamentId }: { tournamentId: string }) {
 
 /* ---------------- ROUND ACCORDION ---------------- */
 
-
 type Participant = {
   id: string
   player_name: string
@@ -103,7 +101,8 @@ function SwissRound({ round }: { round: Round }) {
     async function getMatchesForRound() {
       const { data, error } = await supabase
         .from('tournament_matches_v2')
-        .select(`
+        .select(
+          `
           id,
           match_id,
           player_a,
@@ -127,7 +126,8 @@ function SwissRound({ round }: { round: Round }) {
           player_matches,
           player_ath
         )
-        `)
+        `
+        )
         .eq('round_id', round.id)
         .order('match_id', { ascending: true })
 
@@ -135,11 +135,12 @@ function SwissRound({ round }: { round: Round }) {
         console.error(error)
         return
       }
-      const normalized: Match[] = (data as unknown as Match[] | null)?.map((m) => ({
-        ...m,
-        player_a_participant: m.player_a_participant ?? null,
-        player_b_participant: m.player_b_participant ?? null,
-      })) ?? []
+      const normalized: Match[] =
+        (data as unknown as Match[] | null)?.map((m) => ({
+          ...m,
+          player_a_participant: m.player_a_participant ?? null,
+          player_b_participant: m.player_b_participant ?? null,
+        })) ?? []
 
       setMatches(normalized)
     }
@@ -216,8 +217,8 @@ function SwissRound({ round }: { round: Round }) {
 
 function MatchCard({ match, index }: { match: Match; index: number }) {
   const isCompleted = match.status === 'completed'
-  const participant_a = match.player_a_participant as Participant;
-  const participant_b = match.player_b_participant as Participant;
+  const participant_a = match.player_a_participant as Participant
+  const participant_b = match.player_b_participant as Participant
   const publicKey = useWalletStore((s) => s.pubKey)
   const assignAsync = useWalletStore((s) => s.assignChainAsync)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
@@ -274,11 +275,14 @@ function MatchCard({ match, index }: { match: Match; index: number }) {
                 </div>
 
                 <p className="text-gray-400 text-sm leading-relaxed">
-                  You are about to join this match. This will assign the game chain to your wallet and navigate you to the chess game.
+                  You are about to join this match. This will assign the game
+                  chain to your wallet and navigate you to the chess game.
                 </p>
 
                 <div className="bg-[#262626] rounded-lg p-3 border border-[#333]">
-                  <div className="text-xs text-gray-500 uppercase mb-1">Game Chain</div>
+                  <div className="text-xs text-gray-500 uppercase mb-1">
+                    Game Chain
+                  </div>
                   <div className="text-xs text-gray-300 font-mono truncate">
                     {match.game_chain}
                   </div>
@@ -308,23 +312,28 @@ function MatchCard({ match, index }: { match: Match; index: number }) {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: index * 0.05 }}
-        className={`rounded-lg border border-[#333] bg-[#262626] p-4 flex flex-col gap-3 ${isCompleted ? 'opacity-70' : ''
-          }`}
+        className={`rounded-lg border border-[#333] bg-[#262626] p-4 flex flex-col gap-3 ${
+          isCompleted ? 'opacity-70' : ''
+        }`}
       >
         <div className="flex justify-between items-center text-xs uppercase text-gray-500">
           <span>Match</span>
 
           <div className="flex items-center gap-2">
             {(match.player_a === publicKey || match.player_b === publicKey) && (
-              <button onClick={() => setShowConfirmModal(true)} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-500/20 text-green-400 hover:bg-green-500/30 transition">
+              <button
+                onClick={() => setShowConfirmModal(true)}
+                className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-500/20 text-green-400 hover:bg-green-500/30 transition"
+              >
                 Assign
               </button>
             )}
             <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${match.status === 'completed'
-                ? 'bg-green-500/20 text-green-400'
-                : 'bg-blue-500/20 text-blue-400'
-                }`}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                match.status === 'completed'
+                  ? 'bg-green-500/20 text-green-400'
+                  : 'bg-blue-500/20 text-blue-400'
+              }`}
             >
               {match.status}
             </span>
@@ -354,21 +363,23 @@ function MatchCard({ match, index }: { match: Match; index: number }) {
 function PlayerRow({
   participant,
   isWinner,
-  score,
 }: {
   participant: Participant | undefined
   isWinner: boolean
-  score: string
+  score?: string
 }) {
   return (
     <div
-      className={`flex items-center justify-between ${isWinner ? 'text-yellow-400 font-bold' : 'text-gray-300'
-        }`}
+      className={`flex items-center justify-between ${
+        isWinner ? 'text-yellow-400 font-bold' : 'text-gray-300'
+      }`}
     >
       <div className="flex flex-col gap-0.5">
         <span>{participant?.player_name?.toUpperCase()}</span>
         <span className="text-sm text-gray-500">{participant?.id}</span>
-        <span className="text-xs text-gray-500">Rank #{participant?.player_ath}</span>
+        <span className="text-xs text-gray-500">
+          Rank #{participant?.player_ath}
+        </span>
       </div>
 
       {/* <span className="font-mono text-lg">{score}</span> */}

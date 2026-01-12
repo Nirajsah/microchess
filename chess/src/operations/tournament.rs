@@ -93,8 +93,6 @@ impl ChessContract {
                     value: Box::new(tournament.to_owned()),
                 };
                 self.runtime.send_message(app_chain, message);
-            } else {
-                return; // in any other case,
             }
         }
     }
@@ -116,10 +114,10 @@ impl ChessContract {
         let timer = tournament.time_control.base_minutes;
 
         tournament.update(&update, updated_at);
-        /* if tournament.status != TournamentStatus::RegistrationClosed {
+
+        if tournament.status != TournamentStatus::RegistrationClosed {
             return;
-        } */
-        // Need to fix this
+        }
 
         let (matches, player_map) = {
             match self.state.start_tournament_without_persist(&tournament_id) {
@@ -128,7 +126,7 @@ impl ChessContract {
             }
         };
 
-        let fee = Amount::from_str("1.").unwrap();
+        let fee = Amount::from_str("0.5").unwrap();
         let time = TimeDelta::from_secs(timer.into());
 
         let mut matches_to = Vec::with_capacity(matches.len());

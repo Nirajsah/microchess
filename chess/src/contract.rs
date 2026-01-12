@@ -227,7 +227,7 @@ impl Contract for ChessContract {
                         self.state.match_history.get_mut().push(history);
                     }
                     Event::Tournament { value } => {
-                        self.on_event_host_tournament(value);
+                        self.on_event_host_tournament(*value);
                     }
                     Event::TournamentRegistration {
                         tournament_id,
@@ -460,7 +460,7 @@ impl ChessContract {
         // we don't send result about friendly matches
         if let Some(match_type) = game.match_type {
             match match_type {
-                MatchType::Friendly => return,
+                MatchType::Friendly => (),
                 MatchType::Random => {
                     let bytes = postcard::to_allocvec(&game.moves_string).unwrap();
 
@@ -557,7 +557,7 @@ impl ChessContract {
     ///  Executed on tournament_chain, updating stats of players
     pub async fn handle_match_end(&mut self, metadata: MatchMetaData) {
         match metadata.match_type {
-            MatchType::Friendly => return, // we don't receive Friendly Match results from game_chain
+            MatchType::Friendly => (), // we don't receive Friendly Match results from game_chain
             MatchType::Tournament(t_chain) => {
                 assert_eq!(t_chain, self.runtime.chain_id());
                 if let Some(participants) = self.state.participants.get_mut() {

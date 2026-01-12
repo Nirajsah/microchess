@@ -51,6 +51,14 @@ pub struct Tournament {
 }
 
 impl Tournament {
+    pub fn close_registration(&mut self) {
+        if self.status != TournamentStatus::RegistrationOpen {
+            return;
+        }
+
+        self.status = TournamentStatus::RegistrationClosed;
+    }
+
     pub fn update(&mut self, update: &TournamentUpdate, now: Timestamp) {
         if let Some(tournament_name) = &update.tournament_name {
             self.tournament_name = tournament_name.to_string();
@@ -74,9 +82,11 @@ impl Tournament {
             }
         }
 
-        if self.status == TournamentStatus::Draft {
-            if let Some(status) = update.status {
-                self.status = status;
+        if let Some(status) = update.status {
+            if status == TournamentStatus::RegistrationClosed {
+                self.close_registration();
+            } else {
+                self.status = status
             }
         }
 
@@ -159,7 +169,7 @@ pub struct TournamentUpdate {
     pub visibility: Option<Visibility>,
 }
 
-const TOURNAMENT_VERSION: &str = "v1";
+const TOURNAMENT_VERSION: &str = "v2";
 
 impl From<TournamentInput> for Tournament {
     fn from(input: TournamentInput) -> Self {

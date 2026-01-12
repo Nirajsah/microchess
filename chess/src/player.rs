@@ -67,8 +67,7 @@ impl PlayerHash {
 
     pub fn decode(&self) -> PlayerProfile {
         let bytes = general_purpose::STANDARD.decode(&self.value).ok().unwrap();
-        let player = postcard::from_bytes::<PlayerProfile>(&bytes).ok().unwrap();
-        player
+        postcard::from_bytes::<PlayerProfile>(&bytes).ok().unwrap()
     }
 }
 
