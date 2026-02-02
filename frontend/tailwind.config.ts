@@ -12,6 +12,7 @@ export default {
         sansation: ['Sansation', 'sans-serif'],
         ancizar: ['Ancizar Sans', 'sans-serif'],
         russo: ['Russo One'],
+        inter: ['Inter', 'sans-serif'],
       },
       colors: {
         background: {

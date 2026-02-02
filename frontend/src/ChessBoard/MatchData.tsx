@@ -7,10 +7,11 @@ interface MatchData {
   checkStatus: string
   moves?: string[] | null
   replay: boolean
+  outcome?: string | null
 }
 
 const MatchDataUI = (data: MatchData) => {
-  const { checkStatus, moves: propMoves, replay } = data
+  const { checkStatus, moves: propMoves, replay, outcome } = data
   const [moves, setMoves] = React.useState<string[] | null>(
     replay ? propMoves || null : null
   )
@@ -40,16 +41,22 @@ const MatchDataUI = (data: MatchData) => {
     }
   }, [notification, replay])
 
-  const movePairs = React.useMemo(
-    () =>
-      moves
-        ? Array.from({ length: Math.ceil(moves.length / 2) }, (_, i) => ({
-            white: moves[i * 2] || '',
-            black: moves[i * 2 + 1] || '',
-          }))
-        : [],
-    [moves, propMoves]
-  )
+  const movePairs = React.useMemo(() => {
+    if (!moves) return []
+
+    // Create a copy of moves to avoid mutating the state directly if we were to (though strings are immutable)
+    const displayMoves = [...moves]
+
+    // If there is an outcome, append it as the next "move"
+    if (outcome) {
+      displayMoves.push(outcome)
+    }
+
+    return Array.from({ length: Math.ceil(displayMoves.length / 2) }, (_, i) => ({
+      white: displayMoves[i * 2] || '',
+      black: displayMoves[i * 2 + 1] || '',
+    }))
+  }, [moves, propMoves, outcome])
 
   return (
     <div className="w-full h-full flex flex-col gap-4 bg-[#262626] rounded-xl">
@@ -109,8 +116,23 @@ const MatchDataUI = (data: MatchData) => {
         </div>
       </div>
 
+      {/* Forfeit Game Status Alert */}
+      {checkStatus === 'Forfeit' && (
+        <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 animate-in fade-in duration-300">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500" />
+            <div>
+              <p className="font-medium text-red-200 text-sm">Game Ended by Forfeit</p>
+              <p className="text-xs text-red-500/80">
+                Opponent timed out
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Check Status Alert */}
-      {checkStatus && (
+      {checkStatus && checkStatus !== 'Forfeit' && (
         <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 animate-in fade-in duration-300">
           <div className="flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-amber-500" />

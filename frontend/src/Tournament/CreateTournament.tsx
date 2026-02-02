@@ -285,11 +285,10 @@ export default function CreateTournament() {
             <div className="flex items-center bg-[#262626] p-1.5 rounded-xl border border-[#333]">
               <button
                 onClick={() => setPreviewMode(false)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  !previewMode
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${!previewMode
                     ? 'bg-[#333] text-white shadow-sm'
                     : 'text-gray-500 hover:text-gray-300'
-                }`}
+                  }`}
               >
                 <Settings className="w-4 h-4" /> Editor
               </button>
@@ -297,11 +296,10 @@ export default function CreateTournament() {
                 onClick={() => {
                   if (validateForm()) setPreviewMode(true)
                 }}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  previewMode
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${previewMode
                     ? 'bg-[#333] text-white shadow-sm'
                     : 'text-gray-500 hover:text-gray-300'
-                }`}
+                  }`}
               >
                 <Eye className="w-4 h-4" /> Preview
               </button>
@@ -346,22 +344,20 @@ export default function CreateTournament() {
                               setCurrentStep(index)
                             }
                           }}
-                          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all ${
-                            isActive
+                          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all ${isActive
                               ? 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-500'
                               : isCompleted
                                 ? 'text-gray-300 hover:bg-[#262626]'
                                 : 'text-gray-500 hover:bg-[#262626] hover:text-gray-300'
-                          }`}
+                            }`}
                         >
                           <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                              isActive
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center ${isActive
                                 ? 'bg-yellow-500/20'
                                 : isCompleted
                                   ? 'bg-emerald-500/20'
                                   : 'bg-[#333]'
-                            }`}
+                              }`}
                           >
                             {isCompleted ? (
                               <Check className="w-4 h-4 text-emerald-400" />
@@ -579,11 +575,10 @@ function StepBasicInfo({
                       visibility: opt.value,
                     }))
                   }
-                  className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
-                    formData.visibility === opt.value
+                  className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${formData.visibility === opt.value
                       ? 'bg-yellow-500/10 border-yellow-500/50 text-white'
                       : 'bg-[#262626] border-[#333] text-gray-400 hover:border-[#444]'
-                  }`}
+                    }`}
                 >
                   <Icon
                     className={`w-5 h-5 mt-0.5 ${formData.visibility === opt.value ? 'text-yellow-500' : 'text-gray-500'}`}
@@ -657,11 +652,10 @@ function StepFormatRules({
                 onClick={() =>
                   setFormData((prev) => ({ ...prev, gameMode: opt.value }))
                 }
-                className={`p-4 rounded-xl border-2 text-center transition-all ${
-                  formData.gameMode === opt.value
+                className={`p-4 rounded-xl border-2 text-center transition-all ${formData.gameMode === opt.value
                     ? 'bg-yellow-500/10 border-yellow-500/50 text-white'
                     : 'bg-[#262626] border-[#333] text-gray-400 hover:border-[#444]'
-                }`}
+                  }`}
               >
                 <p className="font-medium">{opt.label}</p>
                 <p className="text-xs text-gray-500 mt-1">{opt.desc}</p>
@@ -904,11 +898,10 @@ function StepPrizes({
                     onClick={() =>
                       setFormData((prev) => ({ ...prev, prizeType: opt.value }))
                     }
-                    className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${
-                      formData.prizeType === opt.value
+                    className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.prizeType === opt.value
                         ? 'bg-yellow-500/10 border-yellow-500/50 text-yellow-500'
                         : 'bg-[#262626] border-[#333] text-gray-400 hover:border-[#444]'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-4 h-4" />
                     <span className="font-medium">{opt.label}</span>

@@ -7,6 +7,7 @@ import { PieceRow } from './CapturedPieces'
 import { GameControls } from './GameControls'
 import { useWalletStore } from '@/store/wallet'
 import { ResignButton } from '@/ChessBoard/ResignButton'
+import ClaimForfeitButton from '@/ChessBoard/ClaimForfeitButton'
 
 export const PieceMap: any = {
   bP: '♙',
@@ -39,6 +40,7 @@ export interface MatchData {
   setIsGameChain?: (value: boolean | null) => void
   capturedPieces?: string[] | null
   replay: boolean
+  canClaimForfeit?: boolean
 }
 
 export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
@@ -71,6 +73,7 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
   return (
     <div className="w-full h-[500px] flex justify-center items-center">
       {matchData.game_state !== 'Resign' &&
+      matchData.game_state !== 'Forfeit' &&
       (matchData.color === 'White' || matchData.color === 'Black') ? (
         <div className="w-full h-full flex flex-col">
           {capturedPieces && <PieceRow pieces={blackPieces} />}
@@ -84,7 +87,8 @@ export const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
           {capturedPieces && <PieceRow pieces={whitePieces} />}
 
           {!matchData.replay && (
-            <div className="max-h-[100px]">
+            <div className="max-h-[100px] space-y-2">
+              {matchData.canClaimForfeit && <ClaimForfeitButton canClaim={true} />}
               <ResignButton />
             </div>
           )}

@@ -26,7 +26,7 @@ export class Server {
   private client: ClientManager = ClientManager.instance
   private wallet: WalletManager = WalletManager.instance
 
-  constructor() {}
+  constructor() { }
 
   faucetHandlers: Record<OpType, FaucetHandler> = {
     CREATE_WALLET: async (faucet) => {

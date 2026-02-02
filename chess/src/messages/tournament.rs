@@ -11,7 +11,7 @@ use chess::{
     },
     GameWrapper,
 };
-use linera_sdk::linera_base_types::{AccountOwner, ChainId, TimeDelta};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, ChainId, TimeDelta};
 use log::info;
 
 use crate::{event::Event, messages::Message, ChessContract, STREAM_NAME};
@@ -35,12 +35,18 @@ impl ChessContract {
     }
 
     /// Method used by app_chain to create a new chain send a cross-chain message with the tournament as payload
+    /// Fee is calculated based on expected matches: (max_players/2) * round_count * 0.5 tokens per match
     pub async fn on_msg_host_tournament(&mut self, tournament: Tournament) {
         assert_eq!(self.runtime.chain_id(), self.app_chain());
         let now = self.runtime.system_time();
         let organiser_chain = tournament.organiser_chain;
 
-        let chain = self.create_chain(tournament.organiser_id);
+        // Minimal fee for tournament chain - just enough to process messages
+        // Organizer must fund tournament_chain separately before starting rounds
+        // for now we don't have any transfer mechanism on the wallet side, we'll send 20 tokens to the tournament chain
+        let fee = Amount::from_tokens(10);
+
+        let chain = self.create_chain(tournament.organiser_id, fee);
 
         let mut t = tournament.clone();
         t.tournament_chain = Some(chain);

@@ -69,13 +69,20 @@ export function myTournament(tournamentId: string) {
 }
 
 export function getSanFromBlob(blobHash: string) {
-  const query = `query { readMoves(hash: "${blobHash}") }`
+  const query = `query { readMoves(hash: "${blobHash}") { moves outcome } }`
   const gqlQuery = JSON.stringify({ query: query })
   return request(gqlQuery)
 }
 
 export function _isGameChain() {
   return request(`{ "query": "query { isGameChain }" }`)
+}
+
+// Triggers processing of pending incoming messages on the current chain
+export function syncChain() {
+  const mutation = `mutation { sync }`
+  const query = buildGraphQLQuery(mutation)
+  return request(query)
 }
 
 export function getGameChainInfo() {
@@ -175,7 +182,6 @@ function buildGraphQLQuery(queryBody: string): string {
 /** ---------------------------------------Mutation---------------------- */
 
 export function hostTournament(input: TournamentInput) {
-  console.log('host', input)
   const m = `mutation { hostTournament(value: {
     organiserName: "${input.organiserName}",
     tournamentName: "${input.tournamentName}",
@@ -209,6 +215,12 @@ export function tournamentRegistration(
   tournamentChain: string
 ) {
   const mutation = `mutation { tournamentRegistration(tournamentId: "${tournamentId}", tournamentChain: "${tournamentChain}" ) }`
+  const query = buildGraphQLQuery(mutation)
+  return request(query)
+}
+
+export function startRound(tournamentId: string) {
+  const mutation = `mutation { startRound(tournamentId: "${tournamentId}") }`
   const query = buildGraphQLQuery(mutation)
   return request(query)
 }
@@ -273,6 +285,12 @@ export function resign() {
   return request(query)
 }
 
+export function claimForfeit() {
+  const mutation = `mutation { claimForfeit }`
+  const query = buildGraphQLQuery(mutation)
+  return request(query)
+}
+
 // Deletes chain metadata from user's state
 export function deleteInfo() {
   const mutation = `mutation { deleteChainMetadata }`
@@ -307,6 +325,40 @@ export function promotePiece(
   const mutation = `mutation { pawnPromotion(from: "${from}", to: "${to}", piece: "${piece}", promotedPiece: "${promoted_to}") }`
   const query = buildGraphQLQuery(mutation)
   request(query).then((res) => console.log(res))
+}
+
+// Generate wager token and schedule createWager operation
+// Returns encoded token that should be shared with opponent
+export function generateWagerToken(amount: string) {
+  const query = `query { generateWagerToken(amount: "${amount}") }`
+  const gqlQuery = buildGraphQLQuery(query)
+  return request(gqlQuery)
+}
+
+// Join a wager match using the token shared by creator
+export function joinWager(token: string) {
+  const query = `query { joinWager(tokenStr: "${token}") }`
+  const gqlQuery = buildGraphQLQuery(query)
+  return request(gqlQuery)
+}
+
+// Decode wager token on frontend to show details before joining
+export function decodeWagerToken(token: string): WagerTokenDetails | null {
+  try {
+    const decoded = atob(token)
+    return JSON.parse(decoded)
+  } catch {
+    return null
+  }
+}
+
+export interface WagerTokenDetails {
+  creator: {
+    value: string
+  }
+  amount: string
+  created_at: { micros: number }
+  expires_at: { micros: number }
 }
 
 export const storage = {

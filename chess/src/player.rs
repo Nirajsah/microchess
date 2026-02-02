@@ -3,7 +3,7 @@ use std::ops::Deref;
 /**
  * TODO(When a match is over the points update will be based on game type, i.e., Standard, Bullet, Blitz...)
 */
-use async_graphql::SimpleObject;
+use async_graphql::{InputObject, SimpleObject};
 use base64::{engine::general_purpose, Engine};
 use linera_sdk::linera_base_types::{AccountOwner, ChainId, DataBlobHash, TimeDelta};
 use serde::{Deserialize, Serialize};
@@ -53,7 +53,8 @@ pub struct PlayerInfo {
     pub ath: u32,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, SimpleObject)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, SimpleObject, InputObject)]
+#[graphql(input_name = "PlayerHashInput")]
 pub struct PlayerHash {
     value: String,
 }
@@ -79,7 +80,8 @@ impl Deref for PlayerHash {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject)]
+#[derive(Clone, Debug, Deserialize, Serialize, SimpleObject, InputObject)]
+#[graphql(input_name = "PlayersInput")]
 pub struct Players {
     pub player_1: PlayerHash,
     pub player_2: PlayerHash,

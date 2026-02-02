@@ -15,6 +15,8 @@ export type Scalars = {
   Float: { input: number; output: number; }
   /** A unique identifier for a user or an application. */
   AccountOwner: { input: any; output: any; }
+  /** A non-negative amount of tokens. */
+  Amount: { input: any; output: any; }
   /** The unique identifier (UID) of a chain. This is currently computed as the hash value of a ChainDescription. */
   ChainId: { input: any; output: any; }
   /** Hash of a Data Blob */
@@ -32,7 +34,13 @@ export type ChessService = {
   friendId?: Maybe<Scalars['String']['output']>;
   gameChain?: Maybe<Scalars['ChainId']['output']>;
   gameData: GameData;
+  /**
+   * Generate a wager token with encoded details (creator, amount, expiry)
+   * The token can be decoded on frontend to show wager details to joining player
+   */
+  generateWagerToken?: Maybe<Scalars['String']['output']>;
   isGameChain: Scalars['Boolean']['output'];
+  joinWager: Scalars['String']['output'];
   leaderboard: Array<Leaderboard>;
   /** called by the user/player_chain */
   matchHistoryAll: Array<MatchHistory>;
@@ -47,7 +55,7 @@ export type ChessService = {
   participants?: Maybe<Scalars['String']['output']>;
   profile?: Maybe<PlayerProfile>;
   /** Read moves from datablob */
-  readMoves: Array<Scalars['String']['output']>;
+  readMoves?: Maybe<MatchBlobData>;
   timer: PlayersTime;
   tournament?: Maybe<Tournament>;
   tournamentChains: Array<Scalars['ChainId']['output']>;
@@ -58,6 +66,16 @@ export type ChessService = {
 
 export type ChessServiceGameDataArgs = {
   player: Scalars['AccountOwner']['input'];
+};
+
+
+export type ChessServiceGenerateWagerTokenArgs = {
+  amount: Scalars['String']['input'];
+};
+
+
+export type ChessServiceJoinWagerArgs = {
+  tokenStr: Scalars['String']['input'];
 };
 
 
@@ -125,6 +143,12 @@ export type Match = {
   status: MatchStatus;
 };
 
+export type MatchBlobData = {
+  __typename?: 'MatchBlobData';
+  moves: Array<Scalars['String']['output']>;
+  outcome: Scalars['String']['output'];
+};
+
 export type MatchHistory = {
   __typename?: 'MatchHistory';
   blobHash: Scalars['DataBlobHash']['output'];
@@ -165,20 +189,29 @@ export enum NotificationType {
 
 export type OperationMutationRoot = {
   __typename?: 'OperationMutationRoot';
+  claimForfeit: Array<Scalars['Int']['output']>;
+  createWager: Array<Scalars['Int']['output']>;
   deleteChainMetadata: Array<Scalars['Int']['output']>;
   frGameHash: Array<Scalars['Int']['output']>;
   hostTournament: Array<Scalars['Int']['output']>;
+  joinWager: Array<Scalars['Int']['output']>;
   makeMove: Array<Scalars['Int']['output']>;
   markAllRead: Array<Scalars['Int']['output']>;
   newGame: Array<Scalars['Int']['output']>;
   pawnPromotion: Array<Scalars['Int']['output']>;
   profile: Array<Scalars['Int']['output']>;
   resign: Array<Scalars['Int']['output']>;
+  startRound: Array<Scalars['Int']['output']>;
   subscribe: Array<Scalars['Int']['output']>;
   tournamentRegistration: Array<Scalars['Int']['output']>;
   tournamentWithDraw: Array<Scalars['Int']['output']>;
   updateTournament: Array<Scalars['Int']['output']>;
   updateTournamentLocal: Array<Scalars['Int']['output']>;
+};
+
+
+export type OperationMutationRootCreateWagerArgs = {
+  token: WagerToken;
 };
 
 
@@ -189,6 +222,12 @@ export type OperationMutationRootFrGameHashArgs = {
 
 export type OperationMutationRootHostTournamentArgs = {
   value: TournamentInput;
+};
+
+
+export type OperationMutationRootJoinWagerArgs = {
+  player: PlayerHashInput;
+  token: WagerToken;
 };
 
 
@@ -209,6 +248,11 @@ export type OperationMutationRootPawnPromotionArgs = {
 
 export type OperationMutationRootProfileArgs = {
   name: Scalars['String']['input'];
+};
+
+
+export type OperationMutationRootStartRoundArgs = {
+  tournamentId: Scalars['String']['input'];
 };
 
 
@@ -243,6 +287,10 @@ export type Player = {
 export type PlayerHash = {
   __typename?: 'PlayerHash';
   value: Scalars['String']['output'];
+};
+
+export type PlayerHashInput = {
+  value: Scalars['String']['input'];
 };
 
 /** This struct is mainly used to display user profile to opponent player */
@@ -399,3 +447,14 @@ export enum Visibility {
   Private = 'PRIVATE',
   Public = 'PUBLIC'
 }
+
+/**
+ * Token shared between players to join a wager match
+ * Uses JSON encoding so frontend can decode and show details
+ */
+export type WagerToken = {
+  amount: Scalars['Amount']['input'];
+  createdAt: Scalars['Timestamp']['input'];
+  creator: PlayerHashInput;
+  expiresAt: Scalars['Timestamp']['input'];
+};

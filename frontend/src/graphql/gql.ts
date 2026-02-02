@@ -1,6 +1,7 @@
 /* eslint-disable */
-import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core'
+import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core';
 
+const documents: DocumentNode[] = [];
 /**
  * The gql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  *
@@ -13,11 +14,10 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
  * The query argument is unknown!
  * Please regenerate the types.
  */
-export function gql(source: string): unknown
+export function gql(source: string): unknown;
 
 export function gql(source: string) {
-  return (document as any)[source] ?? {}
+  return (documents as any)[source] ?? {};
 }
 
-export type DocumentType<TDocumentNode extends DocumentNode<any, any>> =
-  TDocumentNode extends DocumentNode<infer TType, any> ? TType : never
+export type DocumentType<TDocumentNode extends DocumentNode<any, any>> = TDocumentNode extends DocumentNode<infer TType, any> ? TType : never;

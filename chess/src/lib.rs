@@ -6,7 +6,7 @@ use chess_lib::{
     pieces::Color,
     ChessError,
 };
-use player::{PlayerInfo, PlayerProfile};
+use player::{PlayerHash, PlayerInfo, PlayerProfile};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 pub struct ChessAbi;
@@ -24,6 +24,8 @@ use linera_sdk::{
     linera_base_types::{AccountOwner, TimeDelta},
 };
 use tournament::{TournamentInput, TournamentUpdate};
+
+use crate::matches::WagerToken;
 
 impl ContractAbi for ChessAbi {
     type Operation = Operation;
@@ -81,7 +83,13 @@ pub enum Operation {
     FrGameHash {
         token: String,
     },
-
+    CreateWager {
+        token: WagerToken, // Encoded WagerToken
+    },
+    JoinWager {
+        token: WagerToken, // Same encoded WagerToken from creator
+        player: PlayerHash,
+    },
     // match operations
     MakeMove {
         from: String,
@@ -95,11 +103,16 @@ pub enum Operation {
         promoted_piece: String,
     },
     Resign,
+    ClaimForfeit, // Claim win when opponent times out (white never makes first move)
     DeleteChainMetadata,
     // basic user operations
     Subscribe,
     Profile {
         name: String,
+    },
+    /// Organizer calls this on tournament_chain to start a round after funding
+    StartRound {
+        tournament_id: String,
     },
 }
 
@@ -189,4 +202,5 @@ pub enum ChainType {
     PersonalChain,
     TournamentChain,
     FriendlyMatchChain,
+    GameChain,
 }

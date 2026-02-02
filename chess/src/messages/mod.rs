@@ -4,7 +4,7 @@ use chess::{
     player::{MatchHistory, PlayerHash, Players},
     tournament::{Tournament, TournamentInput, TournamentUpdate},
 };
-use linera_sdk::linera_base_types::{AccountOwner, ChainId, TimeDelta};
+use linera_sdk::linera_base_types::{AccountOwner, Amount, ChainId, TimeDelta};
 use serde::{Deserialize, Serialize};
 
 pub mod tournament;
@@ -61,5 +61,14 @@ pub enum Message {
     },
     Notification {
         notification: Notification,
+    },
+    CreateWager {
+        lobby_id: MatchId,
+        creator: PlayerHash,
+        amount: Amount,
+    },
+    JoinWager {
+        lobby_id: MatchId,
+        joiner: PlayerHash,
     },
 }

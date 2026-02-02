@@ -10,14 +10,17 @@ use crate::state::ChessState;
 use chess::{
     clock::Clock,
     leaderboard::{EloCalculator, LeaderboardManager},
-    matches::{MatchId, MatchMetaData, MatchType, TimedToken},
+    matches::{
+        MatchBlobData, MatchId, MatchMetaData, MatchType, RankedMatchEntry, TimedToken, WagerLobby,
+        WagerToken,
+    },
     notifications::Notification,
     player::{MatchHistory, Player, PlayerHash, PlayerProfile, Players},
     tournament::{
-        utils::{Participants, TParticipants},
-        TournamentInput,
+        utils::{Match, Participants, TParticipants, TournamentRound},
+        TournamentInput, TournamentStatus,
     },
-    ChessResponse, GameWrapper, InstantiationArgument, Operation,
+    ChainType, ChessResponse, GameWrapper, InstantiationArgument, Operation,
 };
 use chess_lib::{game::game::GameState, ChessError, Result};
 use event::{Event, EventType};
@@ -138,6 +141,7 @@ impl Contract for ChessContract {
                 ChessResponse::Ok
             }
             Operation::Resign => self.on_op_resign(),
+            Operation::ClaimForfeit => self.on_op_claim_forfeit(),
             // we take the hash, decode it and send a req to app_chain
             Operation::FrGameHash { token } => self.on_op_request_friendly_match(token),
             // Create a new hash for a friendly match
@@ -150,6 +154,9 @@ impl Contract for ChessContract {
                 piece,
                 promoted_piece,
             } => self.on_op_pawn_promotion(from, to, piece, promoted_piece),
+            Operation::StartRound { tournament_id } => self.on_op_start_round(tournament_id).await,
+            Operation::CreateWager { token } => self.on_op_create_wager(token),
+            Operation::JoinWager { token, player } => self.on_op_join_wager(token, player),
         }
     }
 
@@ -202,6 +209,14 @@ impl Contract for ChessContract {
                 game_chain,
                 notification,
             } => self.on_msg_handle_friendly_match_data(game_chain, notification),
+            Message::CreateWager {
+                lobby_id,
+                creator,
+                amount,
+            } => self.on_msg_create_wager(lobby_id, creator, amount),
+            Message::JoinWager { lobby_id, joiner } => {
+                self.on_msg_join_wager(lobby_id, joiner).await
+            }
         }
     }
 
@@ -245,6 +260,13 @@ impl Contract for ChessContract {
                             .await;
                     }
                     Event::TournamentChain { chain } => self.on_event_tournament_chain(chain),
+                    Event::TournamentUpdated {
+                        tournament_id: _,
+                        tournament_chain: _,
+                    } => {
+                        // Subscribers can refresh tournament data when they receive this event
+                        // The actual tournament data can be fetched from the tournament_chain
+                    }
                 }
             }
         }
@@ -277,18 +299,27 @@ impl ChessContract {
         self.state.clock.set(Clock::new(timer));
         let (player_1, player_2) = players.get_players();
         let game = GameWrapper::new(player_1, player_2, match_id, match_type);
+        self.state.chain_type.set(ChainType::GameChain);
 
         self.state.board.set(game);
     }
 
     /// Only App chain has the right to create a new game.
+    /// Filters out expired lobby entries (2+ minutes old) before matching.
     pub fn new_match(&mut self, player: PlayerHash) {
         assert_eq!(self.runtime.chain_id(), self.app_chain());
 
-        if let Some(lobby_player) = self.state.lobby.get_mut().pop() {
-            // here we start a new game for incoming player and player sitting in the lobby
+        let now = self.runtime.system_time();
+        let lobby = self.state.lobby.get_mut();
+
+        // Remove expired entries from lobby
+        lobby.retain(|entry| !entry.is_expired(now));
+
+        // Try to find a valid player to match with
+        if let Some(lobby_entry) = lobby.pop() {
+            // Match found - start a new game
             let players = Players {
-                player_1: lobby_player,
+                player_1: lobby_entry.player,
                 player_2: player,
             };
             let fee = Amount::from_str("1.").unwrap();
@@ -300,8 +331,9 @@ impl ChessContract {
                 self.send_game_chain_data_2players(game_chain_data, players, None);
             }
         } else {
-            // we put the player in lobby.
-            self.state.lobby.get_mut().push(player);
+            // No valid match found - add player to lobby with current timestamp
+            let entry = RankedMatchEntry::new(player, now);
+            self.state.lobby.get_mut().push(entry);
         }
     }
 
@@ -384,6 +416,8 @@ impl ChessContract {
         let app_chain = self.app_chain();
         assert_ne!(self.runtime.chain_id(), app_chain);
 
+        self.state.game_chain.set(None);
+
         self.runtime
             .send_message(app_chain, Message::FriendlyGameReq { players });
 
@@ -411,6 +445,117 @@ impl ChessContract {
                 now,
             );
             self.send_game_chain_data_2players(game_chain_data, players, Some(notification))
+        }
+    }
+
+    pub fn on_op_create_wager(&mut self, token: WagerToken) -> ChessResponse {
+        let creator = token.creator.clone();
+
+        let lobby_id = token.lobby_id();
+        let amount = token.amount;
+
+        let app_chain = self.app_chain();
+
+        self.runtime.send_message(
+            app_chain,
+            Message::CreateWager {
+                lobby_id,
+                creator,
+                amount,
+            },
+        );
+
+        ChessResponse::Ok
+    }
+
+    pub fn on_op_join_wager(&mut self, token: WagerToken, joiner: PlayerHash) -> ChessResponse {
+        let now = self.runtime.system_time();
+        if token.is_expired(now) {
+            return ChessResponse::Err(ChessError::Other("Wager token expired".to_string()));
+        }
+
+        let lobby_id = token.lobby_id();
+        let app_chain = self.app_chain();
+
+        self.state.game_chain.set(None);
+
+        self.runtime
+            .send_message(app_chain, Message::JoinWager { lobby_id, joiner });
+
+        ChessResponse::Ok
+    }
+
+    pub fn on_msg_create_wager(&mut self, lobby_id: MatchId, creator: PlayerHash, amount: Amount) {
+        assert_eq!(self.runtime.chain_id(), self.app_chain());
+        let now = self.runtime.system_time();
+
+        let lobby = WagerLobby {
+            lobby_id: lobby_id.clone(),
+            creator,
+            amount,
+            created_at: now,
+        };
+
+        log::info!("we have a wager match request");
+
+        // Store lobby
+        self.state
+            .wager_lobbies
+            .insert(&lobby_id, lobby)
+            .expect("Failed to insert wager lobby");
+    }
+
+    pub async fn on_msg_join_wager(&mut self, lobby_id: MatchId, joiner: PlayerHash) {
+        assert_eq!(self.runtime.chain_id(), self.app_chain());
+
+        // Find the lobby
+        let lobby_opt = self
+            .state
+            .wager_lobbies
+            .get(&lobby_id)
+            .await
+            .expect("Failed to get lobby");
+
+        if let Some(lobby) = lobby_opt {
+            // Found lobby! Start game.
+            let players = Players {
+                player_1: lobby.creator.clone(),
+                player_2: joiner,
+            };
+
+            let fee = Amount::from_str("1.").unwrap();
+            let match_time = TimeDelta::from_secs(900); // 15 mins
+
+            // Create game with FriendlyWager type
+            if let Some((game_chain_data, _)) = self.create_game_chain(
+                fee,
+                match_time,
+                MatchType::FriendlyWager(lobby.amount),
+                &players,
+            ) {
+                let now = self.runtime.system_time();
+                let app_chain = self.app_chain();
+                let notification = Notification::friendly_match(
+                    "Wager Match Started".to_string(),
+                    game_chain_data,
+                    format!("Wager amount: {}", lobby.amount),
+                    app_chain,
+                    now,
+                );
+                self.send_game_chain_data_2players(game_chain_data, players, Some(notification));
+
+                log::info!("we have a wager match started");
+
+                // Clean up lobby
+                self.state
+                    .wager_lobbies
+                    .remove(&lobby_id)
+                    .expect("Failed to remove lobby");
+            }
+        } else {
+            // Lobby not found or expired. In real app, we'd refund.
+            // For now, we just drop.
+            log::info!("Lobby not found or expired");
         }
     }
 
@@ -452,17 +597,35 @@ impl ChessContract {
         let app_chain = self.app_chain();
         let game = self.state.board.get();
 
-        // we don't send result about friendly matches
-        if game.match_type.unwrap() == MatchType::Friendly {
-            return;
-        }
-
-        // we don't send result about friendly matches
-        if let Some(match_type) = game.match_type {
+        if let Some(match_type) = &game.match_type {
             match match_type {
-                MatchType::Friendly => (),
+                MatchType::Friendly => (), // No result for pure friendly
+                MatchType::FriendlyWager(_amount) => {
+                    // For wager, we DO send result to AppChain so it can payout
+                    let blob_data = MatchBlobData {
+                        moves: game.moves_string.clone(),
+                        outcome: game.state.to_string(),
+                    };
+                    let bytes = postcard::to_allocvec(&blob_data).unwrap();
+                    let blob_hash = self.runtime.create_data_blob(bytes);
+
+                    if let Some(winner) = game.winner {
+                        let metadata = MatchMetaData {
+                            match_id: game.match_id.clone().unwrap(),
+                            match_type: *match_type, // This carries the amount!
+                            winner,
+                            blob_hash,
+                        };
+                        self.runtime
+                            .send_message(app_chain, Message::MatchEnd { metadata });
+                    }
+                }
                 MatchType::Random => {
-                    let bytes = postcard::to_allocvec(&game.moves_string).unwrap();
+                    let blob_data = MatchBlobData {
+                        moves: game.moves_string.clone(),
+                        outcome: game.state.to_string(),
+                    };
+                    let bytes = postcard::to_allocvec(&blob_data).unwrap();
 
                     let blob_hash = self.runtime.create_data_blob(bytes);
 
@@ -479,7 +642,11 @@ impl ChessContract {
                     }
                 }
                 MatchType::Tournament(tournament_chain) => {
-                    let bytes = postcard::to_allocvec(&game.moves_string).unwrap();
+                    let blob_data = MatchBlobData {
+                        moves: game.moves_string.clone(),
+                        outcome: game.state.to_string(),
+                    };
+                    let bytes = postcard::to_allocvec(&blob_data).unwrap();
 
                     let blob_hash = self.runtime.create_data_blob(bytes);
 
@@ -492,7 +659,7 @@ impl ChessContract {
                         };
 
                         self.runtime
-                            .send_message(tournament_chain, Message::MatchEnd { metadata });
+                            .send_message(*tournament_chain, Message::MatchEnd { metadata });
                     }
                 }
             }
@@ -533,7 +700,8 @@ impl ChessContract {
     }
 
     /// Use to create a mutli-owner-chain for tournament use only
-    pub fn create_chain(&mut self, creator: AccountOwner) -> ChainId {
+    /// Fee should be calculated by caller based on expected matches
+    pub fn create_chain(&mut self, creator: AccountOwner, fee: Amount) -> ChainId {
         let owner = AccountOwner::from_str(
             "0x58dbee7a91df69a6c836799585fdd0de6f93fd4f0f4a996513f5b903140bb6ca",
         )
@@ -548,9 +716,7 @@ impl ChessContract {
         let app_id = self.runtime.application_id();
         let permissions = ApplicationPermissions::new_single(app_id.forget_abi());
 
-        self.runtime
-            .open_chain(ownership, permissions, Amount::from_str("10.").unwrap())
-        // Ammount 20. for tournament_chain, to process matches
+        self.runtime.open_chain(ownership, permissions, fee)
     }
 
     ///  Executed on the app_chain, sending final updates to players after a match
@@ -558,6 +724,15 @@ impl ChessContract {
     pub async fn handle_match_end(&mut self, metadata: MatchMetaData) {
         match metadata.match_type {
             MatchType::Friendly => (), // we don't receive Friendly Match results from game_chain
+            MatchType::FriendlyWager(_amount) => {
+                assert_eq!(self.app_chain(), self.runtime.chain_id());
+                // Payout Logic
+                // In a full implementation, we transfer `amount * 2` to metadata.winner
+                // For now, we'll just log it or update a fictional balance if we had one.
+                // We could send a notification to the winner.
+
+                // Clean up any match tracking if needed.
+            }
             MatchType::Tournament(t_chain) => {
                 assert_eq!(t_chain, self.runtime.chain_id());
                 if let Some(participants) = self.state.participants.get_mut() {
@@ -575,6 +750,21 @@ impl ChessContract {
                     };
 
                     let _ = self.state.matches.remove(&metadata.match_id);
+
+                    // Check for round completion
+                    let matches_remaining = self.state.matches.indices().await.unwrap().len();
+                    if matches_remaining == 0 {
+                        let current_round = self.state.tournament_rounds.get().len() as u8;
+                        let tournament = self.state.tournament.get().as_ref().unwrap();
+                        let max_rounds = tournament.round_count.unwrap_or(3);
+
+                        if current_round < max_rounds {
+                            self.start_new_round(current_round + 1);
+                        } else {
+                            self.state.tournament.get_mut().as_mut().unwrap().status =
+                                TournamentStatus::Completed;
+                        }
+                    }
                 }
             }
             MatchType::Random => {
@@ -635,5 +825,53 @@ impl ChessContract {
                 }
             }
         }
+    }
+
+    pub fn start_new_round(&mut self, round: u8) {
+        let Some(tournament) = self.state.tournament.get() else {
+            return;
+        };
+
+        let timer = tournament.time_control.base_minutes;
+        let me = self.runtime.chain_id();
+
+        let (matches, player_map) = {
+            match self.state.generate_round_pairings(round) {
+                Some(m) => m,
+                None => return,
+            }
+        };
+
+        if matches.is_empty() {
+            if let Some(t) = self.state.tournament.get_mut() {
+                t.status = TournamentStatus::Completed;
+            }
+            return;
+        }
+
+        let fee = Amount::from_str("0.5").unwrap();
+        let time = TimeDelta::from_secs((timer * 60).into());
+
+        let mut matches_to = Vec::with_capacity(matches.len());
+
+        for m in matches {
+            let players = Players {
+                player_1: player_map.get(&m.player_a.to_string()).unwrap().clone(),
+                player_2: player_map.get(&m.player_b.to_string()).unwrap().clone(),
+            };
+
+            if let Some((chain, match_id)) =
+                self.create_game_chain(fee, time, MatchType::Tournament(me), &players)
+            {
+                self.state.matches.insert(&match_id, players).ok();
+
+                matches_to.push(Match {
+                    game_chain: Some(chain),
+                    ..m
+                });
+            }
+        }
+        let t_round = TournamentRound::new(round, matches_to);
+        self.state.tournament_rounds.get_mut().push(t_round);
     }
 }

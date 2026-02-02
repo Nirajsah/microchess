@@ -15,7 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { myTournament, updateTournament, updateTournamentLocal } from '@/api'
+import { myTournament, updateTournament, updateTournamentLocal, startRound } from '@/api'
 import { toast } from 'sonner'
 import {
   GameMode,
@@ -114,6 +114,23 @@ export default function ManageTournament() {
       return { ...prev, [name]: value }
     })
     setHasChanges(true)
+  }
+
+  const handleStartRound = async () => {
+    try {
+      // Backend will determine the correct round number based on tournament state
+      await startRound(tournament.tournamentId)
+      toast.success('Round started successfully')
+      setHasChanges(false)
+      // Refetch tournament data to update status
+      const response = await myTournament(id!)
+      const data = JSON.parse(response).data.myTournament
+      setTournament(data)
+      setFormData(data)
+    } catch (error) {
+      toast.error('Failed to start round')
+      console.error('Error starting round:', error)
+    }
   }
 
   const handleUpdate = () => {
@@ -542,20 +559,24 @@ export default function ManageTournament() {
                           value: TournamentStatus.RegistrationClosed,
                         },
                         {
-                          label: 'Start Tournament',
-                          value: TournamentStatus.InProgress,
-                        },
-                        {
                           label: 'Re-open Registration',
                           value: TournamentStatus.RegistrationOpen,
                         },
                       ]}
                     />
-                    {formData?.status === TournamentStatus.InProgress && (
-                      <p className="text-xs text-yellow-500 mt-1">
-                        ⚠️ Saving will start the tournament
+                    
+                    {/* Start Round Button */}
+                    <div className="pt-2">
+                      <Button
+                        onClick={handleStartRound}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        Start Next Round
+                      </Button>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Required funding: {(tournament.maxPlayers / 2) * 0.5} tokens
                       </p>
-                    )}
+                    </div>
                   </div>
                 )}
 

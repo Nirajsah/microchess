@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chess::{
     clock::Clock,
     leaderboard::{Leaderboard, LeaderboardManager},
-    matches::MatchId,
+    matches::{MatchId, RankedMatchEntry, WagerLobby},
     notifications::Notification,
     player::{MatchHistory, PlayerHash, PlayerProfile, Players},
     tournament::{
@@ -29,8 +29,8 @@ use linera_sdk::{
 pub struct ChessState {
     pub chain_type: RegisterView<ChainType>, // we don't need this
     /* App Chain */
-    /// Lobby to hold players for potential match
-    pub lobby: RegisterView<Vec<PlayerHash>>, // will be updated to include ranks.
+    /// Lobby to hold players for potential match with timestamp for expiry
+    pub lobby: RegisterView<Vec<RankedMatchEntry>>,
     /// Count the number of games played on microchess, only for app_chain
     pub game_count: RegisterView<u64>,
     /// Holds ongoing game data, only for app_chain
@@ -84,6 +84,7 @@ pub struct ChessState {
     */
     /// for app_chain and subscribers only
     pub tournament_chains: RegisterView<Vec<ChainId>>,
+    pub wager_lobbies: MapView<MatchId, WagerLobby>,
 }
 
 #[allow(dead_code)]
@@ -112,18 +113,18 @@ impl ChessState {
         self.participants.set(Some(participants))
     }
 
-    pub fn start_tournament_without_persist(
+    pub fn generate_round_pairings(
         &self,
-        _tournament_id: &str,
+        round: u8,
     ) -> Option<(Vec<Match>, HashMap<String, PlayerHash>)> {
         if let Some(participants) = self.participants.get() {
             match participants {
                 Participants::Swiss(p) => {
-                    let matches = p.generate_pairings(1);
+                    let matches = p.generate_pairings(round);
                     Some((matches, p.participants.clone()))
                 }
                 Participants::SingleElim(p) => {
-                    let matches = p.generate_pairings(1);
+                    let matches = p.generate_pairings(round);
                     Some((matches, p.participants.clone()))
                 }
             }
