@@ -80,7 +80,7 @@ async fn test_tournament() {
         tournament_name: "Teigjoeiagst".to_string(),
         tournament_description: None,
         tournament_format: TournamentFormat::Swiss,
-        max_players: 16,
+        max_players: 12,
         min_players: 4,
         match_type: MatchType::Bo1,
         round_count: None,

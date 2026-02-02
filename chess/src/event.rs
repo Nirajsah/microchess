@@ -34,6 +34,10 @@ pub enum Event {
     TournamentChain {
         chain: ChainId,
     },
+    TournamentUpdated {
+        tournament_id: String,
+        tournament_chain: ChainId,
+    },
 }
 
 #[derive(Debug, Deserialize, Serialize)]

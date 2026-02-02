@@ -7,7 +7,7 @@ use std::sync::Arc;
 use async_graphql::{EmptySubscription, Object, Request, Response, Schema, SimpleObject};
 use chess::{
     leaderboard::Leaderboard,
-    matches::TimedToken,
+    matches::{MatchBlobData, TimedToken, WagerToken},
     notifications::Notification,
     player::{MatchHistory, PlayerInfo, PlayerProfile, PlayersTime},
     tournament::{
@@ -19,7 +19,7 @@ use chess::{
 use linera_sdk::{
     abi::WithServiceAbi,
     graphql::GraphQLMutationRoot,
-    linera_base_types::{AccountOwner, ChainId, DataBlobHash},
+    linera_base_types::{AccountOwner, Amount, ChainId, DataBlobHash, TimeDelta},
     views::View,
     Service, ServiceRuntime,
 };
@@ -105,7 +105,7 @@ impl ChessService {
     }
 
     async fn is_game_chain(&self) -> bool {
-        self.state.board.get().match_id.is_some()
+        self.state.chain_type.get() == &ChainType::GameChain
     }
 
     async fn mv_string(&self) -> &Vec<String> {
@@ -169,8 +169,9 @@ impl ChessService {
     }
 
     /// Read moves from datablob
-    async fn read_moves(&self, hash: DataBlobHash) -> Vec<String> {
-        postcard::from_bytes::<Vec<String>>(&self.runtime.read_data_blob(hash)).unwrap_or_default()
+    async fn read_moves(&self, hash: DataBlobHash) -> Option<MatchBlobData> {
+        let bytes = self.runtime.read_data_blob(hash);
+        postcard::from_bytes::<MatchBlobData>(&bytes).ok()
     }
 
     async fn my_tournaments(&self) -> Vec<Tournament> {
@@ -239,5 +240,64 @@ impl ChessService {
 
     async fn tournament_round(&self) -> Option<&TournamentRound> {
         self.state.tournament_rounds.get().last()
+    }
+
+    /// Generate a wager token with encoded details (creator, amount, expiry)
+    /// The token can be decoded on frontend to show wager details to joining player
+    async fn generate_wager_token(&self, amount: String) -> Option<String> {
+        use chess::matches::WagerToken;
+        use std::str::FromStr;
+
+        let amount = Amount::from_str(&amount).ok()?;
+        let now = self.runtime.system_time();
+
+        if let Some(profile) = self.state.profile.get() {
+            let creator = profile.hash()?;
+            let token = WagerToken::new(
+                creator,
+                amount,
+                now.saturating_add(TimeDelta::from_secs(120)),
+            );
+
+            let encoded = token.encode();
+
+            self.runtime
+                .schedule_operation(&Operation::CreateWager { token });
+
+            Some(encoded)
+        } else {
+            None
+        }
+    }
+
+    async fn join_wager(&self, token_str: String) -> String {
+        // Get player hash first
+        let player_hash = if let Some(profile) = self.state.profile.get() {
+            match profile.hash() {
+                Some(hash) => hash,
+                None => return "Failed to get player hash".to_string(),
+            }
+        } else {
+            return "Player not found".to_string();
+        };
+
+        // Decode and validate token
+        let token = match WagerToken::decode(&token_str) {
+            Some(t) => t,
+            None => return "Invalid wager token".to_string(),
+        };
+
+        let now = self.runtime.system_time();
+        if token.is_expired(now) {
+            return "Wager token expired".to_string();
+        }
+
+        // Schedule the join wager operation with original token string
+        self.runtime.schedule_operation(&Operation::JoinWager {
+            token,
+            player: player_hash,
+        });
+
+        "Success".to_string()
     }
 }

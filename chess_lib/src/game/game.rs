@@ -47,6 +47,7 @@ pub enum GameState {
     Checkmate,
     Stalemate,
     Resign,
+    Forfeit,
     Ended,
 }
 
@@ -58,6 +59,7 @@ impl Display for GameState {
             GameState::Checkmate => "Checkmate",
             GameState::Stalemate => "Stalemate",
             GameState::Resign => "Resign",
+            GameState::Forfeit => "Forfeit",
             GameState::Ended => "Ended",
         };
         write!(f, "{}", g)

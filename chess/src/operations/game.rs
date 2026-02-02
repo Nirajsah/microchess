@@ -25,6 +25,39 @@ impl ChessContract {
         ChessResponse::Ok
     }
 
+    /// Allows the non-active player (e.g., black when white never moves) to claim a win
+    /// when the active player's clock has expired.
+    pub fn on_op_claim_forfeit(&mut self) -> ChessResponse {
+        assert_ne!(self.runtime.chain_id(), self.app_chain());
+
+        let clock = self.state.clock.get();
+        let block_time = self.runtime.system_time();
+        let board = self.state.board.get();
+        let active_player = board.active_player;
+
+        // The claimer must NOT be the active player
+        let claimer = self.runtime.authenticated_signer().unwrap();
+        let active_player_account = board.players[active_player.index()].unwrap();
+
+        if claimer == active_player_account {
+            return ChessResponse::Err(ChessError::new("Cannot claim forfeit as active player"));
+        }
+
+        // Check if active player's time has expired
+        if !clock.timed_out(block_time, active_player) {
+            return ChessResponse::Err(ChessError::new("Active player still has time remaining"));
+        }
+
+        // Award win to claimer (the non-active player)
+        let board = self.state.board.get_mut();
+        board.winner = Some(claimer);
+        board.state = GameState::Forfeit;
+
+        self.send_result();
+
+        ChessResponse::Ok
+    }
+
     /// NEED work, we don't want to encode everytime we send a request, should only send necessary data to app_chain
     pub fn on_op_request_friendly_match(&mut self, token: String) -> ChessResponse {
         let id = self.runtime.authenticated_signer().unwrap();
@@ -41,7 +74,12 @@ impl ChessContract {
         };
 
         if let Some(hash) = player {
-            let decoded: PlayerHash = TimedToken::decode_token(&token, now).unwrap();
+            let decoded_opt = TimedToken::decode_token(&token, now);
+            if decoded_opt.is_none() {
+                return ChessResponse::Err(ChessError::new("Invalid or expired token"));
+            }
+            let decoded = decoded_opt.unwrap();
+
             let players = Players {
                 player_1: decoded,
                 player_2: hash,
@@ -80,6 +118,8 @@ impl ChessContract {
             self.state.profile.set(Some(p.clone()));
             p.hash()
         };
+
+        self.state.game_chain.set(None);
 
         if let Some(hash) = player {
             self.runtime
