@@ -99,6 +99,7 @@ export interface MatchData {
   onEnd?: () => void
   onStop?: () => void
   isPlaying?: boolean
+  outcome?: string | null
 }
 
 const RightSideMenu: React.FC<MatchData> = (matchData: MatchData) => {
@@ -142,16 +143,19 @@ export default function ReplayBoard() {
   const resetBoard = useReplayStore((s) => s.resetBoard)
   const [moves, setMoves] = React.useState<string[]>([])
   const [isPlaying, setIsPlaying] = React.useState(false)
+
   const [san, setSan] = React.useState<string[]>([])
+  const [outcome, setOutcome] = React.useState<string | null>(null)
 
   useEffect(() => {
     const fetchSanFromBlob = async () => {
       try {
         const response = await getSanFromBlob(id!)
         const data = JSON.parse(response).data.readMoves
-        setSan(data)
+        setSan(data.moves)
+        setOutcome(data.outcome)
       } catch (error) {
-        console.error('Error fetching my tournaments:', error)
+        console.error('Error fetching san:', error)
       }
     }
     fetchSanFromBlob()
@@ -282,6 +286,7 @@ export default function ReplayBoard() {
               onStart={handleStart}
               onEnd={handleEnd}
               isPlaying={isPlaying}
+              outcome={outcome}
             />
           </div>
         </div>

@@ -70,6 +70,11 @@ export interface Options extends ChainListenerConfig {
      */
     waitForOutgoingMessages?: boolean;
     /**
+     * Whether to allow creating blocks in the fast round. Fast blocks have lower latency but
+     * must be used carefully so that there are never any conflicting fast block proposals.
+     */
+    allowFastBlocks?: boolean;
+    /**
      * (EXPERIMENTAL) Whether application services can persist in some cases between queries.
      */
     longLivedServices?: boolean;
@@ -168,6 +173,9 @@ export interface ChainListenerConfig {
     delayAfterMs?: number;
 }
 
+/**
+ * A blanket policy to apply to all messages by default.
+ */
 export type BlanketMessagePolicy = "Accept" | "Reject" | "Ignore";
 
 export type ApplicationId = string;
@@ -415,6 +423,10 @@ export interface InitOutput {
   readonly chain_addOwner: (a: number, b: any, c: number) => any;
   readonly chain_validatorVersionInfo: (a: number) => any;
   readonly chain_application: (a: number, b: number, c: number) => any;
+  readonly __wbg_faucet_free: (a: number, b: number) => void;
+  readonly faucet_new: (a: number, b: number) => number;
+  readonly faucet_createWallet: (a: number) => any;
+  readonly faucet_claimChain: (a: number, b: number, c: any) => any;
   readonly __wbg_secret_free: (a: number, b: number) => void;
   readonly secret_set: (a: number, b: number, c: number, d: any) => any;
   readonly secret_get: (a: number, b: number, c: number) => any;
@@ -423,10 +435,6 @@ export interface InitOutput {
   readonly wallet_get: () => any;
   readonly wallet_readJsWallet: () => any;
   readonly wallet_save_to_storage: (a: number, b: number) => any;
-  readonly __wbg_faucet_free: (a: number, b: number) => void;
-  readonly faucet_new: (a: number, b: number) => number;
-  readonly faucet_createWallet: (a: number) => any;
-  readonly faucet_claimChain: (a: number, b: number, c: any) => any;
   readonly __wbg_client_free: (a: number, b: number) => void;
   readonly client_new: (a: number, b: any, c: number) => any;
   readonly client_assignChain: (a: number, b: any, c: any) => any;
@@ -457,12 +465,13 @@ export interface InitOutput {
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_export_7: WebAssembly.Table;
   readonly __externref_table_dealloc: (a: number) => void;
-  readonly closure1073_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure1337_externref_shim: (a: number, b: number, c: any) => void;
-  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__haf1205b389f3f51f: (a: number, b: number) => void;
+  readonly closure939_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure1383_externref_shim: (a: number, b: number, c: any) => void;
+  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h593d8abe4afeb8a2: (a: number, b: number) => void;
+  readonly closure2821_externref_shim: (a: number, b: number, c: any) => void;
   readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h18ca806deb6aeb38_multivalue_shim: (a: number, b: number) => [number, number];
-  readonly closure3477_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure4002_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly closure3404_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure4053_externref_shim: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_thread_destroy: (a?: number, b?: number, c?: number) => void;
   readonly __wbindgen_start: (a: number) => void;
 }

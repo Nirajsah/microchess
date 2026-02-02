@@ -175,21 +175,28 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
 
     if (!server || !ready)
       return { success: false, error: 'Server is not ready..' }
-    const chain = await server.assign(chainId)
-    abortNotificationHandler()
-    const aborter = chain.onNotification((data: any) => {
-      set((state) => (state.notification = data))
-    })
-    set({
-      activeClient: chain,
-      refetch: !refetch,
-      notificationHandler: aborter,
-      activeApplication: null,
-      chainClients: chainClients.set(chainId as ChainId, chain),
-      activeChain: chainId as ChainId,
-    })
 
-    return { success: true, result: 'Chain Assigned' }
+    try {
+      const chain = await server.assign(chainId)
+      abortNotificationHandler()
+
+      const aborter = chain.onNotification((data: any) => {
+        set((state) => (state.notification = data))
+      })
+
+      set({
+        activeClient: chain,
+        refetch: !refetch,
+        notificationHandler: aborter,
+        activeApplication: null,
+        chainClients: chainClients.set(chainId as ChainId, chain),
+        activeChain: chainId as ChainId,
+      })
+
+      return { success: true, result: 'Chain Assigned' }
+    } catch (error) {
+      return { success: false, error: String(error) }
+    }
   },
 
   setDefaultAsync: async (chainId: string): Promise<Result<string>> => {
@@ -207,35 +214,30 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   setInUseAsync: async (chainId: string) => {
     const { server, chainClients, refetch, abortNotificationHandler } = get()
 
-    const chainClient = chainClients.get(chainId as ChainId)
+    const APP_ID = import.meta.env.VITE_MICROCHESS_APPLICATION_ID
+    let chainClient = chainClients.get(chainId as ChainId)
+
     if (!chainClient) {
       if (!server) throw new Error('Something is wrong..., Server is missing')
-      abortNotificationHandler()
-      const chainClient = await server.initChainClient(chainId as ChainId)
-      const aborter = chainClient.onNotification((data: any) => {
-        set((state) => (state.notification = data))
-      })
-      set({
-        activeClient: chainClient,
-        chainClients: chainClients.set(chainId as ChainId, chainClient),
-        refetch: !refetch,
-        notificationHandler: aborter,
-        activeApplication: null,
-        activeChain: chainId as ChainId,
-      })
-    } else {
-      abortNotificationHandler()
-      const aborter = chainClient.onNotification((data: any) => {
-        set((state) => (state.notification = data))
-      })
-      set({
-        activeClient: chainClient,
-        refetch: !refetch,
-        notificationHandler: aborter,
-        activeApplication: null,
-        activeChain: chainId as ChainId,
-      })
+      chainClient = await server.initChainClient(chainId as ChainId)
     }
+
+    abortNotificationHandler()
+    const aborter = chainClient.onNotification((data: any) => {
+      set((state) => (state.notification = data))
+    })
+
+    // Create application instance for this chain
+    const application = await chainClient.application(APP_ID)
+
+    set({
+      activeClient: chainClient,
+      chainClients: chainClients.set(chainId as ChainId, chainClient),
+      refetch: !refetch,
+      notificationHandler: aborter,
+      activeApplication: application,
+      activeChain: chainId as ChainId,
+    })
   },
 
   abortNotificationHandler: () => {
